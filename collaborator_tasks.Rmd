@@ -1,0 +1,43 @@
+---
+title: "Collaborator_Tasks"
+author: "Leroy_Bondhus"
+date: "February 16, 2021"
+output: html_document
+---
+
+## USING THIS FILE FOR ORGANIZATION
+* Feel free to add ToDo items to you own list
+* If adding ToDo item to someone else's list add your name to request in parentheses
+* This file is NOT meant to track progress (task requestor, usually Leroy, can remove items from completed section. This section only so updates are more easily noticed. )
+
+## Leroy's Tasks
+### To Do
+* Organize github repository for collaboration
+* Check that Roshni and Yenifer can pull,edit,push,commit to this document
+* Check that Roshni and Yenifer can create their own Rmd workspaces in this repo
+* Assign specific tasks to Roshni and Yenifer 
+
+### Completed
+*
+---------------
+
+## Roshni's Tasks
+### ToDo
+* Move this item to completed (Leroy)
+
+### Completed
+*
+---------------
+
+
+## Yenifer's Tasks
+### ToDo
+* Move this item to completed (Leroy)
+
+### Completed
+* 
+---------------
+
+
+
+
