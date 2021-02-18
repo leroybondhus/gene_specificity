@@ -32,10 +32,10 @@ output: html_document
 
 ## Yenifer's Tasks
 ### ToDo
-* Move this item to completed (Leroy)
+* 
 
 ### Completed
-* 
+* Move this item to completed (Leroy)
 ---------------
 
 
