@@ -34,7 +34,7 @@ output: html_document
 * Move this item to completed (Leroy)
 * updated 
 * updated again
-* and again
+* changed
 ---------------
 
 
