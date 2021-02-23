@@ -23,8 +23,12 @@ output: html_document
 
 ## Roshni's Tasks
 ### ToDo
+* Draft specificy measure comparison methods section on shared google doc (Draft of Paper) (Leroy) 
 * research different specificity measures
+*     + make table of measure's 1.name or symbol 2.equation 3.source publication 4. notes (shoot for ~2-5) (Leroy)
+*     + write functions for each measure for ease of use (Leroy)
 * functionalize dropping different tissues from the dataset and being able to calculate specificity score
+*     + draft some potential measurements and figures that can be used to compare results (Leroy)
 
 ### Completed
 * Move this item to completed (Leroy)
@@ -33,7 +37,13 @@ output: html_document
 
 ## Yenifer's Tasks
 ### ToDo
-* 
+* Draft sample similarity/distance comparison methods section of shared google doc (Draft of Paper) (Leroy)
+* Literature search for sample similarity/distance for gene expression (Leroy)
+*     + make table of measure's 1.name or symbol 2.equation 3.source publication 4. notes (shoot for ~2-5) (Leroy)
+*         +include binary specificity cutoff (Leroy)
+*     + write functions for each measure for ease of use (Leroy)
+* Write functions to generate a tree from a distance matrix (Leroy)
+*     + requires use of -list- objects in R, discuss with Leroy
 
 ### Completed
 * Move this item to completed (Leroy)
