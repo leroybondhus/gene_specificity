@@ -32,9 +32,6 @@ output: html_document
 
 ### Completed
 * Move this item to completed (Leroy)
-* updated 
-* updated again
-* changed
 ---------------
 
 
