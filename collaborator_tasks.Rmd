@@ -26,7 +26,7 @@ output: html_document
 * Move this item to completed (Leroy)
 
 ### Completed
-*
+* Move this item to completed (Leroy)
 ---------------
 
 
