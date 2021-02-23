@@ -23,7 +23,8 @@ output: html_document
 
 ## Roshni's Tasks
 ### ToDo
-*
+* research different specificity measures
+* functionalize dropping different tissues from the dataset and being able to calculate specificity score
 
 ### Completed
 * Move this item to completed (Leroy)
