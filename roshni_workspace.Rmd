@@ -8,3 +8,18 @@ curate_te_matrix <- function(te_matrix, drop_col_name){
   te_matrix <- te_matrix[-a]
   return(te_matrix)
 }
+
+# function that calculates SDs of genes given a tissue expression matrix
+z_score <- function(te_matrix){
+  mean_expression <- rowMeans(te_matrix)
+  std_expression <- apply(te_matrix,1,sd)
+  std_matrix <- (te_matrix - mean_expression) / std_expression
+  std_matrix[is.na(std_matrix)] <- -1
+  return(std_matrix)
+}
+
+# function that outputs a list of genes above a specific SD cutoff given a matrix of standard deviations
+specific_genes_by_zscore <- function(std_matrix, tissue_of_interest, std_cutoff){
+  index <- which(colnames(std_matrix)==tissue_of_interest)
+  print(which(std_matrix[,index]>std_cutoff))
+}
