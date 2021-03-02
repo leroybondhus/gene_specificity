@@ -4,7 +4,80 @@ output: html_document
 ---
 
 ```{r}
+{
+GTEX.data <-read.csv("/Users/yeniferhernandez/Desktop/Arboleda_Lab/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct\ 2.txt", header = T, sep="\t")  
+num_cols <- unlist(lapply(GTEX.data , is.numeric))
+GTEX.data_num <- GTEX.data[ , num_cols]           
+mean_exp <- apply(GTEX.data_num , 1, mean) 
+median_exp <- apply(GTEX.data_num , 1, median)
+sd_exp <- apply(GTEX.data_num , 1, sd)
+GTEX_log <- log(GTEX.data_num + 1)# log of GTEX gene expression 
+mean_log <- apply(GTEX_log , 1, mean) 
+sd_log <- apply(GTEX_log , 1, sd) 
+sd_log<- abs(sd_log)
+median_log <- apply(GTEX_log , 1, median)
+gene_sd <- cbind.data.frame(GTEX.data[,2],sd_log) 
+colnames(gene_sd) <- c("Description","Standard Deviation Log") 
+Name <- GTEX.data[,1]
 
 
+#cosine similarity
+cosine_similarity <- function(data_set,a,b) {
+product_ab <- data_set[,a] * data_set[,b]
+sum_ab <- sum(product_ab)
+magnitude_a <- data_set[,a]^2
+magnitude_a <- sum(magnitude_a)
+magn_a <- sqrt(magnitude_a)
+magnitude_b <- data_set[,b]^2
+magnitude_b <- sum(magnitude_b)
+magn_b <- sqrt(magnitude_b)
+magn_c <- magn_a * magn_b
+cos_sin <-  sum_ab/magn_c
+cos_sin
+}
+
+#cosine dissimilarity 
+cosine_dissimilarity <- function(data_set,a,b) {
+product_ab <- data_set[,a] * data_set[,b]
+sum_ab <- sum(product_ab)
+magnitude_a <- data_set[,a]^2
+magnitude_a <- sum(magnitude_a)
+magn_a <- sqrt(magnitude_a)
+magnitude_b <- data_set[,b]^2
+magnitude_b <- sum(magnitude_b)
+magn_b <- sqrt(magnitude_b)
+magn_c <- magn_a * magn_b
+cos_sin <-  sum_ab/magn_c
+cos_sin <- 1 - cos_sin
+cos_sin
+}
+
+#Pearson's coefficients 
+pearson_coefficient <- function(data_set,x,y) {
+  mean_x <- mean(data_set[,x])
+  mean_y <- mean(data_set[,y])
+  minus_x <- (data_set[,x] - mean_x)
+  minus_y <- (data_set[,y] - mean_y)
+  product_xy <- minus_x*minus_y
+  sum_xy<- sum(product_xy)
+  power_x <- minus_x ^ 2 
+  sum_power_x <-sum(power_x)
+  square_x <- sqrt(sum_power_x)
+  power_y <- minus_y ^ 2
+  sum_power_y <-sum(power_y)
+  square_y <- sqrt(sum_power_y)
+  product_square <- square_x*square_y
+  PE <- sum_xy/product_square
+  PE
+}
+
+
+
+
+
+
+
+
+}
 
 ```
