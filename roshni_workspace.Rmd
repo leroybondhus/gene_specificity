@@ -2,4 +2,9 @@
 title: "roshni_workspace"
 output: html_document
 ---
-
+# function that drops certain tissues from gene_x_expression matrix
+curate_te_matrix <- function(te_matrix, drop_col_name){
+  a <- which(colnames(te_matrix)==drop_col_name)
+  te_matrix <- te_matrix[-a]
+  return(te_matrix)
+}
