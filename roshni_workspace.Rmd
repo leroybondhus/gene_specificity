@@ -2,13 +2,16 @@
 title: "roshni_workspace"
 output: html_document
 ---
+```{r}
 # function that drops certain tissues from gene_x_expression matrix
 curate_te_matrix <- function(te_matrix, drop_col_name){
   a <- which(colnames(te_matrix)==drop_col_name)
   te_matrix <- te_matrix[-a]
   return(te_matrix)
 }
-
+```
+```{r}
+# Z-SCORE FUNCTION
 # function that calculates SDs of genes given a tissue expression matrix
 z_score <- function(te_matrix){
   mean_expression <- rowMeans(te_matrix)
@@ -18,8 +21,47 @@ z_score <- function(te_matrix){
   return(std_matrix)
 }
 
-# function that outputs a list of genes above a specific SD cutoff given a matrix of standard deviations
+# function that outputs a list of gene indices above a specific SD cutoff given a matrix of standard deviations
 specific_genes_by_zscore <- function(std_matrix, tissue_of_interest, std_cutoff){
   index <- which(colnames(std_matrix)==tissue_of_interest)
   print(which(std_matrix[,index]>std_cutoff))
 }
+```
+```{r}
+# COUNTS FUNCTION
+specificity_by_counts <- function(te_matrix,gene_of_interest_index,expressed_cutoff,specific_cutoff){
+  a <- which(te_matrix[gene_of_interest_index,]>=expressed_cutoff)
+  if(length(a)<=specific_cutoff){
+    print(colnames(te_matrix[a]))
+  }
+}
+```
+```{r}
+# TAU FUNCTION
+specificity_by_tau <- function(te_matrix, gene_of_interest_index){
+   x_hat <- (te_matrix[gene_of_interest_index,]) / (max(te_matrix[gene_of_interest_index,]))
+   tau <- sum(x_hat) / (ncol(te_matrix)-2)
+   print(tau)
+}
+```
+```{r}
+# TISSUE SPECIFICITY INDEX FUNCTION
+specificity_by_tsi <- function(te_matrix,gene_of_interest_index){
+  a <- max(te_matrix[gene_of_interest_index,])
+  b <- sum(te_matrix[gene_of_interest_index,])
+  tsi <- a/b
+  print(tsi)
+}
+```
+```{r}
+# GINI FUNCTION
+specificity_by_gini <- function(te_matrix,gene_of_interest_index){
+  xi <- sort(te_matrix[gene_of_interest_index,],decreasing = FALSE)
+  print(xi)
+  firstterm <- (ncol(te_matrix)+1) / ncol(te_matrix)
+  secondtermnum <- 2*sum(ncol(te_matrix)+1-(1:ncol(te_matrix)))*xi
+  secondtermden <- (ncol(te_matrix))*sum(xi)
+  gini <- firstterm - (secondtermnum/secondtermden)
+  print(gini)
+}
+```
