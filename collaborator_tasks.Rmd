@@ -24,18 +24,19 @@ output: html_document
 ## Roshni's Tasks
 ### ToDo
 * Draft specificy measure comparison methods section on shared google doc (Draft of Paper) (Leroy) 
-* research different specificity measures
-*     + make table of measure's 1.name or symbol 2.equation 3.source publication 4. notes (shoot for ~2-5) (Leroy)
-*     + write functions for each measure for ease of use (Leroy)
 * functionalize dropping different tissues from the dataset and being able to calculate specificity score
 *     + draft some potential measurements and figures that can be used to compare results (Leroy)
 
-### Progress
-* finished table comparing specificity scores
-* functionalized dropping different tissues from te matrix
+### Progress Since Last Meeting
+* function for dropping different tissues and calculating specificity scores is written as of 03/02/21
+* wrote functions for all specificity measures (03/09/21)
+* begun drafting methods section (03/09/21)
 
 ### Completed
 * Move this item to completed (Leroy)
+* research different specificity measures
+*     + make table of measure's 1.name or symbol 2.equation 3.source publication 4. notes (shoot for ~2-5) (Leroy)
+*     + write functions for each measure for ease of use (Leroy)
 ---------------
 
 
