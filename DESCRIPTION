@@ -1,0 +1,11 @@
+Package: gene_specificity_funcs
+Title: container for functions for gene specificity project
+Version: 0.0.1
+Authors@R: c(
+	person("Leroy","Bondhus", email = "bondh185@ucla.edu", role = c("cre", "aut"),
+	person("Roshni", "Varma", email = "", role = "aut"),
+	person("Yenifer", "Hernandez", email = "", role = "aut))
+Description:
+Depends: R ( >= 3.6.1)
+License:
+LazyData: true
