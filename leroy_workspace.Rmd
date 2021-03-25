@@ -1,0 +1,97 @@
+---
+title: "leroy_workspace"
+author: "Leroy Bondhus"
+date: "3/24/2021"
+output: html_document
+---
+
+
+### set up libraries
+```{r}
+library("devtools")
+library("roxygen2")
+library("usedist")
+```
+
+### building distance tree functions
+```{r}
+
+# simulate some genes
+genes <- letters[1:1000]
+samples <- paste("s", as.character(1:5), sep = "")
+mat <- matrix(nrow=length(genes), ncol=length(samples))
+for(i in 1:length(samples)){
+  mat[,i] <- rnorm(length(genes))
+}
+
+## let samples 2 and 3 be descendants of 1
+for(i in 2:3){
+  mat[,i] <- mat[,1] + rnorm(length(genes)) * 0.1 ## simulate technical noise 
+  gsamp <- sample(1:length(genes), sample(50:150, 1))  ##
+  mat[gsamp,i] <- rnorm(length(gsamp))
+}
+
+## calculate distance matrix
+dist_mat <- matrix(nrow = length(samples), ncol = length(samples))
+dist_mat <- dist(t(mat), diag = F, upper = F)
+dist_mat_norm <- dist_mat / max(dist_mat)  ## constrain domain of distance values to 0-1
+dist_df <- data.frame(t(combn(samples,2)), as.numeric(dist_mat_norm), stringsAsFactors = F)
+names(dist_df) <- c("sample1","sample2", "norm_distance")
+hist(dist_mat_norm,breaks = 1000)
+
+create_node <- function(name = "...", dist_to_parent = -1,
+                        left_child=NA, right_child=NA  ){
+  return(list(name=name, dist_to_parent=dist_to_parent,
+              left_child=left_child, right_child=right_child))
+                        }
+
+
+## dist_df is object passed and object that will control tree build
+dist_tree <- function(dist_df=dist_df){
+  samples <- unique(c(as.character(dist_df$sample1),
+                      as.character(dist_df$sample2)))
+  node_list <- list()
+  for(i in 1:length(samples)){
+    node_list[[samples[i]]] <- create_node(name=samples[i])
+  }
+  
+  parent_index <- 1
+  min_pair <- dist_df[which(dist_df$norm_distance==min(dist_df$norm_distance)),]
+  ## connect pair to a common parent node
+  left_child <- node_list[[min_pair$sample1]]; right_child <- node_list[[min_pair$sample2]]
+  left_child$dist_to_parent <- min_pair$norm_distance; right_child$dist_to_parent <- min_pair$norm_distance
+  parent_node <- create_node(name = paste("p",parent_index,sep = ""), left_child = left_child, right_child = right_child )
+  ## update dist_df to include new parent_node and pairwise distance (min distance to any child)
+  update_dist_df(dist_df=dist_df, new_parent_node=parent_node)
+
+}
+
+
+### test for whether or not any descendants of parent node have specified descendant_name
+### By default considers a node to be a descendant of itself. 
+### If self_descendant set to false, only child nodes and their descendants considered
+is_descendant <- function(parent_node, descendant_name, self_descendant = TRUE){
+  if(all(is.na(parent_node))){return(FALSE)}   ## base case: if node does not exist it has no descendants
+  if(parent_node$name == descendant_name & self_descendant==TRUE){return(TRUE)}
+  else(return( is_descendant(parent_node$left_child, descendant_name)
+               | is_descendant(parent_node$right_child, descendant_name)))
+}
+
+
+update_dist_df<-function(dist_df, new_parent_node){
+  samples <- unique(c(as.character(dist_df$sample1),
+                      as.character(dist_df$sample2)))
+  new_dist_df <- dist_df
+  ## test each samples for whether it is descendant of new parent node
+  descendants <- apply(as.array(samples), MARGIN=1, FUN=is_descendant, parent_node=parent_node)
+  samples[descendants]
+  
+  ## 
+  
+}
+
+
+
+prcomp(mat,scale = T)
+prgtex <- prcomp(gtex[,3:ncol(gtex)],scale = T)
+```
