@@ -11,12 +11,12 @@ output: html_document
 library("devtools")
 library("roxygen2")
 library("usedist")
-
+library("ggtree")
 ```
 
-```{r tree_helper_funcs}
+```{r hierarchical_tree_funcs}
 
-create_node <- function(name = "...", dist_to_parent = -1,
+LMB_htf.create_node <- function(name = "...", dist_to_parent = -1,
                         left_child=NA, right_child=NA  ){
   return(list(name=name, dist_to_parent=dist_to_parent,
               left_child=left_child, right_child=right_child))
@@ -27,15 +27,15 @@ create_node <- function(name = "...", dist_to_parent = -1,
 ### test for whether or not any descendants of parent node have specified descendant_name
 ### By default considers a node to be a descendant of itself. 
 ### If self_descendant set to false, only child nodes and their descendants considered
-is_descendant <- function(parent_node, descendant_name, self_descendant = TRUE){
+LMB_htf.is_descendant <- function(parent_node, descendant_name, self_descendant = TRUE){
   if(all(is.na(parent_node))){return(FALSE)}   ## base case: if node does not exist it has no descendants
   if(parent_node$name == descendant_name & self_descendant==TRUE){return(TRUE)}
-  else(return( is_descendant(parent_node$left_child, descendant_name)
-               | is_descendant(parent_node$right_child, descendant_name)))
+  else(return( LMB_htf.is_descendant(parent_node$left_child, descendant_name)
+               | LMB_htf.is_descendant(parent_node$right_child, descendant_name)))
 }
 
 ## return distance between two samples from dist_df
-pair_dist_from_dist_df <- function(dist_df, name1, name2 ){
+LMB_htf.pair_dist_from_dist_df <- function(dist_df, name1, name2 ){
   which <- which((dist_df$sample1 == name1 & dist_df$sample2 == name2) 
                  | (dist_df$sample1 == name2 & dist_df$sample2 == name1))
   return(dist_df[which,]$norm_distance)
@@ -43,13 +43,13 @@ pair_dist_from_dist_df <- function(dist_df, name1, name2 ){
 
 ## updates distance df to adjust for new_parent_node
 ## removes reference to new_parent_node descendants and replaces these with self reference
-## uses functions: is_descendant, pair_dist_from_dist_df
-update_dist_df<-function(dist_df, new_parent_node){
+## uses functions: LMB_htf.is_descendant, LMB_htf.pair_dist_from_dist_df
+LMB_htf.update_dist_df<-function(dist_df, new_parent_node){
   samples <- unique(c(as.character(dist_df$sample1),
                       as.character(dist_df$sample2)))
   
   ## test each samples for whether it is descendant of the new parent node
-  which_desc <- apply(as.array(samples), MARGIN=1, FUN=is_descendant, parent_node=new_parent_node)
+  which_desc <- apply(as.array(samples), MARGIN=1, FUN=LMB_htf.is_descendant, parent_node=new_parent_node)
   descendants <- samples[which_desc]
   not_descendants <- samples[!which_desc]
   
@@ -59,7 +59,7 @@ update_dist_df<-function(dist_df, new_parent_node){
   for(i in 1:nrow(new_par_combs)){
     ## for each sample that is not a descendant of the new parent, get the minimum distance to a sample that is a descendant
     new_par_combs$norm_distance[i] <- min(apply(as.array(descendants), MARGIN=1,
-                                         FUN=pair_dist_from_dist_df,
+                                         FUN=LMB_htf.pair_dist_from_dist_df,
                                          dist_df=dist_df, name1=levels(new_par_combs$sample2)[i]))
   }
   new_dist_df <- rbind(dist_df, new_par_combs)
@@ -71,23 +71,23 @@ update_dist_df<-function(dist_df, new_parent_node){
 }
 
 
-sum_dist_of_children <- function(node){
-  if(all(is.na(node$left_child)) & !all(is.na(node$right_child))){print("WARNING: Asymetric Node"); return(-Inf)}
+LMB_htf.sum_dist_of_children <- function(node){
+  if(all(is.na(node$left_child)) != all(is.na(node$right_child))){print("WARNING: Asymetric Node"); return(-Inf)}
   if(all(is.na(node$left_child)) & all(is.na(node$right_child))){return(0)} ## if no children, return 0 as sum of distances
-  left_sum <- node$left_child$dist_to_parent + sum_dist_of_children(node$left_child)
-  right_sum <- node$right_child$dist_to_parent + sum_dist_of_children(node$right_child)
-  if(left_sum != right_sum){print("WARNING: Asymetric Node"); return(-Inf)}
+  left_sum <- node$left_child$dist_to_parent + LMB_htf.sum_dist_of_children(node$left_child)
+  right_sum <- node$right_child$dist_to_parent + LMB_htf.sum_dist_of_children(node$right_child)
+  if( abs(left_sum - right_sum) > 1e-10 ){print("WARNING: Asymetric Node"); return(-Inf)}  ## test for equality sometimes fails, test diff less than small number
   else(return(left_sum))
 }
 
 
 ## dist_df is object passed and object that will control tree build
-dist_tree <- function(dist_df=dist_df, is_rooted=F){
+LMB_htf.dist_tree <- function(dist_df=dist_df, is_rooted=F){
   samples <- unique(c(as.character(dist_df$sample1),
                       as.character(dist_df$sample2)))
   node_list <- list()
   for(i in 1:length(samples)){
-    node_list[[samples[i]]] <- create_node(name=samples[i])
+    node_list[[samples[i]]] <- LMB_htf.create_node(name=samples[i])
   }
   
   parent_index <- 1
@@ -97,16 +97,16 @@ dist_tree <- function(dist_df=dist_df, is_rooted=F){
     if(nrow(min_pair) > 1){print("WARNING: tie in minimum pair")}
     ## connect pair to a common parent node
     left_child <- node_list[[min_pair$sample1]]; right_child <- node_list[[min_pair$sample2]]
-    left_child$dist_to_parent <- min_pair$norm_distance - sum_dist_of_children(left_child); 
-    right_child$dist_to_parent <- min_pair$norm_distance - sum_dist_of_children(right_child);
-    parent_node <- create_node(name = paste("p",parent_index,sep = ""), left_child = left_child, right_child = right_child )
+    left_child$dist_to_parent <- min_pair$norm_distance - LMB_htf.sum_dist_of_children(left_child); 
+    right_child$dist_to_parent <- min_pair$norm_distance - LMB_htf.sum_dist_of_children(right_child);
+    parent_node <- LMB_htf.create_node(name = paste("p",parent_index,sep = ""), left_child = left_child, right_child = right_child )
     
     ## update node list
     node_list <- node_list[which(names(node_list) != min_pair$sample1 & names(node_list) != min_pair$sample2 )]
     node_list[[parent_node$name]] <- parent_node
     
     ## update dist_df to include new parent_node and pairwise distance (min distance to any child)
-    dist_df <- update_dist_df(dist_df=dist_df, new_parent_node=parent_node)
+    dist_df <- LMB_htf.update_dist_df(dist_df=dist_df, new_parent_node=parent_node)
 
     ## repeat until dist_df is empty (which implies everything is connect)
     parent_index <- parent_index+1
@@ -117,10 +117,10 @@ dist_tree <- function(dist_df=dist_df, is_rooted=F){
   ### rooting might not be necessary for generality -- can also pull this out and build distance matrix with a root with dist to all samples set to 1.
   if(is_rooted){
     node_list$name <- "root"
-    node_list$p4$dist_to_parent <- 1 - sum_dist_of_children(node_list$p4) ## when rooted forces domain to cover 0-1 by making dist to root 1 for all samples
+    node_list$p4$dist_to_parent <- 1 - LMB_htf.sum_dist_of_children(node_list$p4) ## when rooted forces domain to cover 0-1 by making dist to root 1 for all samples
     return(node_list)
   }
-  parent_node$dist_to_parent <- 1 - sum_dist_of_children(parent_node)  ## distance is distance to an abstract root 
+  parent_node$dist_to_parent <- 1 - LMB_htf.sum_dist_of_children(parent_node)  ## distance is distance to an abstract root 
   return(parent_node)
 
 }
@@ -149,15 +149,22 @@ for(i in 2:3){
 dist_mat <- matrix(nrow = length(samples), ncol = length(samples))
 dist_mat <- dist(t(mat), diag = F, upper = F)
 dist_mat_norm <- dist_mat / max(dist_mat)  ## constrain domain of distance values to 0-1
-dist_df <- data.frame(t(combn(samples,2)), as.numeric(dist_mat_norm), stringsAsFactors = F)
-names(dist_df) <- c("sample1","sample2", "norm_distance")
+dist_df_temp <- data.frame(t(combn(samples,2)), as.numeric(dist_mat_norm), stringsAsFactors = F)
+names(dist_df_temp) <- c("sample1","sample2", "norm_distance")
 hist(dist_mat_norm,breaks = 1000)
 
 
-distance_tree <- dist_tree(dist_df = dist_df)
+distance_tree <- LMB_htf.dist_tree(dist_df = dist_df_temp)
 
 
+#### convert distance_tree to plottable format
+#### suggested packages: data.tree (convert between yaml)
+#### suggested plan: save distance tree as yaml for conversion
+####                 and then ggtree for plotting
 
 
+hclus <- hclust(dist_mat_norm)
+as.dendrogram(hclus)
+plot(hclus)
 
 ```
