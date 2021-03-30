@@ -12,10 +12,11 @@ library("devtools")
 library("roxygen2")
 library("usedist")
 library("ggtree")
+install("gene.specificity.funcs")
 ```
 
 ```{r hierarchical_tree_funcs}
-
+### ADDED TO PACKAGE (TRUE)
 LMB_htf.create_node <- function(name = "...", dist_to_parent = -1,
                         left_child=NA, right_child=NA  ){
   return(list(name=name, dist_to_parent=dist_to_parent,
@@ -23,7 +24,7 @@ LMB_htf.create_node <- function(name = "...", dist_to_parent = -1,
                         }
 
 
-
+### ADDED TO PACKAGE (TRUE)
 ### test for whether or not any descendants of parent node have specified descendant_name
 ### By default considers a node to be a descendant of itself. 
 ### If self_descendant set to false, only child nodes and their descendants considered
@@ -34,12 +35,14 @@ LMB_htf.is_descendant <- function(parent_node, descendant_name, self_descendant 
                | LMB_htf.is_descendant(parent_node$right_child, descendant_name)))
 }
 
+### ADDED TO PACKAGE (TRUE)
 ## return distance between two samples from dist_df
 LMB_htf.pair_dist_from_dist_df <- function(dist_df, name1, name2 ){
   which <- which((dist_df$sample1 == name1 & dist_df$sample2 == name2) 
                  | (dist_df$sample1 == name2 & dist_df$sample2 == name1))
   return(dist_df[which,]$norm_distance)
 }
+
 
 ## updates distance df to adjust for new_parent_node
 ## removes reference to new_parent_node descendants and replaces these with self reference
