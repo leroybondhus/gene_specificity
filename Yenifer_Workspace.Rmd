@@ -20,36 +20,136 @@ gene_sd <- cbind.data.frame(GTEX.data[,2],sd_log)
 colnames(gene_sd) <- c("Description","Standard Deviation Log") 
 Name <- GTEX.data[,1]
 
+#standard deviations 
+actual_sdev_matrix<- function(data,mean,sd,row_num,col_num,col_names) {
+actu_sdev <- matrix(0, nrow = row_num, ncol = col_num)
+for(j in 1:col_num) {
+  for(i in 1:row_num)  {
+   actu_sdev[i,j] <- (data[i,j] - mean[i])/sd[i]
+}      
+}
+actu_sdev <-replace(actu_sdev, is.na(actu_sdev), 0)
+n <- matrix(0, nrow = col_num, ncol = col_num)
+dot_product_matrix <- matrix(0, nrow = col_num, ncol = col_num)
+for(G1 in 1:col_num) {
+  for(G2 in 1:col_num)  {
+   n <- actu_sdev[,G1]*actu_sdev[,G2]
+   dot_product_matrix [G2,G1]<- sum(n)
+}
+}
+diag_val <- diag(dot_product_matrix )
+diag_matrix <- data.matrix(diag_val)
+simi_matrix<- matrix(0, nrow = col_num, ncol = col_num)
+for(G1 in 1:col_num) {
+  for(G2 in 1:col_num)  {
+ simi_matrix[G1,G2]<-  dot_product_matrix [G1,G2]/(max(diag_matrix [G1],diag_matrix [G2]))
+}
+}
+colnames(simi_matrix)<-colnames(col_names)
+rownames(simi_matrix)<-colnames(col_names)
+View(simi_matrix)
 
+
+}
 #cosine similarity
-cosine_similarity <- function(data_set,a,b) {
-product_ab <- data_set[,a] * data_set[,b]
-sum_ab <- sum(product_ab)
-magnitude_a <- data_set[,a]^2
-magnitude_a <- sum(magnitude_a)
-magn_a <- sqrt(magnitude_a)
-magnitude_b <- data_set[,b]^2
-magnitude_b <- sum(magnitude_b)
-magn_b <- sqrt(magnitude_b)
-magn_c <- magn_a * magn_b
-cos_sin <-  sum_ab/magn_c
-cos_sin
+cosine_similarity <- function(data_set,x,y) {
+product_xy <- data_set[,x] * data_set[,y]
+sum_xy <- sum(product_xy)
+magnitude_x <- data_set[,x]^2
+magnitude_x<- sum(magnitude_x)
+magn_x <- sqrt(magnitude_x)
+magnitude_y <- data_set[,y]^2
+magnitude_y <- sum(magnitude_y)
+magn_y <- sqrt(magnitude_y)
+magn_z <- magn_x * magn_y
+cos_sin <-  sum_xy/magn_z
+return(cos_sin)
 }
 
-#cosine dissimilarity 
-cosine_dissimilarity <- function(data_set,a,b) {
-product_ab <- data_set[,a] * data_set[,b]
-sum_ab <- sum(product_ab)
-magnitude_a <- data_set[,a]^2
-magnitude_a <- sum(magnitude_a)
-magn_a <- sqrt(magnitude_a)
-magnitude_b <- data_set[,b]^2
-magnitude_b <- sum(magnitude_b)
-magn_b <- sqrt(magnitude_b)
-magn_c <- magn_a * magn_b
-cos_sin <-  sum_ab/magn_c
-cos_sin <- 1 - cos_sin
-cos_sin
+#cosine similarity matrix 
+cosine_similarity_matrix <- function(data_set,col_num) {
+cosine_simi<- matrix(0, nrow = col_num, ncol = col_num)
+for(y in 1:54) {
+  for(x in 1:54)  {
+product_xy <- data_set[,x] * data_set[,y]
+sum_xy <- sum(product_xy)
+magnitude_x <- data_set[,x]^2
+magnitude_x<- sum(magnitude_x)
+magn_x <- sqrt(magnitude_x)
+magnitude_y <- data_set[,y]^2
+magnitude_y <- sum(magnitude_y)
+magn_y <- sqrt(magnitude_y)
+magn_z <- magn_x * magn_y
+cos_sin <-  sum_xy/magn_z
+colnames(cosine_simi)<-colnames(data_set)
+cosine_simi[x,y] <- cos_sin
+
+
+  }
+}
+View(cosine_simi)
+
+}
+#binary standard deviation
+actu_sdev_binary_matrix <- function(data,mean,sd,row_num,col_num,col_names,cutoff) {
+actu_sdev_binary<- matrix(0, nrow = row_num, ncol = col_num)
+for(j in 1:col_num) {
+  for(i in 1:row_num)  {
+   actu_sdev_binary[i,j] <- (data[i,j] - mean[i])/sd[i]
+
+}
+}
+actu_sdev_binary<- replace(actu_sdev_binary, is.na(actu_sdev_binary), 0)
+actu_sdev_binary[actu_sdev_binary <  cutoff] <- 0
+actu_sdev_binary[actu_sdev_binary >  cutoff] <- 1 
+
+n_binary <- matrix(0, nrow = col_num, ncol = col_num)
+dot_pro_matrix_binary <- matrix(0, nrow = col_num, ncol = col_num)
+for(G1 in 1:col_num) {
+  for(G2 in 1:col_num)  {
+   n_binary<- actu_sdev_binary[,G1]*actu_sdev_binary[,G2]
+   dot_pro_matrix_binary[G2,G1]<- sum(n_binary)
+}
+}
+diag_val_binary <- diag(dot_pro_matrix_binary) 
+diag_matrix_binary <- data.matrix(diag_val_binary)
+binary_simi_matrix <- matrix(0, nrow = col_num, ncol = col_num)
+
+for(G1 in 1:col_num) {
+  for(G2 in 1:col_num)  {
+ binary_simi_matrix [G1,G2]<- dot_pro_matrix_binary[G1,G2]/(max(diag_matrix_binary[G1],diag_matrix_binary[G2]))
+ }
+}
+
+colnames(binary_simi_matrix)<-colnames(col_names)
+rownames(binary_simi_matrix)<-colnames(col_names)
+View(binary_simi_matrix)
+
+}
+#Pearson's coefficients 
+pearson_coefficient_matrix <- function(data_set,col_num) {
+  pearson_matrix<- matrix(0, nrow = col_num, ncol = col_num)
+  for(y in 1:col_num) {
+     for(x in 1:col_num)  {
+  mean_x <- mean(data_set[,x])
+  mean_y <- mean(data_set[,y])
+  minus_x <- (data_set[,x] - mean_x)
+  minus_y <- (data_set[,y] - mean_y)
+  product_xy <- minus_x*minus_y
+  sum_xy<- sum(product_xy)
+  power_x <- minus_x ^ 2 
+  sum_power_x <-sum(power_x)
+  square_x <- sqrt(sum_power_x)
+  power_y <- minus_y ^ 2
+  sum_power_y <-sum(power_y)
+  square_y <- sqrt(sum_power_y)
+  product_square <- square_x*square_y
+  PE <- sum_xy/product_square
+  colnames(pearson_matrix)<-colnames(data_set)
+  pearson_matrix[x,y] <- PE
+}
+}
+View(pearson_matrix)
 }
 
 #Pearson's coefficients 
@@ -70,14 +170,15 @@ pearson_coefficient <- function(data_set,x,y) {
   PE <- sum_xy/product_square
   PE
 }
-
-
-
-
-
-
-
-
 }
+
+#cosine dissimilarity 
+cosine_dissimilarity <- function(data_set,x,y) {
+cos_sin <- 1 - cosine_similarity(data_set,x,y)
+return(cos_sin)
+}
+
+
+
 
 ```
