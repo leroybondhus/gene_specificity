@@ -4,7 +4,6 @@ output: html_document
 ---
 
 ```{r}
-{
 GTEX.data <-read.csv("/Users/yeniferhernandez/Desktop/Arboleda_Lab/gtex_medians_PC_only_wo_MT.csv", header = TRUE, sep=",")  
 num_cols <- unlist(lapply(GTEX.data , is.numeric))
 GTEX.data_num <- GTEX.data[ , num_cols]  
