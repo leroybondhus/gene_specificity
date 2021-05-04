@@ -5,9 +5,10 @@ output: html_document
 
 ```{r}
 {
-GTEX.data <-read.csv("/Users/yeniferhernandez/Desktop/Arboleda_Lab/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct\ 2.txt", header = T, sep="\t")  
+GTEX.data <-read.csv("/Users/yeniferhernandez/Desktop/Arboleda_Lab/gtex_medians_PC_only_wo_MT.csv", header = TRUE, sep=",")  
 num_cols <- unlist(lapply(GTEX.data , is.numeric))
-GTEX.data_num <- GTEX.data[ , num_cols]           
+GTEX.data_num <- GTEX.data[ , num_cols]  
+GTEX.data_num <- GTEX.data_num[,-1]
 mean_exp <- apply(GTEX.data_num , 1, mean) 
 median_exp <- apply(GTEX.data_num , 1, median)
 sd_exp <- apply(GTEX.data_num , 1, sd)
@@ -20,8 +21,33 @@ gene_sd <- cbind.data.frame(GTEX.data[,2],sd_log)
 colnames(gene_sd) <- c("Description","Standard Deviation Log") 
 Name <- GTEX.data[,1]
 
-#standard deviations 
-actual_sdev_matrix<- function(data,mean,sd,row_num,col_num,col_names) {
+#cosine similarity matrix 
+cosine_similarity_matrix <- function(data_set,col_num) {
+cosine_simi<- matrix(0, nrow = col_num, ncol = col_num)
+for(y in 1:col_num) {
+  for(x in 1:col_num) {
+product_xy <- data_set[,x] * data_set[,y]
+sum_xy <- sum(product_xy)
+magnitude_x <- data_set[,x]^2
+magnitude_x<- sum(magnitude_x)
+magn_x <- sqrt(magnitude_x)
+magnitude_y <- data_set[,y]^2
+magnitude_y <- sum(magnitude_y)
+magn_y <- sqrt(magnitude_y)
+magn_z <- magn_x * magn_y
+cos_sin <-  sum_xy/magn_z
+colnames(cosine_simi)<-colnames(data_set)
+rownames(cosine_simi)<-colnames(GTEX.data_num)
+cosine_simi[x,y] <- cos_sin
+
+
+  }
+}
+View(cosine_simi)
+
+}
+#actual standard deviations matrix
+actual_sdev_matrix<- function(data,mean,sd,row_num,col_num) {
 actu_sdev <- matrix(0, nrow = row_num, ncol = col_num)
 for(j in 1:col_num) {
   for(i in 1:row_num)  {
@@ -45,88 +71,13 @@ for(G1 in 1:col_num) {
  simi_matrix[G1,G2]<-  dot_product_matrix [G1,G2]/(max(diag_matrix [G1],diag_matrix [G2]))
 }
 }
-colnames(simi_matrix)<-colnames(col_names)
-rownames(simi_matrix)<-colnames(col_names)
+colnames(simi_matrix)<-colnames(data)
+rownames(simi_matrix)<-colnames(data)
 View(simi_matrix)
 
 
 }
-#cosine similarity
-cosine_similarity <- function(data_set,x,y) {
-product_xy <- data_set[,x] * data_set[,y]
-sum_xy <- sum(product_xy)
-magnitude_x <- data_set[,x]^2
-magnitude_x<- sum(magnitude_x)
-magn_x <- sqrt(magnitude_x)
-magnitude_y <- data_set[,y]^2
-magnitude_y <- sum(magnitude_y)
-magn_y <- sqrt(magnitude_y)
-magn_z <- magn_x * magn_y
-cos_sin <-  sum_xy/magn_z
-return(cos_sin)
-}
-
-#cosine similarity matrix 
-cosine_similarity_matrix <- function(data_set,col_num) {
-cosine_simi<- matrix(0, nrow = col_num, ncol = col_num)
-for(y in 1:54) {
-  for(x in 1:54)  {
-product_xy <- data_set[,x] * data_set[,y]
-sum_xy <- sum(product_xy)
-magnitude_x <- data_set[,x]^2
-magnitude_x<- sum(magnitude_x)
-magn_x <- sqrt(magnitude_x)
-magnitude_y <- data_set[,y]^2
-magnitude_y <- sum(magnitude_y)
-magn_y <- sqrt(magnitude_y)
-magn_z <- magn_x * magn_y
-cos_sin <-  sum_xy/magn_z
-colnames(cosine_simi)<-colnames(data_set)
-cosine_simi[x,y] <- cos_sin
-
-
-  }
-}
-View(cosine_simi)
-
-}
-#binary standard deviation
-actu_sdev_binary_matrix <- function(data,mean,sd,row_num,col_num,col_names,cutoff) {
-actu_sdev_binary<- matrix(0, nrow = row_num, ncol = col_num)
-for(j in 1:col_num) {
-  for(i in 1:row_num)  {
-   actu_sdev_binary[i,j] <- (data[i,j] - mean[i])/sd[i]
-
-}
-}
-actu_sdev_binary<- replace(actu_sdev_binary, is.na(actu_sdev_binary), 0)
-actu_sdev_binary[actu_sdev_binary <  cutoff] <- 0
-actu_sdev_binary[actu_sdev_binary >  cutoff] <- 1 
-
-n_binary <- matrix(0, nrow = col_num, ncol = col_num)
-dot_pro_matrix_binary <- matrix(0, nrow = col_num, ncol = col_num)
-for(G1 in 1:col_num) {
-  for(G2 in 1:col_num)  {
-   n_binary<- actu_sdev_binary[,G1]*actu_sdev_binary[,G2]
-   dot_pro_matrix_binary[G2,G1]<- sum(n_binary)
-}
-}
-diag_val_binary <- diag(dot_pro_matrix_binary) 
-diag_matrix_binary <- data.matrix(diag_val_binary)
-binary_simi_matrix <- matrix(0, nrow = col_num, ncol = col_num)
-
-for(G1 in 1:col_num) {
-  for(G2 in 1:col_num)  {
- binary_simi_matrix [G1,G2]<- dot_pro_matrix_binary[G1,G2]/(max(diag_matrix_binary[G1],diag_matrix_binary[G2]))
- }
-}
-
-colnames(binary_simi_matrix)<-colnames(col_names)
-rownames(binary_simi_matrix)<-colnames(col_names)
-View(binary_simi_matrix)
-
-}
-#Pearson's coefficients 
+#Pearson's coefficients function matrix 
 pearson_coefficient_matrix <- function(data_set,col_num) {
   pearson_matrix<- matrix(0, nrow = col_num, ncol = col_num)
   for(y in 1:col_num) {
@@ -146,39 +97,52 @@ pearson_coefficient_matrix <- function(data_set,col_num) {
   product_square <- square_x*square_y
   PE <- sum_xy/product_square
   colnames(pearson_matrix)<-colnames(data_set)
+  rownames(pearson_matrix)<-colnames(data_set)
   pearson_matrix[x,y] <- PE
 }
 }
 View(pearson_matrix)
 }
 
-#Pearson's coefficients 
-pearson_coefficient <- function(data_set,x,y) {
-  mean_x <- mean(data_set[,x])
-  mean_y <- mean(data_set[,y])
-  minus_x <- (data_set[,x] - mean_x)
-  minus_y <- (data_set[,y] - mean_y)
-  product_xy <- minus_x*minus_y
-  sum_xy<- sum(product_xy)
-  power_x <- minus_x ^ 2 
-  sum_power_x <-sum(power_x)
-  square_x <- sqrt(sum_power_x)
-  power_y <- minus_y ^ 2
-  sum_power_y <-sum(power_y)
-  square_y <- sqrt(sum_power_y)
-  product_square <- square_x*square_y
-  PE <- sum_xy/product_square
-  PE
-}
-}
 
 #cosine dissimilarity 
 cosine_dissimilarity <- function(data_set,x,y) {
 cos_sin <- 1 - cosine_similarity(data_set,x,y)
 return(cos_sin)
 }
+```
+#####DISTANCE TREES
+```{r}
+#function cluster dendogram 
+cluster_dendogram <- function(data_simi){
+ cluster<-as.data.frame(as.table(data_simi))
+dist_mat <- data_simi
+dist_mat <- dist(t(data_simi), diag = F, upper = F)
+dist_mat_norm <- dist_mat / max(dist_mat)  
+hclus <- hclust(dist_mat_norm)
+as.dendrogram(hclus)
+plot(hclus) 
+}
 
 
+#example cosine similarity 
+cosine_similarity_matrix(GTEX.data_num,54)
+cluster_dendogram(cosine_simi)
+
+
+
+
+
+#example pearson_coefficient 
+pearson_coefficient_matrix(GTEX.data_num,54)
+cluster_dendogram(pearson_matrix)
+
+  
+
+#standard deviations 
+#example of actual standard deviations
+actual_sdev_matrix(GTEX_log,mean_log,sd_log,19193,54)
+cluster_dendogram(simi_matrix)
 
 
 ```
