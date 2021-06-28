@@ -113,35 +113,144 @@ return(cos_sin)
 #####DISTANCE TREES
 ```{r}
 #function cluster dendogram 
+ 
 cluster_dendogram <- function(data_simi){
- cluster<-as.data.frame(as.table(data_simi))
+cluster<-as.data.frame(as.table(data_simi))
 dist_mat <- data_simi
 dist_mat <- dist(t(data_simi), diag = F, upper = F)
-dist_mat_norm <- dist_mat / max(dist_mat)  
-hclus <- hclust(dist_mat_norm)
+dist_mat_norm <- dist_mat / max(dist_mat) 
+hclus <- hclust(dist_mat_norm,method ="single")
 as.dendrogram(hclus)
-plot(hclus) 
+plot(hclus)
 }
-
-
-#example cosine similarity 
-cosine_similarity_matrix(GTEX.data_num,54)
-cluster_dendogram(cosine_simi)
-
-
 
 
 
 #example pearson_coefficient 
+png(filename = "single_pearson.png",width = 980)
 pearson_coefficient_matrix(GTEX.data_num,54)
 cluster_dendogram(pearson_matrix)
+dev.off()
 
-  
+#example cosine similarity 
+png(filename = "single_cosine.png",width = 980)
+cosine_similarity_matrix(GTEX.data_num,54)
+cluster_dendogram(cosine_simi)
+dev.off()
+
+
 
 #standard deviations 
 #example of actual standard deviations
+#example cosine similarity 
+png(filename = "single_sdev.png",width = 980)
 actual_sdev_matrix(GTEX_log,mean_log,sd_log,19193,54)
 cluster_dendogram(simi_matrix)
+dev.off()
 
+
+mat <- cosine_simi 
+dist_mat <- matrix(nrow = length(54), ncol = length(54))
+dist_mat <- dist(t(mat), diag = F, upper = F)
+dist_mat_norm <- dist_mat / max(dist_mat)  ## constrain domain of distance values to 0-1
+dist_df_temp <- data.frame(t(combn(54,2)), as.numeric(dist_mat_norm), stringsAsFactors = F)
+#names(dist_df_temp) <- c("sample1","sample2", "norm_distance")
+hist(dist_mat_norm,breaks = 1000)
+distance_tree <- GeneSpecificityFuncs::LMB_htf.dist_tree(dist_df = dist_df_temp)
+
+
+
+
+
+
+```
+### Weights functions 
+```{r}
+count_number_descendant<- function(node) {
+  if(is.na(node$left_child) & is.na(node$right_child)){
+    return(1) }
+  else{
+   return (count_number_descendant(node$left_child)+count_number_descendant(node$right_child))}
+}
+
+
+calc_node_weight <- function(node, parent_weight = 0) {
+node$weight <-  (node$dist_to_parent / count_number_descendant(node)) + parent_weight
+	if(!all(is.na(node[["left_child"]]))){
+	  	 node[["left_child"]]<-calc_node_weight(node[["left_child"]],parent_weight = node$weight)
+       node[["right_child"]]<-calc_node_weight(node[["right_child"]],parent_weight = node$weight)
+	}
+return(node)
+}
+
+ return_sample_weights <- function(node){
+   if(is.na(node$left_child) & is.na(node$right_child)){
+     return(data.frame(name = node$name,weight = node$weight))
+   }
+ return(rbind(return_sample_weights(node[["left_child"]]),return_sample_weights(node[["right_child"]])))
+}
+#gives vector of weights
+weights_tree <-return_sample_weights(tree)
+list_names<-(colnames(GTEX.data_num))
+for (i in 1:54){
+  weights_tree$name[weights_tree$name == i] <- list_names[i]
+  
+}
+
+```
+###example of weights vector z-scores
+```{r}
+actu_sdev <- matrix(0, nrow = 19193, ncol = 54) 
+for(j in 1:54) {
+  for(i in 1:19193)  {
+   actu_sdev[i,j] <- (GTEX_log[i,j] - mean_log[i])/sd_log[i]
+}      
+}
+
+actu_sdev <-replace(actu_sdev, is.na(actu_sdev), 0)
+n <- matrix(0, nrow = 54, ncol = 54)
+dot_product_matrix <- matrix(0, nrow = 54, ncol = 54)
+for(G1 in 1:54) {
+  for(G2 in 1:54)  {
+   n <- actu_sdev[,G1]*actu_sdev[,G2]
+   dot_product_matrix [G2,G1]<- sum(n)
+}
+}
+diag_val <- diag(dot_product_matrix )
+diag_matrix <- data.matrix(diag_val)
+simi_matrix<- matrix(0, nrow = 54, ncol = 54)
+for(G1 in 1:54) {
+  for(G2 in 1:54)  {
+ simi_matrix[G1,G2]<-  dot_product_matrix [G1,G2]/(max(diag_matrix [G1],diag_matrix [G2]))
+}
+}
+colnames(simi_matrix)<-colnames(GTEX.data_num)
+rownames(simi_matrix)<-colnames(GTEX.data_num)
+
+
+simi <-simi_matrix
+## calculate distance matrix
+dist_simi <- dist(t(simi), diag = F, upper = F)
+dist_simi_norm <- dist_simi / max(dist_simi)  ## constrain domain of distance values to 0-1
+dist_simi_temp <- data.frame(t(combn(54,2)), as.numeric(dist_simi_norm), stringsAsFactors = F)
+names(dist_simi_temp) <- c("sample1","sample2", "norm_distance")
+hist(dist_simi_norm,breaks = 1000)
+
+dist_simi_vector<-as.vector(unlist(dist_simi_temp))
+
+
+distance_simi_tree <- GeneSpecificityFuncs::LMB_htf.dist_tree(dist_df = dist_simi_temp)
+count_number_descendant(distance_simi_tree)
+tree_simi<-calc_node_weight(distance_simi_tree)
+tree_simi_vector<-as.vector(unlist(tree_simi))
+simi_tree<-data.frame(tree_simi_vector)
+
+
+weights_simi <-return_sample_weights(simi_tree)
+list_names<-(colnames(GTEX.data_num))
+for (i in 1:54){
+  weights_simi$name[weights_simi$name == i] <- list_names[i]
+  
+}
 
 ```
