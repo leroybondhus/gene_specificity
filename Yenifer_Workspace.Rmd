@@ -241,6 +241,13 @@ tree<-calc_node_weight(distance_tree)
 tree_vector<-as.vector(unlist(tree))
 cosine_tree<-data.frame(tree_vector)
 
+weights_cosine<-return_sample_weights(tree)
+
+list_names<-(colnames(GTEX.data_num))
+for (i in 1:54){
+  weights_cosine$name[weights_cosine$name == i] <- list_names[i]
+  
+}
 
 
 
@@ -293,6 +300,13 @@ tree_simi<-calc_node_weight(distance_simi_tree)
 tree_simi_vector<-as.vector(unlist(tree_simi))
 simi_tree<-data.frame(tree_simi_vector)
 
+weights_simi<-return_sample_weights(tree_simi)
+
+list_names<-(colnames(GTEX.data_num))
+for (i in 1:54){
+  weights_simi$name[weights_simi$name == i] <- list_names[i]
+  
+}
 
 
 
@@ -341,7 +355,13 @@ tree_pearson_vector<-as.vector(unlist(tree_pearson))
 pearson_tree<-data.frame(tree_pearson_vector)
 
 
+weights_pearson<-return_sample_weights(tree_pearson)
 
+list_names<-(colnames(GTEX.data_num))
+for (i in 1:54){
+  weights_pearson$name[weights_pearson$name == i] <- list_names[i]
+  
+}
 
 
 
