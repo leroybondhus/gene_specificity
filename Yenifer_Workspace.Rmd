@@ -198,7 +198,55 @@ for (i in 1:54){
 }
 
 ```
-###example of weights vector z-scores
+###example of weights vector 
+#Cosine Similarity
+```{r}
+
+#example cosine similarity 
+cosine_simi<- matrix(0, nrow = 54, ncol = 54)
+for(y in 1:54) {
+  for(x in 1:54)  {
+product_xy <- GTEX.data_num[,x] * GTEX.data_num[,y]
+sum_xy <- sum(product_xy)
+magnitude_x <- GTEX.data_num[,x]^2
+magnitude_x<- sum(magnitude_x)
+magn_x <- sqrt(magnitude_x)
+magnitude_y <- GTEX.data_num[,y]^2
+magnitude_y <- sum(magnitude_y)
+magn_y <- sqrt(magnitude_y)
+magn_z <- magn_x * magn_y
+cos_sin <-  sum_xy/magn_z
+colnames(cosine_simi)<-colnames(GTEX.data_num)
+rownames(cosine_simi)<-colnames(GTEX.data_num)
+cosine_simi[x,y] <- cos_sin
+
+  }
+}
+mat <- cosine_simi
+
+
+## calculate distance matrix
+dist_mat <- dist(t(mat), diag = F, upper = F)
+dist_mat_norm <- dist_mat / max(dist_mat)  ## constrain domain of distance values to 0-1
+dist_df_temp <- data.frame(t(combn(54,2)), as.numeric(dist_mat_norm), stringsAsFactors = F)
+names(dist_df_temp) <- c("sample1","sample2", "norm_distance")
+hist(dist_mat_norm,breaks = 1000)
+
+dist_vector<-as.vector(unlist(dist_df_temp))
+
+
+distance_tree <- GeneSpecificityFuncs::LMB_htf.dist_tree(dist_df = dist_df_temp)
+count_number_descendant(distance_tree)
+tree<-calc_node_weight(distance_tree)
+tree_vector<-as.vector(unlist(tree))
+cosine_tree<-data.frame(tree_vector)
+
+
+
+
+
+```
+#Standard deviations
 ```{r}
 actu_sdev <- matrix(0, nrow = 19193, ncol = 54) 
 for(j in 1:54) {
@@ -246,11 +294,55 @@ tree_simi_vector<-as.vector(unlist(tree_simi))
 simi_tree<-data.frame(tree_simi_vector)
 
 
-weights_simi <-return_sample_weights(simi_tree)
-list_names<-(colnames(GTEX.data_num))
-for (i in 1:54){
-  weights_simi$name[weights_simi$name == i] <- list_names[i]
-  
+
+
+
+```
+#Pearson Coefficients
+```{r}
+  pearson_matrix<- matrix(0, nrow = 54, ncol = 54)
+  for(y in 1:54) {
+     for(x in 1:54)  {
+  mean_x <- mean(GTEX.data_num[,x])
+  mean_y <- mean(GTEX.data_num[,y])
+  minus_x <- (GTEX.data_num[,x] - mean_x)
+  minus_y <- (GTEX.data_num[,y] - mean_y)
+  product_xy <- minus_x*minus_y
+  sum_xy<- sum(product_xy)
+  power_x <- minus_x ^ 2 
+  sum_power_x <-sum(power_x)
+  square_x <- sqrt(sum_power_x)
+  power_y <- minus_y ^ 2
+  sum_power_y <-sum(power_y)
+  square_y <- sqrt(sum_power_y)
+  product_square <- square_x*square_y
+  PE <- sum_xy/product_square
+  colnames(pearson_matrix)<-colnames(GTEX.data_num)
+  rownames(pearson_matrix)<-colnames(GTEX.data_num)
+  pearson_matrix[x,y] <- PE
 }
+}
+
+pearson <-pearson_matrix
+## calculate distance matrix
+dist_pearson <- dist(t(pearson), diag = F, upper = F)
+dist_pearson_norm <- dist_pearson / max(dist_pearson)  ## constrain domain of distance values to 0-1
+dist_pearson_temp <- data.frame(t(combn(54,2)), as.numeric(dist_pearson_norm), stringsAsFactors = F)
+names(dist_pearson_temp) <- c("sample1","sample2", "norm_distance")
+hist(dist_pearson_norm,breaks = 1000)
+
+dist_pearson_vector<-as.vector(unlist(dist_pearson_temp))
+
+
+distance_pearson_tree <- GeneSpecificityFuncs::LMB_htf.dist_tree(dist_df = dist_pearson_temp)
+count_number_descendant(distance_pearson_tree)
+tree_pearson<-calc_node_weight(distance_pearson_tree)
+tree_pearson_vector<-as.vector(unlist(tree_pearson))
+pearson_tree<-data.frame(tree_pearson_vector)
+
+
+
+
+
 
 ```
