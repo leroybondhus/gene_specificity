@@ -5,8 +5,11 @@ library('tibble')
 library('RColorBrewer') 
 library('ggplot2') 
 library('lubridate') 
+library('gridExtra')
+library('devtools')
+library('circlepackeR')
 
-# loading te matrix
+1# loading te matrix
 GTEX.data <- read.csv("gtex_medians_PC_only_wo_MT.csv", header=T, sep=",")
 
 # function that drops certain columns from a te matrix
@@ -118,3 +121,15 @@ weighted_cosine_sd_matrix <- weighted_sd(GTEX.subset,weighted_cosine_mean, cosin
 
 weighted_cosine_tau_values <- apply(weighted_cosine_GTEX,1,specificity_by_tau)
 weighted_cosine_tsi_values <- apply(weighted_cosine_GTEX,1,specificity_by_tsi)
+
+# visualizing how tau values are changing
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+plot(tau_values,weighted_similarity_tau_values)
+plot(tau_values,weighted_pearson_tau_values)
+plot(tau_values,weighted_cosine_tau_values)
+
+# visualizing how tsi values are changing
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+plot(tsi_values,weighted_similarity_tsi_values)
+plot(tsi_values,weighted_pearson_tsi_values)
+plot(tsi_values,weighted_cosine_tsi_values)
