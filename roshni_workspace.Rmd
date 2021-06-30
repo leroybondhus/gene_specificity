@@ -1,19 +1,29 @@
----
-title: "roshni_workspace"
-output: html_document
----
-```{r}
-# function that drops certain tissues from gene_x_expression matrix
-curate_te_matrix <- function(te_matrix, drop_col_name){
-  a <- which(colnames(te_matrix)==drop_col_name)
-  te_matrix <- te_matrix[-a]
+# loading packages
+library('tidyr')
+library('dplyr') 
+library('tibble') 
+library('RColorBrewer') 
+library('ggplot2') 
+library('lubridate') 
+
+# loading te matrix
+GTEX.data <- read.csv("gtex_medians_PC_only_wo_MT.csv", header=T, sep=",")
+
+# function that drops certain columns from a te matrix
+drop_cols <- function(te_matrix, ...){
+  cols_to_drop <- list(...)
+  for (col in cols_to_drop){
+    a <- which(colnames(te_matrix)==col)
+    te_matrix <- te_matrix[-a]
+  }
   return(te_matrix)
 }
-```
-```{r}
-# Z-SCORE FUNCTION
-# function that calculates SDs of genes given a tissue expression matrix
-z_score <- function(te_matrix){
+
+# using above function to subset te matrix to only include tissue expression values
+GTEX.subset <- drop_cols(GTEX.data,"X","Name","Description")
+
+# function that returns a matrix of SDs given a te matrix
+specificity_by_zscore <- function(te_matrix){
   mean_expression <- rowMeans(te_matrix)
   std_expression <- apply(te_matrix,1,sd)
   std_matrix <- (te_matrix - mean_expression) / std_expression
@@ -21,47 +31,90 @@ z_score <- function(te_matrix){
   return(std_matrix)
 }
 
-# function that outputs a list of gene indices above a specific SD cutoff given a matrix of standard deviations
-specific_genes_by_zscore <- function(std_matrix, tissue_of_interest, std_cutoff){
-  index <- which(colnames(std_matrix)==tissue_of_interest)
-  print(which(std_matrix[,index]>std_cutoff))
+# generating matrix of standard deviation values for each gene in each tissue
+std_matrix <- specificity_by_zscore(GTEX.subset)
+
+# function that will return tau values given matrix of tissue expression 
+# https://dx.doi.org/10.1093%2Fbib%2Fbbw008
+specificity_by_tau <- function(te_matrix){
+  x_hat <- te_matrix/max(te_matrix)
+  tau <- sum(1-x_hat) / (NROW(te_matrix)-1)
 }
-```
-```{r}
-# COUNTS FUNCTION
-specificity_by_counts <- function(te_matrix,gene_of_interest_index,expressed_cutoff,specific_cutoff){
-  a <- which(te_matrix[gene_of_interest_index,]>=expressed_cutoff)
-  if(length(a)<=specific_cutoff){
-    print(colnames(te_matrix[a]))
-  }
-}
-```
-```{r}
-# TAU FUNCTION
-specificity_by_tau <- function(te_matrix, gene_of_interest_index){
-   x_hat <- (te_matrix[gene_of_interest_index,]) / (max(te_matrix[gene_of_interest_index,]))
-   tau <- sum(x_hat) / (ncol(te_matrix)-2)
-   print(tau)
-}
-```
-```{r}
-# TISSUE SPECIFICITY INDEX FUNCTION
-specificity_by_tsi <- function(te_matrix,gene_of_interest_index){
-  a <- max(te_matrix[gene_of_interest_index,])
-  b <- sum(te_matrix[gene_of_interest_index,])
+
+# calculating tau values
+tau_values <- apply(GTEX.subset,1,specificity_by_tau)
+
+# function that will return tissue specificity index values given matrix of tissue expression
+# https://dx.doi.org/10.1093%2Fbib%2Fbbw008
+specificity_by_tsi <- function(te_matrix){
+  a <- max(te_matrix)
+  b <- sum(te_matrix)
   tsi <- a/b
-  print(tsi)
 }
-```
-```{r}
-# GINI FUNCTION
-specificity_by_gini <- function(te_matrix,gene_of_interest_index){
-  xi <- sort(te_matrix[gene_of_interest_index,],decreasing = FALSE)
-  print(xi)
-  firstterm <- (ncol(te_matrix)+1) / ncol(te_matrix)
-  secondtermnum <- 2*sum(ncol(te_matrix)+1-(1:ncol(te_matrix)))*xi
-  secondtermden <- (ncol(te_matrix))*sum(xi)
-  gini <- firstterm - (secondtermnum/secondtermden)
-  print(gini)
+
+# calculating tsi values
+tsi_values <- apply(GTEX.subset,1,specificity_by_tsi)
+
+# function that will apply a weights vector to a te matrix and return a matrix with weighted te values
+apply_weights <- function(te_matrix, weights_vector){
+  weights_vector <- weights_vector[order(weights_vector$name),]
+  weighted_te_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (i in 1:nrow(weights_vector)){
+    weighted_te_matrix[,i] <- weights_vector[i,2]*te_matrix[,i]
+  }
+  colnames(weighted_te_matrix) <- colnames(te_matrix)
+  return(weighted_te_matrix)
 }
-```
+
+# function that will calculate weighted mean expression for each gene given a weighted te matrix and a weights vector
+weighted_means <- function(weighted_te_matrix, weights_vector){
+  weighted_means <- c(1:nrow(weighted_te_matrix))
+  for (i in 1:nrow(weighted_te_matrix)){
+    weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum(weights_vector[,2])
+  }
+  return(weighted_means)
+}
+
+# function that will calculate the weighted standard deviation given a te matrix, a vector of weighted means, and a weights vector
+weighted_sd <- function(te_matrix, weighted_means, weights_vector){
+  weights_vector <- weights_vector[order(weights_vector$name),]
+  weighted_std_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (i in 1:length(weighted_means)){
+    weighted_std_matrix <- (sum(weights_vector[i,2]*((te_matrix[i,]-weighted_means[i])^2))) / (((nrow(weights_vector)-1)/(nrow(weights_vector)))*(sum(weights_vector[,2])))
+    print(i)
+  }
+  return(weighted_std_matrix)
+}
+
+# using similarity weights vector to calculate sd, tau, and tsi values
+similarity_weights <- read.csv("weights_simi_.csv")
+
+weighted_similarity_GTEX <- apply_weights(GTEX.subset, similarity_weights)
+
+weighted_similarity_mean <- weighted_means(weighted_similarity_GTEX, similarity_weights)
+weighted_similarity_sd_matrix <- weighted_sd(GTEX.subset,weighted_similarity_mean, similarity_weights)
+
+weighted_similarity_tau_values <- apply(weighted_similarity_GTEX,1,specificity_by_tau)
+weighted_similarity_tsi_values <- apply(weighted_similarity_GTEX,1,specificity_by_tsi)
+
+# using pearson weights to calculate sd, tau, and tsi values
+pearson_weights <- read.csv("weights_pearson_.csv")
+
+weighted_pearson_GTEX <- apply_weights(GTEX.subset, pearson_weights)
+
+weighted_pearson_mean <- weighted_means(weighted_pearson_GTEX, pearson_weights)
+weighted_pearson_sd_matrix <- weighted_sd(GTEX.subset, weighted_pearson_mean,pearson_weights)
+
+weighted_pearson_tau_values <- apply(weighted_pearson_GTEX,1,specificity_by_tau)
+weighted_pearson_tsi_values <- apply(weighted_pearson_GTEX,1,specificity_by_tsi)
+
+# using cosine weights to calculate sd, tau, and tsi values
+cosine_weights <- read.csv("weights_cosine_.csv")
+
+weighted_cosine_GTEX <- apply_weights(GTEX.subset, cosine_weights)
+
+weighted_cosine_mean <- weighted_means(weighted_cosine_GTEX, cosine_weights)
+weighted_cosine_sd_matrix <- weighted_sd(GTEX.subset,weighted_cosine_mean, cosine_weights)
+
+weighted_cosine_tau_values <- apply(weighted_cosine_GTEX,1,specificity_by_tau)
+weighted_cosine_tsi_values <- apply(weighted_cosine_GTEX,1,specificity_by_tsi)
