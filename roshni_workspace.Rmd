@@ -9,7 +9,7 @@ library('gridExtra')
 library('devtools')
 library('circlepackeR')
 
-1# loading te matrix
+# loading te matrix
 GTEX.data <- read.csv("gtex_medians_PC_only_wo_MT.csv", header=T, sep=",")
 
 # function that drops certain columns from a te matrix
