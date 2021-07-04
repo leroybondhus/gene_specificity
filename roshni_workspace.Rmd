@@ -12,6 +12,7 @@ library('Hmisc')
 library('ggpubr')
 library('grid')
 library('lattice')
+library('gdata')
 
 # loading te matrix
 GTEX.data <- read.csv("gtex_medians_PC_only_wo_MT.csv", header=T, sep=",")
@@ -63,10 +64,15 @@ specificity_by_tsi <- function(te_matrix){
 tsi_values <- apply(GTEX.subset,1,specificity_by_tsi)
 
 # function to alphabetize weights vector
-##### need to create function to match te_matrix columns to weights_vector rows in any order
 alphabetize <- function(weights_vector){
   weights_vector <- weights_vector[order(weights_vector$name),]
   return(weights_vector)
+}
+
+# matches order of weights vector to  order of columns in te matrix (does not have to be alphabetical)
+match_order <- function(weights_vector,te_matrix){
+  new_order <- left_join(data.frame(name=colnames(te_matrix)),weights_vector,by="name")
+  return(new_order)
 }
 
 # function that will apply a weights vector to a te matrix and return a matrix with weighted te values
@@ -205,7 +211,7 @@ pointplot_zscore_flat_vs_similarity <- ggplot(df_zscore_flat_vs_similarity, aes(
 
 grid.arrange(pointplot_zscore_flat_vs_similarity, histogram_zscore_flat_vs_similarity, ncol=2)
 
-# 2d density plot for flat vs. similarity weighted zscore
+# 2d density plot for flat vs. pearson weighted zscore
 df_zscore_flat_vs_pearson <- data.frame(max_zscore,max_pearson_zscore)
 densityplot_zscore_flat_vs_pearson <- ggplot(df_zscore_flat_vs_pearson, aes(x=max_zscore, y=max_pearson_zscore) ) +
   geom_bin2d() + 
@@ -215,7 +221,7 @@ densityplot_zscore_flat_vs_pearson <- ggplot(df_zscore_flat_vs_pearson, aes(x=ma
   xlab("Flat Z-Scores") +
   ylab("Pearson Weighted Z-Scores")
 
-# histogram for flat vs. similarity weighted zscore
+# histogram for flat vs. pearson weighted zscore
 delta_zscore_flat_vs_pearson <- max_zscore-max_pearson_zscore
 index <- c(1:18834)
 df_delta_zscore_flat_vs_pearson <- data.frame(x=index, y=delta_zscore_flat_vs_pearson)
@@ -227,7 +233,7 @@ histogram_zscore_flat_vs_pearson <- ggplot(df_delta_zscore_flat_vs_pearson, aes(
 # display two plots
 grid.arrange(densityplot_zscore_flat_vs_pearson, histogram_zscore_flat_vs_pearson, ncol=2)
 
-# 2d density plot for flat vs. similarity weighted zscore
+# 2d density plot for flat vs. cosine weighted zscore
 df_zscore_flat_vs_cosine <- data.frame(max_zscore,max_cosine_zscore)
 densityplot_zscore_flat_vs_cosine <- ggplot(df_zscore_flat_vs_cosine, aes(x=max_zscore, y=max_cosine_zscore) ) +
   geom_bin2d() + 
@@ -237,7 +243,7 @@ densityplot_zscore_flat_vs_cosine <- ggplot(df_zscore_flat_vs_cosine, aes(x=max_
   xlab("Flat Z-Scores") +
   ylab("Cosine Weighted Z-Scores")
 
-# histogram for flat vs. similarity weighted zscore
+# histogram for flat vs. cosine weighted zscore
 delta_zscore_flat_vs_cosine <- max_zscore-max_cosine_zscore
 index <- c(1:18834)
 df_delta_zscore_flat_vs_cosine <- data.frame(x=index, y=delta_zscore_flat_vs_cosine)
