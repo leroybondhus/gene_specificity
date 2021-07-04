@@ -8,6 +8,10 @@ library('lubridate')
 library('gridExtra')
 library('devtools')
 library('circlepackeR')
+library('Hmisc')
+library('ggpubr')
+library('grid')
+library('lattice')
 
 # loading te matrix
 GTEX.data <- read.csv("gtex_medians_PC_only_wo_MT.csv", header=T, sep=",")
@@ -30,12 +34,12 @@ specificity_by_zscore <- function(te_matrix){
   mean_expression <- rowMeans(te_matrix)
   std_expression <- apply(te_matrix,1,sd)
   std_matrix <- (te_matrix - mean_expression) / std_expression
-  std_matrix[is.na(std_matrix)] <- -1
   return(std_matrix)
 }
 
 # generating matrix of standard deviation values for each gene in each tissue
-std_matrix <- specificity_by_zscore(GTEX.subset)
+zscore_matrix <- specificity_by_zscore(GTEX.subset)
+zscore_matrix <- na.omit(zscore_matrix)
 
 # function that will return tau values given matrix of tissue expression 
 # https://dx.doi.org/10.1093%2Fbib%2Fbbw008
@@ -58,9 +62,16 @@ specificity_by_tsi <- function(te_matrix){
 # calculating tsi values
 tsi_values <- apply(GTEX.subset,1,specificity_by_tsi)
 
-# function that will apply a weights vector to a te matrix and return a matrix with weighted te values
-apply_weights <- function(te_matrix, weights_vector){
+# function to alphabetize weights vector
+##### need to create function to match te_matrix columns to weights_vector rows in any order
+alphabetize <- function(weights_vector){
   weights_vector <- weights_vector[order(weights_vector$name),]
+  return(weights_vector)
+}
+
+# function that will apply a weights vector to a te matrix and return a matrix with weighted te values
+# pass te_matrix columns and weights_vector rows in same order
+apply_weights <- function(te_matrix, weights_vector){
   weighted_te_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
   for (i in 1:nrow(weights_vector)){
     weighted_te_matrix[,i] <- weights_vector[i,2]*te_matrix[,i]
@@ -70,7 +81,10 @@ apply_weights <- function(te_matrix, weights_vector){
 }
 
 # function that will calculate weighted mean expression for each gene given a weighted te matrix and a weights vector
-weighted_means <- function(weighted_te_matrix, weights_vector){
+# pass te_matrix columns and weights_vector rows in same order
+# can be done with wtd.mean from Hmisc, but much slower
+weighted_means <- function(te_matrix, weights_vector){
+  weighted_te_matrix <- apply_weights(te_matrix, weights_vector)
   weighted_means <- c(1:nrow(weighted_te_matrix))
   for (i in 1:nrow(weighted_te_matrix)){
     weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum(weights_vector[,2])
@@ -79,45 +93,63 @@ weighted_means <- function(weighted_te_matrix, weights_vector){
 }
 
 # function that will calculate the weighted standard deviation given a te matrix, a vector of weighted means, and a weights vector
-weighted_sd <- function(te_matrix, weighted_means, weights_vector){
-  weights_vector <- weights_vector[order(weights_vector$name),]
-  weighted_std_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
-  for (i in 1:length(weighted_means)){
-    weighted_std_matrix <- (sum(weights_vector[i,2]*((te_matrix[i,]-weighted_means[i])^2))) / (((nrow(weights_vector)-1)/(nrow(weights_vector)))*(sum(weights_vector[,2])))
-    print(i)
+# pass te_matrix columns and weights_vector rows in same order
+weighted_sd <- function(te_matrix, weights_vector){
+  weighted_var <- matrix(nrow=nrow(te_matrix),ncol=1)
+  for (i in 1:nrow(te_matrix)){
+    weighted_var[i] <- wtd.var(GTEX.subset[i,],weights=similarity_weights[,2])
   }
-  return(weighted_std_matrix)
+  weighted_sd <- sqrt(weighted_var)
+  return(weighted_sd)
 }
 
-# using similarity weights vector to calculate sd, tau, and tsi values
+# function that will compute the weighted zscore for each gene in each tissue given a te matrix, weighted means, and weighted standard deviations
+# weighted_means and weighted_sd pass as arguments rather than calculated internally to avoid run time
+weighted_zscore <- function(te_matrix, weighted_means, weighted_sd){
+  for (i in 1:nrow(te_matrix)){
+    te_matrix[i,] <- (te_matrix[i,]-weighted_means[i])/weighted_sd[i]
+  }
+  return(te_matrix)
+}
+
+# using similarity weights vector to calculate zscore, tau, and tsi values
 similarity_weights <- read.csv("weights_simi_.csv")
+similarity_weights <- alphabetize(similarity_weights)
 
 weighted_similarity_GTEX <- apply_weights(GTEX.subset, similarity_weights)
 
-weighted_similarity_mean <- weighted_means(weighted_similarity_GTEX, similarity_weights)
-weighted_similarity_sd_matrix <- weighted_sd(GTEX.subset,weighted_similarity_mean, similarity_weights)
+weighted_similarity_mean <- weighted_means(GTEX.subset, similarity_weights)
+weighted_similarity_sd <- weighted_sd(GTEX.subset, similarity_weights)
+weighted_similarity_zscore <- weighted_zscore(GTEX.subset,weighted_similarity_mean,weighted_similarity_sd)
+weighted_similarity_zscore <- na.omit(weighted_similarity_zscore)
 
 weighted_similarity_tau_values <- apply(weighted_similarity_GTEX,1,specificity_by_tau)
 weighted_similarity_tsi_values <- apply(weighted_similarity_GTEX,1,specificity_by_tsi)
 
-# using pearson weights to calculate sd, tau, and tsi values
+# using pearson weights to calculate zscore, tau, and tsi values
 pearson_weights <- read.csv("weights_pearson_.csv")
+pearson_weights <- alphabetize(pearson_weights)
 
 weighted_pearson_GTEX <- apply_weights(GTEX.subset, pearson_weights)
 
-weighted_pearson_mean <- weighted_means(weighted_pearson_GTEX, pearson_weights)
-weighted_pearson_sd_matrix <- weighted_sd(GTEX.subset, weighted_pearson_mean,pearson_weights)
+weighted_pearson_mean <- weighted_means(GTEX.subset, pearson_weights)
+weighted_pearson_sd <- weighted_sd(GTEX.subset, pearson_weights)
+weighted_pearson_zscore <- weighted_zscore(GTEX.subset,weighted_pearson_mean,weighted_pearson_sd)
+weighted_pearson_zscore <- na.omit(weighted_pearson_zscore)
 
 weighted_pearson_tau_values <- apply(weighted_pearson_GTEX,1,specificity_by_tau)
 weighted_pearson_tsi_values <- apply(weighted_pearson_GTEX,1,specificity_by_tsi)
 
-# using cosine weights to calculate sd, tau, and tsi values
+# using cosine weights to calculate zscore, tau, and tsi values
 cosine_weights <- read.csv("weights_cosine_.csv")
+cosine_weights <- alphabetize(cosine_weights)
 
 weighted_cosine_GTEX <- apply_weights(GTEX.subset, cosine_weights)
 
-weighted_cosine_mean <- weighted_means(weighted_cosine_GTEX, cosine_weights)
-weighted_cosine_sd_matrix <- weighted_sd(GTEX.subset,weighted_cosine_mean, cosine_weights)
+weighted_cosine_mean <- weighted_means(GTEX.subset, cosine_weights)
+weighted_cosine_sd <- weighted_sd(GTEX.subset, cosine_weights)
+weighted_cosine_zscore <- weighted_zscore(GTEX.subset,weighted_cosine_mean,weighted_cosine_sd)
+weighted_cosine_zscore <- na.omit(weighted_cosine_zscore)
 
 weighted_cosine_tau_values <- apply(weighted_cosine_GTEX,1,specificity_by_tau)
 weighted_cosine_tsi_values <- apply(weighted_cosine_GTEX,1,specificity_by_tsi)
@@ -133,3 +165,86 @@ layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
 plot(tsi_values,weighted_similarity_tsi_values)
 plot(tsi_values,weighted_pearson_tsi_values)
 plot(tsi_values,weighted_cosine_tsi_values)
+
+# visualzing difference in zscore
+max_zscore <- apply(zscore_matrix,1,max)
+max_similarity_zscore <- apply(weighted_similarity_zscore,1,max)
+max_pearson_zscore <- apply(weighted_pearson_zscore,1,max)
+max_cosine_zscore <- apply(weighted_cosine_zscore,1,max)
+
+# 2d density plot for flat vs. similarity weighted zscore
+df_zscore_flat_vs_similarity <- data.frame(max_zscore,max_similarity_zscore)
+densityplot_zscore_flat_vs_similarity <- ggplot(df_zscore_flat_vs_similarity, aes(x=max_zscore, y=max_similarity_zscore) ) +
+  geom_bin2d() + 
+  theme_bw() +
+  ggtitle("Flat Z-Scores Vs. Similarity Weighted Z-Scores") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Flat Z-Scores") +
+  ylab("Similarity Weighted Z-Scores")
+
+# histogram for flat vs. similarity weighted zscore
+delta_zscore_flat_vs_similarity <- max_zscore-max_similarity_zscore
+index <- c(1:18834)
+df_delta_zscore_flat_vs_similarity <- data.frame(x=index, y=delta_zscore_flat_vs_similarity)
+histogram_zscore_flat_vs_similarity <- ggplot(df_delta_zscore_flat_vs_similarity, aes(x=delta_zscore_flat_vs_similarity)) + 
+  geom_histogram(binwidth=0.2,color="black", fill="white") +
+  labs(title="Difference Between Flat Z-Score and Similarity Weighted Z-Score",x="Delta", y = "Count") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# display two plots
+grid.arrange(densityplot_zscore_flat_vs_similarity, histogram_zscore_flat_vs_similarity, ncol=2)
+
+# test scatterplot with transparent points
+pointplot_zscore_flat_vs_similarity <- ggplot(df_zscore_flat_vs_similarity, aes(x=max_zscore, y=max_similarity_zscore) ) +
+  geom_point(alpha=0.5,color="blue") + 
+  theme_bw() +
+  ggtitle("Flat Z-Scores Vs. Similarity Weighted Z-Scores") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Flat Z-Scores") +
+  ylab("Similarity Weighted Z-Scores")
+
+grid.arrange(pointplot_zscore_flat_vs_similarity, histogram_zscore_flat_vs_similarity, ncol=2)
+
+# 2d density plot for flat vs. similarity weighted zscore
+df_zscore_flat_vs_pearson <- data.frame(max_zscore,max_pearson_zscore)
+densityplot_zscore_flat_vs_pearson <- ggplot(df_zscore_flat_vs_pearson, aes(x=max_zscore, y=max_pearson_zscore) ) +
+  geom_bin2d() + 
+  theme_bw() +
+  ggtitle("Flat Z-Scores Vs. Pearson Weighted Z-Scores") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Flat Z-Scores") +
+  ylab("Pearson Weighted Z-Scores")
+
+# histogram for flat vs. similarity weighted zscore
+delta_zscore_flat_vs_pearson <- max_zscore-max_pearson_zscore
+index <- c(1:18834)
+df_delta_zscore_flat_vs_pearson <- data.frame(x=index, y=delta_zscore_flat_vs_pearson)
+histogram_zscore_flat_vs_pearson <- ggplot(df_delta_zscore_flat_vs_pearson, aes(x=delta_zscore_flat_vs_pearson)) + 
+  geom_histogram(binwidth=0.2,color="black", fill="white") +
+  labs(title="Difference Between Flat Z-Score and Pearson Weighted Z-Score",x="Delta", y = "Count") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# display two plots
+grid.arrange(densityplot_zscore_flat_vs_pearson, histogram_zscore_flat_vs_pearson, ncol=2)
+
+# 2d density plot for flat vs. similarity weighted zscore
+df_zscore_flat_vs_cosine <- data.frame(max_zscore,max_cosine_zscore)
+densityplot_zscore_flat_vs_cosine <- ggplot(df_zscore_flat_vs_cosine, aes(x=max_zscore, y=max_cosine_zscore) ) +
+  geom_bin2d() + 
+  theme_bw() +
+  ggtitle("Flat Z-Scores Vs. Cosine Weighted Z-Scores") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Flat Z-Scores") +
+  ylab("Cosine Weighted Z-Scores")
+
+# histogram for flat vs. similarity weighted zscore
+delta_zscore_flat_vs_cosine <- max_zscore-max_cosine_zscore
+index <- c(1:18834)
+df_delta_zscore_flat_vs_cosine <- data.frame(x=index, y=delta_zscore_flat_vs_cosine)
+histogram_zscore_flat_vs_cosine <- ggplot(df_delta_zscore_flat_vs_cosine, aes(x=delta_zscore_flat_vs_cosine)) + 
+  geom_histogram(binwidth=0.2,color="black", fill="white") +
+  labs(title="Difference Between Flat Z-Score and Cosine Weighted Z-Score",x="Delta", y = "Count") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# display two plots
+grid.arrange(densityplot_zscore_flat_vs_cosine, histogram_zscore_flat_vs_cosine, ncol=2)
