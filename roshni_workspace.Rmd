@@ -254,3 +254,21 @@ histogram_zscore_flat_vs_cosine <- ggplot(df_delta_zscore_flat_vs_cosine, aes(x=
 
 # display two plots
 grid.arrange(densityplot_zscore_flat_vs_cosine, histogram_zscore_flat_vs_cosine, ncol=2)
+
+# subset data set to only include certain indices
+drop_index <- function(te_matrix, ...){
+  cols_to_drop <- list(...)
+  name_list <- c()
+  for (col in cols_to_drop){
+    name_list <- append(name_list, colnames(te_matrix[col]))
+  }
+  for (name in name_list){
+    a <- which(colnames(te_matrix)==name)
+    te_matrix <- te_matrix[-a]
+  }
+  return(te_matrix)
+}
+
+# creating one dataset with no brain columns and one dataset with only brain columns
+GTEX.NoBrain <- drop_index(GTEX.subset,8:20)
+GTEX.Brain <- drop_index(GTEX.subset,1:7,21:54)
