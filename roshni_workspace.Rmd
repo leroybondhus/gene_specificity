@@ -272,3 +272,49 @@ drop_index <- function(te_matrix, ...){
 # creating one dataset with no brain columns and one dataset with only brain columns
 GTEX.NoBrain <- drop_index(GTEX.subset,8:20)
 GTEX.Brain <- drop_index(GTEX.subset,1:7,21:54)
+
+# functions to select random column and add it to another matrix, calcualte new zscores, and find delta between the old and new zscores
+append_random_columns <- function(te_matrix, sample_matrix, size_of_selection){
+  selected_columns <- sample(sample_matrix, size_of_selection)
+  df <- data.frame(te_matrix,selected_columns)
+  return(df)
+}
+
+calc_appended_weighted_zscore <- function(te_matrix, appended_df, weights_vector){
+  weight_vector <- match_order(weights_vector, appended_df)
+  new_means <- weighted_means(appended_df, weight_vector)
+  new_sd <- weighted_sd(appended_df, weight_vector)
+  new_zscore <- weighted_zscore(appended_df, new_means, new_sd)
+  new_zscore <- na.omit(new_zscore)
+  new_zscore <- new_zscore[,1:ncol(te_matrix)]
+  return(new_zscore)
+}
+  
+delta_zscores <- function(te_matrix, new_zscores, weights_vector){
+  weight_vector <- match_order(weights_vector, te_matrix)
+  old_means <- weighted_means(te_matrix, weight_vector)
+  old_sd <- weighted_sd(te_matrix, weight_vector)
+  old_zscore <- weighted_zscore(te_matrix, old_means, old_sd)
+  old_zscore <- na.omit(old_zscore)
+  original_max <- apply(old_zscore,1,max)
+  new_max <- apply(new_zscores,1,max)
+  delta <- original_max - new_max
+  return(delta)
+}
+
+plot_delta_zscores <- function(te_matrix, sample_matrix, size_of_selection, weights_vector, number_of_permutations){
+  size_of_selection <- c(1:size_of_selection)
+  number_of_permutations <- c(1:number_of_permutations)
+  p <- ggplot()
+  for (i in size_of_selection){
+    for (j in number_of_permutations){
+      store1 <- append_random_columns(te_matrix, sample_matrix, size_of_selection[i])
+      store2 <- calc_appended_weighted_zscore(te_matrix, store1, weights_vector)
+      store3 <- delta_zscores(te_matrix, store2, weights_vector)
+      x <- rep(size_of_selection[i],times=length(store3))
+      df <- data.frame(x,store3)
+      p <- p + geom_bin2d(data=df,aes(x=df[,1],y=df[,2]))
+    }
+  }
+  return(p)
+}
