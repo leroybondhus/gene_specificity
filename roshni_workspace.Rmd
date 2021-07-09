@@ -305,6 +305,9 @@ delta_zscores <- function(te_matrix, new_zscores, weights_vector){
 plot_delta_zscores <- function(te_matrix, sample_matrix, size_of_selection, weights_vector, number_of_permutations){
   size_of_selection <- c(1:size_of_selection)
   number_of_permutations <- c(1:number_of_permutations)
+  a <- rep(0, times=nrow(te_matrix))
+  b <- rep(0, times=nrow(te_matrix))
+  c <- data.frame(a,b)
   p <- ggplot()
   for (i in size_of_selection){
     for (j in number_of_permutations){
@@ -313,7 +316,7 @@ plot_delta_zscores <- function(te_matrix, sample_matrix, size_of_selection, weig
       store3 <- delta_zscores(te_matrix, store2, weights_vector)
       x <- rep(size_of_selection[i],times=length(store3))
       df <- data.frame(x,store3)
-      p <- p + geom_bin2d(data=df,aes(x=df[,1],y=df[,2]))
+      p <- p + geom_bin2d(data=df,aes(x=df[,1],y=df[,2])) + geom_bin2d(data=c,aes(x=c[,1],y=c[,2]), fill="white")
     }
   }
   return(p)
