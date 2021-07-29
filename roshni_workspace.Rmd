@@ -13,6 +13,19 @@ library('ggpubr')
 library('grid')
 library('lattice')
 library('gdata')
+library('parallel')
+library('doParallel')
+library('data.table')
+library('graphics')
+library('viridis')
+
+registerDoParallel(cores=4)
+
+
+
+
+
+##### loading and wrangling GTEX data
 
 # loading te matrix
 GTEX.data <- read.csv("gtex_medians_PC_only_wo_MT.csv", header=T, sep=",")
@@ -29,231 +42,6 @@ drop_cols <- function(te_matrix, ...){
 
 # using above function to subset te matrix to only include tissue expression values
 GTEX.subset <- drop_cols(GTEX.data,"X","Name","Description")
-
-# function that returns a matrix of SDs given a te matrix
-specificity_by_zscore <- function(te_matrix){
-  mean_expression <- rowMeans(te_matrix)
-  std_expression <- apply(te_matrix,1,sd)
-  std_matrix <- (te_matrix - mean_expression) / std_expression
-  return(std_matrix)
-}
-
-# generating matrix of standard deviation values for each gene in each tissue
-zscore_matrix <- specificity_by_zscore(GTEX.subset)
-zscore_matrix <- na.omit(zscore_matrix)
-
-# function that will return tau values given matrix of tissue expression 
-# https://dx.doi.org/10.1093%2Fbib%2Fbbw008
-specificity_by_tau <- function(te_matrix){
-  x_hat <- te_matrix/max(te_matrix)
-  tau <- sum(1-x_hat) / (NROW(te_matrix)-1)
-}
-
-# calculating tau values
-tau_values <- apply(GTEX.subset,1,specificity_by_tau)
-
-# function that will return tissue specificity index values given matrix of tissue expression
-# https://dx.doi.org/10.1093%2Fbib%2Fbbw008
-specificity_by_tsi <- function(te_matrix){
-  a <- max(te_matrix)
-  b <- sum(te_matrix)
-  tsi <- a/b
-}
-
-# calculating tsi values
-tsi_values <- apply(GTEX.subset,1,specificity_by_tsi)
-
-# function to alphabetize weights vector
-alphabetize <- function(weights_vector){
-  weights_vector <- weights_vector[order(weights_vector$name),]
-  return(weights_vector)
-}
-
-# matches order of weights vector to  order of columns in te matrix (does not have to be alphabetical)
-match_order <- function(weights_vector,te_matrix){
-  new_order <- left_join(data.frame(name=colnames(te_matrix)),weights_vector,by="name")
-  return(new_order)
-}
-
-# function that will apply a weights vector to a te matrix and return a matrix with weighted te values
-# pass te_matrix columns and weights_vector rows in same order
-apply_weights <- function(te_matrix, weights_vector){
-  weighted_te_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
-  for (i in 1:nrow(weights_vector)){
-    weighted_te_matrix[,i] <- weights_vector[i,2]*te_matrix[,i]
-  }
-  colnames(weighted_te_matrix) <- colnames(te_matrix)
-  return(weighted_te_matrix)
-}
-
-# function that will calculate weighted mean expression for each gene given a weighted te matrix and a weights vector
-# pass te_matrix columns and weights_vector rows in same order
-# can be done with wtd.mean from Hmisc, but much slower
-weighted_means <- function(te_matrix, weights_vector){
-  weighted_te_matrix <- apply_weights(te_matrix, weights_vector)
-  weighted_means <- c(1:nrow(weighted_te_matrix))
-  for (i in 1:nrow(weighted_te_matrix)){
-    weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum(weights_vector[,2])
-  }
-  return(weighted_means)
-}
-
-# function that will calculate the weighted standard deviation given a te matrix, a vector of weighted means, and a weights vector
-# pass te_matrix columns and weights_vector rows in same order
-weighted_sd <- function(te_matrix, weights_vector){
-  weighted_var <- matrix(nrow=nrow(te_matrix),ncol=1)
-  for (i in 1:nrow(te_matrix)){
-    weighted_var[i] <- wtd.var(GTEX.subset[i,],weights=similarity_weights[,2])
-  }
-  weighted_sd <- sqrt(weighted_var)
-  return(weighted_sd)
-}
-
-# function that will compute the weighted zscore for each gene in each tissue given a te matrix, weighted means, and weighted standard deviations
-# weighted_means and weighted_sd pass as arguments rather than calculated internally to avoid run time
-weighted_zscore <- function(te_matrix, weighted_means, weighted_sd){
-  for (i in 1:nrow(te_matrix)){
-    te_matrix[i,] <- (te_matrix[i,]-weighted_means[i])/weighted_sd[i]
-  }
-  return(te_matrix)
-}
-
-# using similarity weights vector to calculate zscore, tau, and tsi values
-similarity_weights <- read.csv("weights_simi_.csv")
-similarity_weights <- alphabetize(similarity_weights)
-
-weighted_similarity_GTEX <- apply_weights(GTEX.subset, similarity_weights)
-
-weighted_similarity_mean <- weighted_means(GTEX.subset, similarity_weights)
-weighted_similarity_sd <- weighted_sd(GTEX.subset, similarity_weights)
-weighted_similarity_zscore <- weighted_zscore(GTEX.subset,weighted_similarity_mean,weighted_similarity_sd)
-weighted_similarity_zscore <- na.omit(weighted_similarity_zscore)
-
-weighted_similarity_tau_values <- apply(weighted_similarity_GTEX,1,specificity_by_tau)
-weighted_similarity_tsi_values <- apply(weighted_similarity_GTEX,1,specificity_by_tsi)
-
-# using pearson weights to calculate zscore, tau, and tsi values
-pearson_weights <- read.csv("weights_pearson_.csv")
-pearson_weights <- alphabetize(pearson_weights)
-
-weighted_pearson_GTEX <- apply_weights(GTEX.subset, pearson_weights)
-
-weighted_pearson_mean <- weighted_means(GTEX.subset, pearson_weights)
-weighted_pearson_sd <- weighted_sd(GTEX.subset, pearson_weights)
-weighted_pearson_zscore <- weighted_zscore(GTEX.subset,weighted_pearson_mean,weighted_pearson_sd)
-weighted_pearson_zscore <- na.omit(weighted_pearson_zscore)
-
-weighted_pearson_tau_values <- apply(weighted_pearson_GTEX,1,specificity_by_tau)
-weighted_pearson_tsi_values <- apply(weighted_pearson_GTEX,1,specificity_by_tsi)
-
-# using cosine weights to calculate zscore, tau, and tsi values
-cosine_weights <- read.csv("weights_cosine_.csv")
-cosine_weights <- alphabetize(cosine_weights)
-
-weighted_cosine_GTEX <- apply_weights(GTEX.subset, cosine_weights)
-
-weighted_cosine_mean <- weighted_means(GTEX.subset, cosine_weights)
-weighted_cosine_sd <- weighted_sd(GTEX.subset, cosine_weights)
-weighted_cosine_zscore <- weighted_zscore(GTEX.subset,weighted_cosine_mean,weighted_cosine_sd)
-weighted_cosine_zscore <- na.omit(weighted_cosine_zscore)
-
-weighted_cosine_tau_values <- apply(weighted_cosine_GTEX,1,specificity_by_tau)
-weighted_cosine_tsi_values <- apply(weighted_cosine_GTEX,1,specificity_by_tsi)
-
-# visualizing how tau values are changing
-layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
-plot(tau_values,weighted_similarity_tau_values)
-plot(tau_values,weighted_pearson_tau_values)
-plot(tau_values,weighted_cosine_tau_values)
-
-# visualizing how tsi values are changing
-layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
-plot(tsi_values,weighted_similarity_tsi_values)
-plot(tsi_values,weighted_pearson_tsi_values)
-plot(tsi_values,weighted_cosine_tsi_values)
-
-# visualzing difference in zscore
-max_zscore <- apply(zscore_matrix,1,max)
-max_similarity_zscore <- apply(weighted_similarity_zscore,1,max)
-max_pearson_zscore <- apply(weighted_pearson_zscore,1,max)
-max_cosine_zscore <- apply(weighted_cosine_zscore,1,max)
-
-# 2d density plot for flat vs. similarity weighted zscore
-df_zscore_flat_vs_similarity <- data.frame(max_zscore,max_similarity_zscore)
-densityplot_zscore_flat_vs_similarity <- ggplot(df_zscore_flat_vs_similarity, aes(x=max_zscore, y=max_similarity_zscore) ) +
-  geom_bin2d() + 
-  theme_bw() +
-  ggtitle("Flat Z-Scores Vs. Similarity Weighted Z-Scores") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  xlab("Flat Z-Scores") +
-  ylab("Similarity Weighted Z-Scores")
-
-# histogram for flat vs. similarity weighted zscore
-delta_zscore_flat_vs_similarity <- max_zscore-max_similarity_zscore
-index <- c(1:18834)
-df_delta_zscore_flat_vs_similarity <- data.frame(x=index, y=delta_zscore_flat_vs_similarity)
-histogram_zscore_flat_vs_similarity <- ggplot(df_delta_zscore_flat_vs_similarity, aes(x=delta_zscore_flat_vs_similarity)) + 
-  geom_histogram(binwidth=0.2,color="black", fill="white") +
-  labs(title="Difference Between Flat Z-Score and Similarity Weighted Z-Score",x="Delta", y = "Count") +
-  theme(plot.title = element_text(hjust = 0.5))
-
-# display two plots
-grid.arrange(densityplot_zscore_flat_vs_similarity, histogram_zscore_flat_vs_similarity, ncol=2)
-
-# test scatterplot with transparent points
-pointplot_zscore_flat_vs_similarity <- ggplot(df_zscore_flat_vs_similarity, aes(x=max_zscore, y=max_similarity_zscore) ) +
-  geom_point(alpha=0.5,color="blue") + 
-  theme_bw() +
-  ggtitle("Flat Z-Scores Vs. Similarity Weighted Z-Scores") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  xlab("Flat Z-Scores") +
-  ylab("Similarity Weighted Z-Scores")
-
-grid.arrange(pointplot_zscore_flat_vs_similarity, histogram_zscore_flat_vs_similarity, ncol=2)
-
-# 2d density plot for flat vs. pearson weighted zscore
-df_zscore_flat_vs_pearson <- data.frame(max_zscore,max_pearson_zscore)
-densityplot_zscore_flat_vs_pearson <- ggplot(df_zscore_flat_vs_pearson, aes(x=max_zscore, y=max_pearson_zscore) ) +
-  geom_bin2d() + 
-  theme_bw() +
-  ggtitle("Flat Z-Scores Vs. Pearson Weighted Z-Scores") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  xlab("Flat Z-Scores") +
-  ylab("Pearson Weighted Z-Scores")
-
-# histogram for flat vs. pearson weighted zscore
-delta_zscore_flat_vs_pearson <- max_zscore-max_pearson_zscore
-index <- c(1:18834)
-df_delta_zscore_flat_vs_pearson <- data.frame(x=index, y=delta_zscore_flat_vs_pearson)
-histogram_zscore_flat_vs_pearson <- ggplot(df_delta_zscore_flat_vs_pearson, aes(x=delta_zscore_flat_vs_pearson)) + 
-  geom_histogram(binwidth=0.2,color="black", fill="white") +
-  labs(title="Difference Between Flat Z-Score and Pearson Weighted Z-Score",x="Delta", y = "Count") +
-  theme(plot.title = element_text(hjust = 0.5))
-
-# display two plots
-grid.arrange(densityplot_zscore_flat_vs_pearson, histogram_zscore_flat_vs_pearson, ncol=2)
-
-# 2d density plot for flat vs. cosine weighted zscore
-df_zscore_flat_vs_cosine <- data.frame(max_zscore,max_cosine_zscore)
-densityplot_zscore_flat_vs_cosine <- ggplot(df_zscore_flat_vs_cosine, aes(x=max_zscore, y=max_cosine_zscore) ) +
-  geom_bin2d() + 
-  theme_bw() +
-  ggtitle("Flat Z-Scores Vs. Cosine Weighted Z-Scores") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  xlab("Flat Z-Scores") +
-  ylab("Cosine Weighted Z-Scores")
-
-# histogram for flat vs. cosine weighted zscore
-delta_zscore_flat_vs_cosine <- max_zscore-max_cosine_zscore
-index <- c(1:18834)
-df_delta_zscore_flat_vs_cosine <- data.frame(x=index, y=delta_zscore_flat_vs_cosine)
-histogram_zscore_flat_vs_cosine <- ggplot(df_delta_zscore_flat_vs_cosine, aes(x=delta_zscore_flat_vs_cosine)) + 
-  geom_histogram(binwidth=0.2,color="black", fill="white") +
-  labs(title="Difference Between Flat Z-Score and Cosine Weighted Z-Score",x="Delta", y = "Count") +
-  theme(plot.title = element_text(hjust = 0.5))
-
-# display two plots
-grid.arrange(densityplot_zscore_flat_vs_cosine, histogram_zscore_flat_vs_cosine, ncol=2)
 
 # subset data set to only include certain indices
 drop_index <- function(te_matrix, ...){
@@ -273,70 +61,290 @@ drop_index <- function(te_matrix, ...){
 GTEX.NoBrain <- drop_index(GTEX.subset,8:20)
 GTEX.Brain <- drop_index(GTEX.subset,1:7,21:54)
 
-# functions to select random column and add it to another matrix, calcualte new zscores, and find delta between the old and new zscores
-append_random_columns <- function(te_matrix, sample_matrix, size_of_selection){
-  selected_columns <- sample(sample_matrix, size_of_selection)
-  df <- data.frame(te_matrix,selected_columns)
-  return(df)
+
+
+
+
+##### generating list of delta z-scores (weighted)
+
+# function to calculate weighted zscores
+te_to_weighted_zscore <- function(te_matrix, weights_vector){
+  weights_vector <- left_join(data.frame(name=colnames(te_matrix)),weights_vector,by="name")
+  weighted_te_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (i in 1:nrow(weights_vector)){
+    weighted_te_matrix[,i] <- weights_vector[i,2]*te_matrix[,i]
+  }
+  colnames(weighted_te_matrix) <- colnames(te_matrix)
+  weighted_means <- c(1:nrow(weighted_te_matrix))
+  sum_of_weights <- sum(weights_vector[,2])
+  for (i in 1:nrow(weighted_te_matrix)){
+    weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum_of_weights
+  }
+  weighted_var <- matrix(nrow=nrow(te_matrix),ncol=1)
+  for (i in 1:nrow(te_matrix)){
+    weighted_var[i] <- wtd.var(te_matrix[i,],weights=weights_vector[,2])
+  }
+  weighted_sd <- sqrt(weighted_var)
+  for (i in 1:nrow(te_matrix)){
+    te_matrix[i,] <- (te_matrix[i,]-weighted_means[i])/weighted_sd[i]
+  }
+  weighted_zscores <- na.omit(te_matrix)
 }
 
-calc_appended_weighted_zscore <- function(te_matrix, appended_df, weights_vector){
-  weight_vector <- match_order(weights_vector, appended_df)
-  new_means <- weighted_means(appended_df, weight_vector)
-  new_sd <- weighted_sd(appended_df, weight_vector)
-  new_zscore <- weighted_zscore(appended_df, new_means, new_sd)
-  new_zscore <- na.omit(new_zscore)
-  new_zscore <- new_zscore[,1:ncol(te_matrix)]
-  return(new_zscore)
-}
-  
-delta_zscores <- function(te_matrix, new_zscores, weights_vector){
-  weight_vector <- match_order(weights_vector, te_matrix)
-  old_means <- weighted_means(te_matrix, weight_vector)
-  old_sd <- weighted_sd(te_matrix, weight_vector)
-  old_zscore <- weighted_zscore(te_matrix, old_means, old_sd)
-  old_zscore <- na.omit(old_zscore)
-  original_max <- apply(old_zscore,1,max)
-  new_max <- apply(new_zscores,1,max)
-  delta <- original_max - new_max
-  return(delta)
-}
-
-iterate_delta_zscores <- function(te_matrix, sample_matrix, size_of_selection, weights_vector, number_of_permutations){
+# function to calculate weighted zscores based on randomly added samples
+appended_te_to_weighted_zscore <- function(P1,P2,weights_vector,size_of_selection,number_of_permutations){
   size_of_selection <- c(1:size_of_selection)
   number_of_permutations <- c(1:number_of_permutations)
-  output <- c()
+  results_list <- list()
   for (i in size_of_selection){
     for (j in number_of_permutations){
-      store1 <- append_random_columns(te_matrix, sample_matrix, size_of_selection[i])
-      store2 <- calc_appended_weighted_zscore(te_matrix, store1, weights_vector)
-      store3 <- delta_zscores(te_matrix, store2, weights_vector)
-      store3 <- mean(store3)
-      output <- append(output, store3)
+      selected_columns <- sample(P2, size_of_selection)
+      df <- data.frame(P1,selected_columns)
+      weight_vector <- left_join(data.frame(name=colnames(df)),weights_vector,by="name")
+      weighted_te_matrix <- matrix(nrow=nrow(df),ncol=ncol(df))
+      for (i in 1:nrow(weight_vector)){
+        weighted_te_matrix[,i] <- weight_vector[i,2]*df[,i]
+      }
+      colnames(weighted_te_matrix) <- colnames(df)
+      weighted_means <- c(1:nrow(weighted_te_matrix))
+      sum_of_weights <- sum(weight_vector[,2])
+      for (i in 1:nrow(weighted_te_matrix)){
+        weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum_of_weights
+      }
+      weighted_var <- matrix(nrow=nrow(df),ncol=1)
+      for (i in 1:nrow(df)){
+        weighted_var[i] <- wtd.var(df[i,],weights=weight_vector[,2])
+      }
+      weighted_sd <- sqrt(weighted_var)
+      for (i in 1:nrow(df)){
+        df[i,] <- (df[i,]-weighted_means[i])/weighted_sd[i]
+      }
+      weighted_zscores <- na.omit(df)
+      weighted_zscores <- weighted_zscores[,1:ncol(P1)]
+      output <- list(weighted_zscores)
+      results_list <- append(results_list,output)
     }
   }
+  return(results_list)
+}
+
+# function to take the difference in values between two dfs
+delta <- function(df_1,df_2){
+  store1 <- as.data.frame(df_1)
+  store2 <- as.data.frame(df_2)
+  df_1 <- as.data.frame(df_1)
+  df_2 <- as.data.frame(df_2)
+  df_1_names <- row.names(df_1)
+  df_2_names <- row.names(df_2)
+  df_1$rowid <- df_1_names
+  df_2$rowid <- df_2_names
+  temp <- inner_join(df_1, df_2, by="rowid")
+  df_1 <- temp[,1:ncol(store1)]
+  df_2 <- temp[,(ncol(store1)+2):ncol(temp)]
+  output <- list((df_1-df_2))
   return(output)
 }
 
-# calculating chance in zscore when brain columns are added for a subset of 30 genes
-random_numbers <- runif(30,1,19193)
-subset.NoBrain <- GTEX.NoBrain[random_numbers,]
-subset.Brain <- GTEX.Brain[random_numbers,]
-list_delta_zscore <- iterate_delta_zscores(subset.NoBrain,subset.Brain,13,similarity_weights,10)
+# reading in weights vector
+similarity_weights <- read.csv("weights_simi_.csv")
 
-# function to retrieve the mean change across permutations for each size selection
-get_sample_mean <- function(list_values, n){
-  iterate <- length(list_values) / n
-  output <- c()
-  for (i in 1:iterate){
-    a <- (i*n) - 9
-    b <- i*n
-    c <- mean(list_values[a:b])
-    output <- append(output,c)
+# creating df of weighted P1 z-scores
+weighted_similarity_zscores <- te_to_weighted_zscore(GTEX.NoBrain,similarity_weights)
+
+# creating list of dfs of weighted P1 z-scores calculated based on added brain columns
+permutation_similarity_data <- appended_te_to_weighted_zscore(GTEX.NoBrain,GTEX.Brain,similarity_weights,13,3)
+
+# creating list of dfs of delta(weighted P1 z-scores) NoBrain - Brain
+permutations <- c(1:length(permutation_similarity_data))
+delta_similarity <- c()
+for (i in permutations){
+  output <- delta(weighted_similarity_zscores,permutation_similarity_data[i])
+  delta_similarity <- append(delta_similarity,output)
+}
+
+
+
+
+
+##### generating list of delta z-scores (flat)
+
+# function to calculate flat zscores
+specificity_by_zscore <- function(te_matrix){
+  mean_expression <- rowMeans(te_matrix)
+  std_expression <- apply(te_matrix,1,sd)
+  zscore_matrix <- (te_matrix - mean_expression) / std_expression
+  return(zscore_matrix)
+}
+
+# function to calculate flat zscores based on randomly added samples
+appended_te_to_flat_zscore <- function(P1,P2,size_of_selection,number_of_permutations){
+  size_of_selection <- c(1:size_of_selection)
+  number_of_permutations <- c(1:number_of_permutations)
+  results_list <- list()
+  for (i in size_of_selection){
+    for (j in number_of_permutations){
+      selected_columns <- sample(P2, size_of_selection)
+      df <- data.frame(P1,selected_columns)
+      mean_expression <- rowMeans(df)
+      std_expression <- apply(df,1,sd)
+      zscore_matrix <- (df - mean_expression) / std_expression
+      zscore_matrix <- na.omit(zscore_matrix)
+      zscore_matrix <- zscore_matrix[,1:ncol(P1)]
+      output <- list(zscore_matrix)
+      results_list <- append(results_list,output)
+    }
   }
-  return(output)
+  return(results_list)
 }
 
-# retrieving and plotting mean changes for each size selection
-sample_means <- get_sample_mean(list_delta_zscore,10)
-plot(c(1:13), sample_means)
+# creating df of flat P1 z-scores
+flat_zscores <- specificity_by_zscore(GTEX.NoBrain)
+flat_zscores <- na.omit(flat_zscores)
+
+# creating list of dfs of flat P1 z-scores calculated based on added brain columns
+permutation_flat_data <- appended_te_to_flat_zscore(GTEX.NoBrain,GTEX.Brain,13,3)
+
+# creating list of dfs of delta(flat P1 z-scores) NoBrain - Brain
+permutations <- c(1:length(permutation_flat_data))
+delta_flat <- c()
+for (i in permutations){
+  output <- delta(flat_zscores,permutation_flat_data[i])
+  delta_flat <- append(delta_flat,output)
+}
+
+
+
+
+
+##### plotting weighted delta z-scores
+
+copy_del_sim <- delta_similarity
+copy_del_sim_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:13){
+  copy_del_sim_temp_df <- unlist(data.frame(copy_del_sim[[3*i]]))
+  copy_del_sim_temp_hist <- hist(copy_del_sim_temp_df, breaks = 100, plot=F)
+  copy_del_sim_hist_objs <- rbind(copy_del_sim_hist_objs, data.frame(counts=copy_del_sim_temp_hist$counts, mids=copy_del_sim_temp_hist$mids, sample_num=rep(i, length(copy_del_sim_temp_hist$counts))))
+}
+ggplot(copy_del_sim_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Weighted Z-Score for Added Brain Columns", x="Change in Weighted Z-Score", y="Number of Brain Columns Added", fill="Counts") + 
+  theme(plot.title=element_text(hjust=0.5))
+
+
+
+
+
+##### plotting flat delta z-scores
+
+copy_del_flat <- delta_flat
+copy_del_flat_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:13){
+  copy_del_flat_temp_df <- unlist(data.frame(copy_del_flat[[3*i]]))
+  copy_del_flat_temp_hist <- hist(copy_del_flat_temp_df, breaks = 100, plot=F)
+  copy_del_flat_hist_objs <- rbind(copy_del_flat_hist_objs, data.frame(counts=copy_del_flat_temp_hist$counts, mids=copy_del_flat_temp_hist$mids, sample_num=rep(i, length(copy_del_flat_temp_hist$counts))))
+}
+ggplot(copy_del_flat_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Flat Z-Score for Added Brain Columns", x="Change in Flat Z-Score", y="Number of Brain Columns Added", fill="Counts") + 
+  theme(plot.title=element_text(hjust=0.5))
+
+
+
+
+
+##### creating one dataset with one brain column and one dataset with the rest of the brain columns
+
+# randomly sample to get one brain column
+one_brain <- sample(GTEX.Brain,1)
+
+# add one brain column to the NoBrain dataset
+GTEX.OneBrain <- cbind(GTEX.NoBrain, one_brain)
+
+# function to drop a column by name
+drop_cols <- function(te_matrix, ...){
+  cols_to_drop <- list(...)
+  for (col in cols_to_drop){
+    a <- which(colnames(te_matrix)==col)
+    te_matrix <- te_matrix[-a]
+  }
+  return(te_matrix)
+}
+
+# drop randomly sampled column from the Brain dataset
+GTEX.TwelveBrain <- drop_cols(GTEX.Brain, "Brain...Hippocampus")
+
+
+
+
+
+##### generating list of delta z-scores (weighted) with baseline of 1
+
+# creating df of weighted P1 z-scores
+weighted_similarity_zscores_1 <- te_to_weighted_zscore(GTEX.OneBrain,similarity_weights)
+
+# creating list of dfs of weighted P1 z-scores calculated based on added brain columns
+permutation_similarity_data_1 <- appended_te_to_weighted_zscore(GTEX.OneBrain,GTEX.TwelveBrain,similarity_weights,12,3)
+
+# creating list of dfs of delta(weighted P1 z-scores) NoBrain - Brain
+permutations <- c(1:length(permutation_similarity_data_1))
+delta_similarity_1 <- c()
+for (i in permutations){
+  output <- delta(weighted_similarity_zscores_1,permutation_similarity_data_1[i])
+  delta_similarity_1 <- append(delta_similarity_1,output)
+}
+
+
+
+
+
+##### generating list of delta z-scores (flat) with baseline of 1
+
+# creating df of flat P1 z-scores
+flat_zscores_1 <- specificity_by_zscore(GTEX.OneBrain)
+flat_zscores_1 <- na.omit(flat_zscores_1)
+
+# creating list of dfs of flat P1 z-scores calculated based on added brain columns
+permutation_flat_data_1 <- appended_te_to_flat_zscore(GTEX.OneBrain,GTEX.TwelveBrain,12,3)
+
+# creating list of dfs of delta(flat P1 z-scores) NoBrain - Brain
+permutations <- c(1:length(permutation_flat_data_1))
+delta_flat_1 <- c()
+for (i in permutations){
+  output <- delta(flat_zscores_1,permutation_flat_data_1[i])
+  delta_flat_1 <- append(delta_flat_1,output)
+}
+
+
+
+# plotting weighted baseline 1
+copy_del_sim_1 <- delta_similarity_1
+copy_del_sim_hist_objs_1 <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:12){
+  copy_del_sim_temp_df_1 <- unlist(data.frame(copy_del_sim_1[[3*i]]))
+  copy_del_sim_temp_hist_1 <- hist(copy_del_sim_temp_df_1, breaks = 100, plot=F)
+  copy_del_sim_hist_objs_1 <- rbind(copy_del_sim_hist_objs_1, data.frame(counts=copy_del_sim_temp_hist_1$counts, mids=copy_del_sim_temp_hist_1$mids, sample_num=rep(i, length(copy_del_sim_temp_hist_1$counts))))
+}
+ggplot(copy_del_sim_hist_objs_1, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Weighted Z-Score for Added Brain Columns, Baseline 1", x="Change in Weighted Z-Score", y="Number of Brain Columns Added", fill="Counts") + 
+  theme(plot.title=element_text(hjust=0.5))
+
+
+
+
+# plotting flat baseline 1
+copy_del_flat_1 <- delta_flat_1
+copy_del_flat_hist_objs_1 <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:12){
+  copy_del_flat_temp_df_1 <- unlist(data.frame(copy_del_flat_1[[3*i]]))
+  copy_del_flat_temp_hist_1 <- hist(copy_del_flat_temp_df_1, breaks = 100, plot=F)
+  copy_del_flat_hist_objs_1 <- rbind(copy_del_flat_hist_objs_1, data.frame(counts=copy_del_flat_temp_hist_1$counts, mids=copy_del_flat_temp_hist_1$mids, sample_num=rep(i, length(copy_del_flat_temp_hist_1$counts))))
+}
+ggplot(copy_del_flat_hist_objs_1, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Flat Z-Score for Added Brain Columns, Baseline 1", x="Change in Flat Z-Score", y="Number of Brain Columns Added", fill="Counts") + 
+  theme(plot.title=element_text(hjust=0.5))
