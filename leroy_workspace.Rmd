@@ -12,7 +12,7 @@ library("devtools")
 library("roxygen2")
 library("usedist")
 library("ggtree")
-install("gene.specificity.funcs")
+install("./../GeneSpecificityFuncs")
 ```
 
 ```{r hierarchical_tree_funcs}
@@ -157,7 +157,7 @@ names(dist_df_temp) <- c("sample1","sample2", "norm_distance")
 hist(dist_mat_norm,breaks = 1000)
 
 
-distance_tree <- LMB_htf.dist_tree(dist_df = dist_df_temp)
+distance_tree <- GeneSpecificityFuncs::LMB_htf.dist_tree(dist_df = dist_df_temp)
 
 
 #### convert distance_tree to plottable format
@@ -170,4 +170,13 @@ hclus <- hclust(dist_mat_norm)
 as.dendrogram(hclus)
 plot(hclus)
 
+```
+
+
+```{r test dendextend}
+library(dendextend)
+dend <- c(1:5) %>% dist %>% hclust(method="average") %>% as.dendrogram
+
+dend %>% plot
+dend %>% unclass %>% str
 ```
