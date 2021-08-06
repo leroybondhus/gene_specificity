@@ -180,3 +180,29 @@ dend <- c(1:5) %>% dist %>% hclust(method="average") %>% as.dendrogram
 dend %>% plot
 dend %>% unclass %>% str
 ```
+
+
+
+```{r set up project map}
+
+### aim: calculate gene expression specificity integrating sample similarity information
+
+### load dataset :: genes(rows) x samples(cols) ## matrix or dataframe  
+###### standardize format and metadata organization
+
+### calculate sample similarity matrix 
+###### test different methods for doing this (Yenifer)
+
+### generate sample similarity tree
+###### test different methods for doing this (Yenifer)
+
+### use similarity tree to calculate sample weights 
+
+### use sample weights to draw distribution of gene expression across all samples (Roshni)
+
+### calculate gene specificity values (Roshni)
+
+
+
+
+```
