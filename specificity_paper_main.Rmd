@@ -1,0 +1,71 @@
+---
+title: "specificity_paper_main"
+author: "Leroy Bondhus"
+date: "8/19/2021"
+output: html_document
+---
+
+
+## NOTE: most functions live in GeneSpecificityFuncs package for 
+##       this project. Load this package here
+## 
+```{r set up package of functions used}
+library("devtools")
+library("roxygen2")
+install("./../GeneSpecificityFuncs")
+```
+
+## load gtex here
+```{r import dataset}
+
+```
+
+## clean gtex dataset here
+```{r clean dataset}
+## show mitochondrial genes drive a large part of sample similarity
+#### Supplemental Figure (Fraction of TPM from chr==M )
+#### Supplemental Figure (heatmap cluster of samples )
+
+
+## remove mitochondrial contribution
+```
+
+
+```{r measure sample similarity}
+### to do: justify method for measuring sample similarity - may require comparison or refs
+
+### create: sim_mat # sample similarity matrix
+```
+
+
+```{r hierarchical clustering on sample similarity}
+### to do: justify method for hierarchical clustering - may require comparison or refs
+
+### create: sim_tree # sample similarity tree
+```
+
+
+```{r calculate sample weights}
+### uses Equation 1. 
+
+### create: sample_weights
+```
+
+
+```{r calculate specificity}
+### uses Equation 2.
+
+### creates: spec_mat # specificity matrix
+```
+
+
+
+
+
+```{r validation with variable sample set}
+
+
+```
+
+
+
