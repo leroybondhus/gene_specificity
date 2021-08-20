@@ -133,7 +133,7 @@ ggplot(copy_del_flat_hist_objs_1, aes(x=mids, y=sample_num, width=1, height=1)) 
   
   
   
-  ##### generating list of delta z-scores (weighted) with baseline of 1
+##### generating list of delta z-scores (weighted) with baseline of 1
 
 # creating df of weighted P1 z-scores
 weighted_similarity_zscores_1 <- te_to_weighted_zscore(GTEX.OneBrain,similarity_weights)
@@ -168,7 +168,7 @@ ggplot(copy_del_sim_hist_objs_1, aes(x=mids, y=sample_num, width=1, height=1)) +
   
   
   
-  # variance for flat baseline 1
+# variance for flat baseline 1
 copy_del_flat_1_forvar <- delta_flat_1
 var_for_n_flat_1 <- c()
 for (i in 1:12){
@@ -188,6 +188,7 @@ for (i in 1:12){
 }
 plot(1:12, var_for_n_sim_1)
 
+# plotting together
 # red = flat variance
 # blue = weighted variance
 plot(var_for_n_flat_1,type = "o",col = "red",xlab="Number of Brain Columns Added",ylab="Variance of Change in Z-Score",main="Variance of Change in Z-Score for Weighted vs. Flat Method")
