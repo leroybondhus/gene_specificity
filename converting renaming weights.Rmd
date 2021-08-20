@@ -1,0 +1,86 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+#input distance tree 
+LMB_htf.sum_dist_of_children <- function(node){
+  if(all(is.na(node$left_child)) != all(is.na(node$right_child))){print("WARNING: Asymetric Node"); return(-Inf)}
+  if(all(is.na(node$left_child)) & all(is.na(node$right_child))){return(0)} ## if no children, return 0 as sum of distances
+  left_sum <- node$left_child$dist_to_parent + LMB_htf.sum_dist_of_children(node$left_child)
+  right_sum <- node$right_child$dist_to_parent + LMB_htf.sum_dist_of_children(node$right_child)
+  if( abs(left_sum - right_sum) > 1e-10 ){print("WARNING: Asymetric Node"); return(-Inf)}  ## test for equality sometimes fails, test diff less than small number
+  else{
+    return(left_sum)
+  }
+  }
+reinputting_weights <- function(node){
+ if(all(is.na(node$left_child)) & all(is.na(node$right_child))){
+       node$height <- 0 
+      
+     }
+  else {
+   node$left_child<-reinputting_weights(node$left_child)
+   node$right_child<-reinputting_weights(node$right_child)
+   node$height<- LMB_htf.sum_dist_of_children(node)
+  
+  }
+   return(node)
+}
+
+
+temp<-reinputting_weights(distance_pearson_tree)
+
+
+
+
+
+
+```
+
+```{r}
+install.packages("data.tree")
+library(data.tree)
+#converts to R6
+distance_tree_node_pear<-(as.Node(temp))
+#converts to dendrogram
+distance_tree_dendrogram_pear<-as.dendrogram()
+View(distance_tree_node_pear)
+View(distance_tree_dendrogram_pear)
+
+
+install.packages("dendextend")
+library(dendextend)
+distance_tree_dendrogram_pear %>% set("labels_col", "blue")  %>% plot(main = "Change label's color")
+str(distance_tree_dendrogram_pear)
+
+get_branches_heights(distance_tree_dendrogram_pear)
+distance_tree_dendrogram_pear %>% unclass %>% str
+distance_tree_node_pear$height
+View(distance_tree_node_pear)
+set_labels(distance_tree_dendrogram_pear,weights_pearson$name)
+View(distance_tree_dendrogram_pear)
+plot(distance_tree_dendrogram_pear, type = c("rectangle", "triangle"),
+      center = TRUE,
+      edge.root = is.leaf(x) || !is.null(attr(x,"edgetext")),
+      nodePar = NULL, edgePar = list(),
+      leaflab = c("perpendicular", "textlike", "none"),
+      dLeaf = NULL, xlab = "", ylab = "", xaxt = "n", yaxt = "s",
+      horiz = FALSE, frame.plot = FALSE)
+
+
+
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
