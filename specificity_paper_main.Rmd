@@ -18,6 +18,11 @@ install("./../GeneSpecificityFuncs")
 ## load gtex here
 ```{r import dataset}
 
+temp <- tempfile()
+download.file("https://storage.googleapis.com/gtex_analysis_v8/rna_seq_data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz",temp)
+gtex <- read.table( temp, skip=2, header = TRUE, sep = "\t")
+unlink(temp); rm(temp)
+
 ```
 
 ## clean gtex dataset here
