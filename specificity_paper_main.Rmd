@@ -17,20 +17,36 @@ install("./../GeneSpecificityFuncs")
 
 ## load gtex here
 ```{r import dataset}
-
+## import gtex medians data
 temp <- tempfile()
 download.file("https://storage.googleapis.com/gtex_analysis_v8/rna_seq_data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz",temp)
 gtex <- read.table( temp, skip=2, header = TRUE, sep = "\t")
 unlink(temp); rm(temp)
+
+
+
+library(biomaRt)
+## import ensembl gene data
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", GRCh=37)
+genes <- getBM(attributes=c('chromosome_name','start_position','end_position','hgnc_symbol', 'ensembl_gene_id','gene_biotype'),
+                 filters = list('biotype'='protein_coding'),
+                 mart = ensembl, useCache = F) 
+genes <- genes[which(is.element(genes$chromosome_name, c(1:22, "X", "Y", "MT")) & genes$hgnc_symbol != "" ) ,]
+
+
 
 ```
 
 ## clean gtex dataset here
 ```{r clean dataset}
 ## show mitochondrial genes drive a large part of sample similarity
-#### Supplemental Figure (Fraction of TPM from chr==M )
-#### Supplemental Figure (heatmap cluster of samples )
+## Note sum of medians in gtex not quite 1M - likely artifact of taking medians
+barplot(colSums(gtex[,3:ncol(gtex)]))
 
+#### Supplemental Figure (Fraction of TPM from chr==M )
+
+
+#### Supplemental Figure (heatmap cluster of samples )
 
 ## remove mitochondrial contribution
 ```
