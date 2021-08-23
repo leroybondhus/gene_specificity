@@ -15,56 +15,6 @@ library("roxygen2")
 install("./../GeneSpecificityFuncs")
 ```
 
-```{r temp:move funcs to pacakge}
-#actual standard deviations matrix
-make_zscore_matrix<- function(dat) {
-  zscores <- matrix(NA, nrow = nrow(dat), ncol = ncol(dat))
-  means <- rowMeans(dat)
-  sds <- as.numeric(rep(NA,length(means)))
-  which <- which(means != 0)
-  sds[which] <- apply(dat[which,],1,sd)
-  for(j in 1:ncol(dat)){zscores[,j] <- (dat[,j] - means)/sds  }
-  return(zscores)
-}
-
-make_dot_product_similarity_matrix <- function(dat) {
-  dot_product_similarity_matrix <- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
-  for(i in 1:ncol(dat)){
-    for(j in 1:ncol(dat)){
-      which_i <- which(!is.na(dat[,i])) ## ignore NAs
-      which_j <- which(!is.na(dat[,j])) ## ignore NAs
-      dot_product_similarity_matrix[i,j] <- sum(dat[which_i,i] * dat[which_j,j]) / (norm(dat[which_i,i],"2")*norm(dat[which_j,j],"2"))
-    }
-  }
-  return(dot_product_similarity_matrix)
-}
-
-zscores <- make_zscore_matrix(log10(gtex[,3:ncol(gtex)]+1) )
-dot_sim <- make_dot_product_similarity_matrix(zscores)
-dot_sim_raw <- make_dot_product_similarity_matrix(log10(gtex[,3:ncol(gtex)]+1 ))
-
-
-colnames(dot_sim) <- colnames(gtex[,3:ncol(gtex)])
-rownames(dot_sim) <- colnames(gtex[,3:ncol(gtex)])
-
-### validate choice
-##use dist=1-dot_sim(zscores(log10(tpm+1))), single linkage clustering for now 
-plot(hclust(as.dist(1-dot_sim),method = "single"), hang = -1, main = "dot_sim,single_clust")
-###
-plot(hclust(as.dist(1-dot_sim),method = "average"), hang = -1, main = "dot_sim,ave_clust")
-plot(hclust(as.dist(1-dot_sim),method = "complete"), hang = -1, main = "dot_sim,complete_clust")
-heatmap(dot_sim)
-
-
-colnames(dot_sim_raw) <- colnames(gtex[,3:ncol(gtex)])
-rownames(dot_sim_raw) <- colnames(gtex[,3:ncol(gtex)])
-plot(hclust(as.dist(1-dot_sim_raw),method = "single"), hang = -1, main = "dot_sim_raw,single_clust")
-plot(hclust(as.dist(1-dot_sim_raw),method = "average"), hang = -1, main = "dot_sim_raw,ave_clust")
-plot(hclust(as.dist(1-dot_sim_raw),method = "complete"), hang = -1, main = "dot_sim_raw,complete_clust")
-heatmap(dot_sim_raw)
-
-```
-
 ## load gtex here
 ```{r import dataset}
 ## import gtex medians data
@@ -92,10 +42,31 @@ genes <- genes[which(is.element(genes$chromosome_name, c(1:22, "X", "Y", "MT")) 
 ## show mitochondrial genes drive a large part of sample similarity
 ## Note sum of medians in gtex not quite 1M - likely artifact of taking medians
 barplot(colSums(gtex[,3:ncol(gtex)]))
+which <- which(genes$chromosome_name != "MT" )
+whichMT <- which(genes$chromosome_name == "MT" )
+library(stringr)
+## match genes between gtex and ensembl
 
+gtex_names <- str_split_fixed(gtex$Name, "[.]", 2)[,1]
+gtex_cleaned <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
+gtex_cleanedMT <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[whichMT])),]
+
+##non-mitochondrial TPM sum
+barplot(colSums(gtex_cleaned[,3:ncol(gtex_cleaned)]))
+##mitochondrial TPM sum
+barplot(colSums(gtex_cleanedMT[,3:ncol(gtex_cleanedMT)]))
+## non-mito + mito TPM sum
+barplot(colSums(gtex_cleaned[,3:ncol(gtex_cleaned)])+colSums(gtex_cleanedMT[,3:ncol(gtex_cleanedMT)]))
+
+gtex_cleaned_renorm <- gtex_cleaned
+for(i in 3:ncol(gtex_cleaned_renorm)){
+  gtex_cleaned_renorm[,i] <- (gtex_cleaned_renorm[,i]*1e6 / sum(gtex_cleaned_renorm[,i]))
+}
+##renormalized TPM without mitochondrial genes
+barplot(colSums(gtex_cleaned_renorm[,3:ncol(gtex_cleaned_renorm)]))
 #### Supplemental Figure (Fraction of TPM from chr==M )
 
-
+gtex <- gtex_cleaned_renorm
 #### Supplemental Figure (heatmap cluster of samples )
 
 ## remove mitochondrial contribution
@@ -104,7 +75,39 @@ barplot(colSums(gtex[,3:ncol(gtex)]))
 
 ```{r measure sample similarity}
 ### to do: justify method for measuring sample similarity - may require comparison or refs
+make_zscore_matrix<- function(dat) {
+  zscores <- matrix(NA, nrow = nrow(dat), ncol = ncol(dat))
+  means <- rowMeans(dat)
+  sds <- as.numeric(rep(NA,length(means)))
+  which <- which(means != 0)
+  sds[which] <- apply(dat[which,],1,sd)
+  for(j in 1:ncol(dat)){zscores[,j] <- (dat[,j] - means)/sds  }
+  return(zscores)
+}
 
+make_dot_product_similarity_matrix <- function(dat) {
+  dot_product_similarity_matrix <- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)){
+      which_i <- which(!is.na(dat[,i])) ## ignore NAs
+      which_j <- which(!is.na(dat[,j])) ## ignore NAs
+      dot_product_similarity_matrix[i,j] <- sum(dat[which_i,i] * dat[which_j,j]) / (norm(dat[which_i,i],"2")*norm(dat[which_j,j],"2"))
+    }
+  }
+  return(dot_product_similarity_matrix)
+}
+
+zscores <- make_zscore_matrix(log10(gtex[,3:ncol(gtex)]+1) )
+dot_sim <- make_dot_product_similarity_matrix(zscores)
+
+colnames(dot_sim) <- colnames(gtex[,3:ncol(gtex)])
+rownames(dot_sim) <- colnames(gtex[,3:ncol(gtex)])
+
+### validate choice
+##use dist=1-dot_sim(zscores(log10(tpm+1))), single linkage clustering for now 
+plot(hclust(as.dist(1-dot_sim),method = "single"), hang = -1, main = "dot_sim,single_clust")
+
+sim_mat <- dot_sim
 ### create: sim_mat # sample similarity matrix
 ```
 
