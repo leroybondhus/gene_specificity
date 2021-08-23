@@ -39,30 +39,30 @@ make_dot_product_similarity_matrix <- function(dat) {
   return(dot_product_similarity_matrix)
 }
 
-zscores <- make_zscore_matrix(log10(gtex[,3:ncol(gtex)]))
+zscores <- make_zscore_matrix(log10(gtex[,3:ncol(gtex)]+1) )
 dot_sim <- make_dot_product_similarity_matrix(zscores)
 dot_sim_raw <- make_dot_product_similarity_matrix(log10(gtex[,3:ncol(gtex)]+1 ))
 
 
 colnames(dot_sim) <- colnames(gtex[,3:ncol(gtex)])
 rownames(dot_sim) <- colnames(gtex[,3:ncol(gtex)])
-plot(hclust(dist(dot_sim),method = "single"), hang = -1)
+
+### validate choice
+##use dist=1-dot_sim(zscores(log10(tpm+1))), single linkage clustering for now 
+plot(hclust(as.dist(1-dot_sim),method = "single"), hang = -1, main = "dot_sim,single_clust")
+###
+plot(hclust(as.dist(1-dot_sim),method = "average"), hang = -1, main = "dot_sim,ave_clust")
+plot(hclust(as.dist(1-dot_sim),method = "complete"), hang = -1, main = "dot_sim,complete_clust")
 heatmap(dot_sim)
 
 
 colnames(dot_sim_raw) <- colnames(gtex[,3:ncol(gtex)])
 rownames(dot_sim_raw) <- colnames(gtex[,3:ncol(gtex)])
-plot(hclust(dist(dot_sim_raw),method = "single"), hang = -1)
+plot(hclust(as.dist(1-dot_sim_raw),method = "single"), hang = -1, main = "dot_sim_raw,single_clust")
+plot(hclust(as.dist(1-dot_sim_raw),method = "average"), hang = -1, main = "dot_sim_raw,ave_clust")
+plot(hclust(as.dist(1-dot_sim_raw),method = "complete"), hang = -1, main = "dot_sim_raw,complete_clust")
 heatmap(dot_sim_raw)
 
-temp <- cor(gtex[,3:ncol(gtex)], method="pearson")
-heatmap(temp)
-temp <- cor(log10(gtex[,3:ncol(gtex)]+1), method="pearson")
-heatmap(temp)
-temp <- cor(gtex[,3:ncol(gtex)], method="spearman")
-heatmap(temp)
-temp <- cor(log10(gtex[,3:ncol(gtex)]+1), method="spearman")
-heatmap(temp)
 ```
 
 ## load gtex here
