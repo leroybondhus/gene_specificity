@@ -161,7 +161,16 @@ LMB_dend.add_weights <- function(dend, weight_of_parent=0){
 }
 sim_tree <- LMB_dend.add_weights(sim_tree)
 
-
+## plot tree with weights
+library(dendextend)
+sim_tree %>% get_nodes_attr("weight")
+png(filename = "temp1.png", width=720, height=460)
+par(mar=c(16,4,1,1)+.1)
+sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2.2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
+dev.off()
+png(filename = "temp2.png", width=720, height=360)
+barplot(get_leaves_attr(sim_tree,"weight"))
+dev.off()
 ### create: sample_weights
 ```
 
