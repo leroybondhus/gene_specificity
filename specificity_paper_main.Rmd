@@ -116,6 +116,13 @@ sim_mat <- dot_sim
 GeneSpecificityFuncs::LMB_htf.dist_tree()
 
 sim_tree <- as.dendrogram(hclust(as.dist(1-dot_sim),method = "single"))
+
+### create: sim_tree # sample similarity tree
+```
+
+
+```{r calculate sample weights}
+### uses Equation 1. 
 str(unclass(sim_tree))
 
 attributes(sim_tree[[1]]) <- c(attributes(sim_tree[[1]]), tempy="hello_from_tempy")
@@ -140,41 +147,20 @@ LMB_dend.add_dist_to_parent <- function(dend, dist_to_parent=0){
 }
 sim_tree <- LMB_dend.add_dist_to_parent(sim_tree)
 
-LMB_dend.add_weights <- function(dend){
-  num_desc <- attributes(dend)$members
-  weight <- 
-  attributes(dend)<- c(attributes(dend), weight=weight)
+LMB_dend.add_weights <- function(dend, weight_of_parent=0){
+  weight <- (attributes(dend)$dist_to_parent / attributes(dend)$members) + weight_of_parent 
+  attributes(dend) <- c(attributes(dend), weight=weight)
+  ## test if at leaf node
+  if(!is.null(attributes(dend)$leaf) && attributes(dend)$leaf){
+    return(dend)
+  }
+  for(i in 1:length(dend)){ ## length of dend should be number of child nodes
+    dend[[i]] <- LMB_dend.add_weights(dend[[i]], weight_of_parent=weight)
+  }
+  return(dend)
 }
+sim_tree <- LMB_dend.add_weights(sim_tree)
 
-## yenifer's code
-##dend has this already :) 
-count_number_descendant<- function(node) {
-  if(is.na(node$left_child) & is.na(node$right_child)){
-    return(1) }
-  else{
-   return (count_number_descendant(node$left_child)+count_number_descendant(node$right_child))}
-}
-calc_node_weight <- function(node, parent_weight = 0) {
-node$weight <-  (node$dist_to_parent / count_number_descendant(node)) + parent_weight
-	if(!all(is.na(node[["left_child"]]))){
-	  	 node[["left_child"]]<-calc_node_weight(node[["left_child"]],parent_weight = node$weight)
-       node[["right_child"]]<-calc_node_weight(node[["right_child"]],parent_weight = node$weight)
-	}
-return(node)
-}
-
- return_sample_weights <- function(node){
-   if(is.na(node$left_child) & is.na(node$right_child)){
-     return(data.frame(name = node$name,weight = node$weight))
-   }
- return(rbind(return_sample_weights(node[["left_child"]]),return_sample_weights(node[["right_child"]])))
-}
-### create: sim_tree # sample similarity tree
-```
-
-
-```{r calculate sample weights}
-### uses Equation 1. 
 
 ### create: sample_weights
 ```
