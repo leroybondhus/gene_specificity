@@ -66,6 +66,11 @@ barplot(colSums(gtex_cleaned_renorm[,3:ncol(gtex_cleaned_renorm)]))
 
 #### Supplemental Figure (Fraction of TPM from chr==M )
 gtex <- gtex_cleaned_renorm
+exp_mat <- gtex[,3:ncol(gtex)]
+## log10(TPM+1) transform of data
+exp_mat <- log10(exp_mat+1)
+rownames(exp_mat) <- gtex$Name
+
 #### Supplemental Figure (heatmap cluster of samples )
 
 ## remove mitochondrial contribution
@@ -74,7 +79,7 @@ gtex <- gtex_cleaned_renorm
 
 ```{r measure sample similarity}
 ### to do: justify method for measuring sample similarity - may require comparison or refs
-make_zscore_matrix<- function(dat) {
+calc_zscore_matrix<- function(dat) {
   zscores <- matrix(NA, nrow = nrow(dat), ncol = ncol(dat))
   means <- rowMeans(dat)
   sds <- as.numeric(rep(NA,length(means)))
@@ -84,7 +89,7 @@ make_zscore_matrix<- function(dat) {
   return(zscores)
 }
 
-make_dot_product_similarity_matrix <- function(dat) {
+calc_dot_product_similarity_matrix <- function(dat) {
   dot_product_similarity_matrix <- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
   for(i in 1:ncol(dat)){
     for(j in 1:ncol(dat)){
@@ -96,11 +101,10 @@ make_dot_product_similarity_matrix <- function(dat) {
   return(dot_product_similarity_matrix)
 }
 
-zscores <- make_zscore_matrix(log10(gtex[,3:ncol(gtex)]+1) )
-dot_sim <- make_dot_product_similarity_matrix(zscores)
-
-colnames(dot_sim) <- colnames(gtex[,3:ncol(gtex)])
-rownames(dot_sim) <- colnames(gtex[,3:ncol(gtex)])
+zscores <- calc_zscore_matrix(exp_mat) 
+dot_sim <- calc_dot_product_similarity_matrix(zscores)
+colnames(dot_sim) <- colnames(exp_mat)
+rownames(dot_sim) <- colnames(exp_mat)
 
 ### validate choice
 ##use dist=1-dot_sim(zscores(log10(tpm+1))), single linkage clustering for now 
@@ -113,8 +117,6 @@ sim_mat <- dot_sim
 ```{r hierarchical clustering on sample similarity}
 ### to do: justify method for hierarchical clustering - may require comparison or refs
 
-GeneSpecificityFuncs::LMB_htf.dist_tree()
-
 sim_tree <- as.dendrogram(hclust(as.dist(1-dot_sim),method = "single"))
 
 ### create: sim_tree # sample similarity tree
@@ -123,12 +125,6 @@ sim_tree <- as.dendrogram(hclust(as.dist(1-dot_sim),method = "single"))
 
 ```{r calculate sample weights}
 ### uses Equation 1. 
-str(unclass(sim_tree))
-
-attributes(sim_tree[[1]]) <- c(attributes(sim_tree[[1]]), tempy="hello_from_tempy")
-
-attributes(sim_tree)
-
 
 LMB_dend.add_dist_to_parent <- function(dend, dist_to_parent=0){
   ## note: distance to parent is fed in at the start of the function
@@ -163,20 +159,54 @@ sim_tree <- LMB_dend.add_weights(sim_tree)
 
 ## plot tree with weights
 library(dendextend)
-sim_tree %>% get_nodes_attr("weight")
-png(filename = "temp1.png", width=720, height=460)
-par(mar=c(16,4,1,1)+.1)
 sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2.2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
-dev.off()
-png(filename = "temp2.png", width=720, height=360)
 barplot(get_leaves_attr(sim_tree,"weight"))
-dev.off()
-### create: sample_weights
+
+weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
+### create: weights
 ```
 
 
 ```{r calculate specificity}
-### uses Equation 2.
+library(dplyr)
+library('Hmisc')
+## order weights to match columns of expression matrix
+names(weights) <- factor(names(weights), levels = colnames(exp_mat))
+weights <- weights[order(names(weights))]
+
+
+# function to calculate weighted zscores
+## was te_to_weighted_zscore
+## now assumes weights are sorted in same order at mat samples
+calc_weighted_zscore_matrix <- function(mat, weights){
+  if(any( colnames(mat) != names(weights) )){print("WARNING: mismatch in weights names and matrix colnames")}
+  weighted_mat <- matrix(nrow=nrow(mat),ncol=ncol(mat))
+  for (i in 1:length(weights)){
+    weighted_mat[,i] <- weights[i]*mat[,i]
+  }
+  colnames(weighted_mat) <- colnames(mat)
+  weighted_means <- numeric(length = nrow(weighted_mat))
+  sum_of_weights <- sum(weights)
+  for (i in 1:nrow(weighted_mat)){
+    weighted_means[i] <- sum(weighted_mat[i,]) / sum_of_weights
+  }
+  weighted_var <- numeric(length=nrow(mat))
+  for (i in 1:nrow(mat)){
+    weighted_var[i] <- wtd.var(mat[i,],weights=weights)
+  }
+  weighted_sd <- sqrt(weighted_var)
+  for (i in 1:nrow(mat)){
+    mat[i,] <- (mat[i,]-weighted_means[i])/weighted_sd[i]
+  }
+  weighted_zscores <- na.omit(mat)
+  return(weighted_zscores)
+}
+
+spec_mat <- calc_weighted_zscore_matrix(exp_mat, weights)
+
+### use Roshni's Code
+
+
 
 ### creates: spec_mat # specificity matrix
 ```
