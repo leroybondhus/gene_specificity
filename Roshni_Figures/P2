@@ -1,0 +1,321 @@
+---
+title: "P2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library('tidyr')
+library('dplyr') 
+library('tibble') 
+library('RColorBrewer') 
+library('ggplot2') 
+library('lubridate') 
+library('gridExtra')
+library('devtools')
+library('circlepackeR')
+library('Hmisc')
+library('ggpubr')
+library('grid')
+library('lattice')
+library('gdata')
+library('parallel')
+library('doParallel')
+library('data.table')
+library('graphics')
+library('viridis')
+
+registerDoParallel(cores=4)
+```
+```{r}
+# loading te matrix
+GTEX.data <- read.csv("gtex_medians_PC_only_wo_MT.csv", header=T, sep=",")
+
+# function that drops certain columns from a te matrix by name
+drop_cols <- function(te_matrix, ...){
+  cols_to_drop <- list(...)
+  for (col in cols_to_drop){
+    a <- which(colnames(te_matrix)==col)
+    te_matrix <- te_matrix[-a]
+  }
+  return(te_matrix)
+}
+
+# using above function to subset te matrix to only include tissue expression values
+GTEX.subset <- drop_cols(GTEX.data,"X","Name","Description")
+
+# subset data set to only include certain indices
+drop_index <- function(te_matrix, ...){
+  cols_to_drop <- list(...)
+  name_list <- c()
+  for (col in cols_to_drop){
+    name_list <- append(name_list, colnames(te_matrix[col]))
+  }
+  for (name in name_list){
+    a <- which(colnames(te_matrix)==name)
+    te_matrix <- te_matrix[-a]
+  }
+  return(te_matrix)
+}
+
+# creating one dataset with no brain columns and one dataset with only brain columns
+GTEX.NoBrain <- drop_index(GTEX.subset,8:20)
+GTEX.Brain <- drop_index(GTEX.subset,1:7,21:54)
+
+one_brain <- sample(GTEX.Brain,1) # used Substantia Nigra selection
+GTEX.OneBrain <- cbind(GTEX.NoBrain, one_brain) 
+
+# creating matrix that includes the rest of the brain samples
+GTEX.TwelveBrain <- drop_cols(GTEX.Brain, colnames(one_brain))
+
+# reading in weights vector
+similarity_weights <- read.csv("weights_simi_.csv")
+
+# function to take the difference between each cell in a matrix; organizes matrices in same order
+delta <- function(df_1,df_2){
+  store1 <- as.data.frame(df_1)
+  store2 <- as.data.frame(df_2)
+  df_1 <- as.data.frame(df_1)
+  df_2 <- as.data.frame(df_2)
+  df_1_names <- row.names(df_1)
+  df_2_names <- row.names(df_2)
+  df_1$rowid <- df_1_names
+  df_2$rowid <- df_2_names
+  temp <- inner_join(df_1, df_2, by="rowid")
+  df_1 <- temp[,1:ncol(store1)]
+  df_2 <- temp[,(ncol(store1)+2):ncol(temp)]
+  output <- list((df_1-df_2))
+  return(output)
+}
+```
+```{r}
+baseline_flat_P2 <- function(P1, P2){
+  df_list <- list()
+  results_list <- list()
+  for (i in 1:ncol(P2)){
+    print(i)
+    selected_column <- P2[,i]
+    df <- data.frame(P1,selected_column)
+    save_df <- list(df)
+    df_list <- append(df_list, save_df)
+    mean_expression <- rowMeans(df)
+    std_expression <- apply(df,1,sd)
+    zscore_matrix <- (df - mean_expression) / std_expression
+    zscore_matrix <- zscore_matrix[,ncol(df)]
+    output <- list(zscore_matrix)
+    results_list <- append(results_list,output)
+    }
+  output <- list(df_list,results_list)
+  return(output)
+}
+
+P2_flat_baseline_zscores <- baseline_flat_P2(GTEX.OneBrain,GTEX.TwelveBrain)
+P2_flat_baseline_zscores <- P2_flat_baseline_zscores[[2]]
+P2_flat_baseline_zscores <- data.frame(P2_flat_baseline_zscores[1:12])
+colnames(P2_flat_baseline_zscores) <- colnames(GTEX.TwelveBrain)
+P2_flat_baseline_zscores <- na.omit(P2_flat_baseline_zscores)
+```
+```{r}
+baseline_weighted_P2 <- function(P1, P2, weights_vector){
+  df_list <- list()
+  results_list <- list()
+  for (m in 1:ncol(P2)){
+    print(m)
+    selected_column <- as.data.frame(P2[,m])
+    colnames(selected_column) <- colnames(P2[m])
+    df <- data.frame(P1,selected_column)
+    save_df <- list(df)
+    df_list <- append(df_list, save_df)
+    weight_vector <- left_join(data.frame(name=colnames(df)),weights_vector,by="name")
+    weighted_te_matrix <- matrix(nrow=nrow(df),ncol=ncol(df))
+    for (i in 1:nrow(weight_vector)){
+      weighted_te_matrix[,i] <- weight_vector[i,2]*df[,i]
+    }
+    colnames(weighted_te_matrix) <- colnames(df)
+    weighted_means <- c(1:nrow(weighted_te_matrix))
+    sum_of_weights <- sum(weight_vector[,2])
+    for (i in 1:nrow(weighted_te_matrix)){
+      weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum_of_weights
+    }
+    weighted_var <- matrix(nrow=nrow(df),ncol=1)
+    for (i in 1:nrow(df)){
+      weighted_var[i] <- wtd.var(df[i,],weights=weight_vector[,2])
+      }
+    weighted_sd <- sqrt(weighted_var)
+    for (i in 1:nrow(df)){
+      df[i,] <- (df[i,]-weighted_means[i])/weighted_sd[i]
+    }
+    df <- df[,ncol(df)]
+    output <- list(df)
+    results_list <- append(results_list,output)
+    }
+  output <- list(df_list,results_list)
+  return(output)
+}
+
+P2_weighted_baseline_zscores <- baseline_weighted_P2(GTEX.OneBrain,GTEX.TwelveBrain, similarity_weights)
+P2_weighted_baseline_zscores <- P2_weighted_baseline_zscores[[2]]
+P2_weighted_baseline_zscores <- data.frame(P2_weighted_baseline_zscores[1:12])
+colnames(P2_weighted_baseline_zscores) <- colnames(GTEX.TwelveBrain)
+P2_weighted_baseline_zscores <- na.omit(P2_weighted_baseline_zscores)
+```
+```{r}
+appended_te_to_flat_zscore_P2 <- function(P1,P2,size_of_selection,number_of_permutations){
+  size_of_selection <- c(2:size_of_selection)
+  number_of_permutations <- c(1:number_of_permutations)
+  df_list <- list()
+  results_list <- list()
+  for (i in size_of_selection){
+    for (j in number_of_permutations){
+      print(j)
+      selected_columns <- sample(P2, i)
+      df <- data.frame(P1,selected_columns)
+      save_df <- list(df)
+      df_list <- append(df_list, save_df)
+      mean_expression <- rowMeans(df)
+      std_expression <- apply(df,1,sd)
+      zscore_matrix <- (df - mean_expression) / std_expression
+      zscore_matrix <- na.omit(zscore_matrix)
+      a <- ncol(P1)
+      b <- ncol(df)
+      zscore_matrix <- zscore_matrix[,a:b]
+      output <- list(zscore_matrix)
+      results_list <- append(results_list,output)
+    }
+  }
+  output <- list(df_list,results_list)
+  return(output)
+}
+
+permutation_flat_data_P2 <- appended_te_to_flat_zscore_P2(GTEX.OneBrain,GTEX.TwelveBrain,12,3)
+
+permutations <- c(1:length(permutation_flat_data_P2[[2]]))
+permutation_flat_data_P2_results <- permutation_flat_data_P2[[2]]
+P2_flat_baseline_zscores <- as.data.frame(P2_flat_baseline_zscores)
+delta_flat_P2 <- c()
+for (i in permutations){
+  temp <- as.data.frame(permutation_flat_data_P2_results[i])
+  temp_names <- colnames(temp)
+  temp_names <- temp_names[2:length(temp_names)]
+  original <- P2_flat_baseline_zscores[,c(temp_names)]
+  temp <- temp[,c(temp_names)]
+  output <- delta(original,temp)
+  delta_flat_P2 <- append(delta_flat_P2,output)
+}
+
+delta_flat_P2_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:11){
+  delta_flat_P2_df <- unlist(data.frame(delta_flat_P2[[3*i]]))
+  delta_flat_P2_temp_hist <- hist(delta_flat_P2_df, breaks = 100, plot = F)
+  delta_flat_P2_hist_objs <- rbind(delta_flat_P2_hist_objs, data.frame(counts=delta_flat_P2_temp_hist$counts, mids=delta_flat_P2_temp_hist$mids, sample_num=rep((i+1), length(delta_flat_P2_temp_hist$counts))))
+}
+ggplot(delta_flat_P2_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Flat Z-Score for Added Brain Columns \n From N=2 to N=12", x="Change in Flat Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
+  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-2,7), breaks=seq(-2,7,1)) + scale_y_continuous(limits = c(1.5,12.5), breaks=seq(0,12,1))
+```
+```{r}
+appended_te_to_weighted_zscore_P2 <- function(P1,P2,weights_vector,size_of_selection,number_of_permutations){
+  size_of_selection <- c(2:size_of_selection)
+  number_of_permutations <- c(1:number_of_permutations)
+  df_list <- list()
+  results_list <- list()
+  for (m in size_of_selection){
+    for (j in number_of_permutations){
+      print(j)
+      selected_columns <- sample(P2, m)
+      df <- data.frame(P1,selected_columns)
+      save_df <- list(df)
+      df_list <- append(df_list, save_df)
+      weight_vector <- left_join(data.frame(name=colnames(df)),weights_vector,by="name")
+      weighted_te_matrix <- matrix(nrow=nrow(df),ncol=ncol(df))
+      for (i in 1:nrow(weight_vector)){
+        weighted_te_matrix[,i] <- weight_vector[i,2]*df[,i]
+      }
+      colnames(weighted_te_matrix) <- colnames(df)
+      weighted_means <- c(1:nrow(weighted_te_matrix))
+      sum_of_weights <- sum(weight_vector[,2])
+      for (i in 1:nrow(weighted_te_matrix)){
+        weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum_of_weights
+      }
+      weighted_var <- matrix(nrow=nrow(df),ncol=1)
+      for (i in 1:nrow(df)){
+        weighted_var[i] <- wtd.var(df[i,],weights=weight_vector[,2])
+      }
+      weighted_sd <- sqrt(weighted_var)
+      for (i in 1:nrow(df)){
+        df[i,] <- (df[i,]-weighted_means[i])/weighted_sd[i]
+      }
+      weighted_zscores <- na.omit(df)
+      a <- ncol(P1)
+      b <- ncol(df)
+      weighted_zscores <- weighted_zscores[,a:b]
+      output <- list(weighted_zscores)
+      results_list <- append(results_list,output)
+    }
+  }
+  output <- list(df_list,results_list)
+  return(output)
+}
+
+permutation_weighted_data_P2 <- appended_te_to_weighted_zscore_P2(GTEX.OneBrain,GTEX.TwelveBrain,similarity_weights,12,3)
+
+permutations <- c(1:length(permutation_weighted_data_P2[[2]]))
+permutation_weighted_data_P2_results <- permutation_weighted_data_P2[[2]]
+P2_weighted_baseline_zscores <- as.data.frame(P2_weighted_baseline_zscores)
+delta_weighted_P2 <- c()
+for (i in permutations){
+  print(i)
+  temp <- as.data.frame(permutation_weighted_data_P2_results[i])
+  temp_names <- colnames(temp)
+  temp_names <- temp_names[2:length(temp_names)]
+  original <- P2_weighted_baseline_zscores[,c(temp_names)]
+  temp <- temp[,c(temp_names)]
+  output <- delta(original,temp)
+  delta_weighted_P2 <- append(delta_weighted_P2,output)
+}
+
+delta_weighted_P2_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:11){
+  delta_weighted_P2_df <- unlist(data.frame(delta_weighted_P2[[3*i]]))
+  delta_weighted_P2_temp_hist <- hist(delta_weighted_P2_df, breaks = 100, plot = F)
+  delta_weighted_P2_hist_objs <- rbind(delta_weighted_P2_hist_objs, data.frame(counts=delta_weighted_P2_temp_hist$counts, mids=delta_weighted_P2_temp_hist$mids, sample_num=rep((i+1), length(delta_weighted_P2_temp_hist$counts))))
+}
+ggplot(delta_weighted_P2_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Weighted Z-Score for Added Brain Columns \n From N=2 to N=12", x="Change in Weighted Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
+  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-2,10), breaks=seq(-2,10,1)) +scale_y_continuous(limits = c(1.5,12.5), breaks=seq(0,12,1))
+```
+```{r}
+var_for_flat_P2 <- c()
+for (i in 1:11){
+  P2_del_flat_forvar_df <- unlist(data.frame(delta_flat_P2[[3*i]]))
+  temp <- var(P2_del_flat_forvar_df)
+  var_for_flat_P2 <- append(var_for_flat_P2, temp)
+}
+plot(1:11, var_for_flat_P2)
+
+var_for_weighted_P2 <- c()
+for (i in 1:11){
+  P2_del_weighted_forvar_df <- unlist(data.frame(delta_weighted_P2[[3*i]]))
+  temp <- var(P2_del_weighted_forvar_df)
+  var_for_weighted_P2 <- append(var_for_weighted_P2, temp)
+}
+plot(1:11, var_for_weighted_P2)
+
+# red = flat variance
+# blue = weighted variance
+plot(var_for_flat_P2,type = "o",col = "red",xlab="Number of Brain Columns Added",ylab="Variance of Change in Z-Score",main="Variance of Change in Z-Score for Weighted vs. Flat Method for P2", ylim = c(0,1))
+
+lines(var_for_weighted_P2, type = "o", col = "blue")
+
+stepSize <- 1
+xMax <- 11
+numTicks <- xMax / stepSize
+v1 <- c(0:numTicks)*stepSize
+axis(side=1, at=v1, labels=v1)
+```
