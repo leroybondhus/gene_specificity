@@ -195,7 +195,7 @@ weights <- weights[order(names(weights))]
 ## now assumes weights are sorted in same order at mat samples
 calc_weighted_zscore_matrix <- function(mat, weights){
   if(any( colnames(mat) != names(weights) )){print("WARNING: mismatch in weights names and matrix colnames order")}
-  weighted_mat <- matrix(nrow=nrow(mat),ncol=ncol(mat))
+  weighted_mat <- mat; weighted_mat[] <- 0
   for (i in 1:length(weights)){
     weighted_mat[,i] <- weights[i]*mat[,i]
   }
@@ -213,7 +213,7 @@ calc_weighted_zscore_matrix <- function(mat, weights){
   for (i in 1:nrow(mat)){
     mat[i,] <- (mat[i,]-weighted_means[i])/weighted_sd[i]
   }
-  weighted_zscores <- na.omit(mat)
+  weighted_zscores <- mat
   return(weighted_zscores)
 }
 
@@ -276,7 +276,7 @@ real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,p
   for(measure in specificity_measures$func_names){
     ## P2_baseline is P1 + each column of P2 so we can calculate once before of rep's loop
     specificity_func <- specificity_measures$funcs[[measure]]
-    if(is.na(specifcity_func)){print(paste(measure, "func is NA"))}
+    if(is.na(specificity_func)){print(paste(measure, "func is NA"))}
     P2_flat_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
     P2_weighted_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
     for(i in 1:ncol(notP1)){
@@ -288,9 +288,8 @@ real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,p
       weights <- weights[order(factor(names(weights),levels = colnames(P1uP2)))]
       ## flat is equivalent to all weights equal to 1
       flat <- weights; flat[1:length(flat)] <- 1
-      
-      P2_flat_baseline[,i] <- specificity_func(P1uP2, flat)
-      P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)
+      P2_flat_baseline[,i] <- specificity_func(P1uP2, flat)[,i]
+      P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)[,i]
     }
     
     for(rep in 1:num_reps){
