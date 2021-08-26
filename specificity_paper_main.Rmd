@@ -129,7 +129,7 @@ sim_tree <- as.dendrogram(hclust(as.dist(1-dot_sim),method = "single"))
 
 ```{r calculate sample weights}
 ### uses Equation 1. 
-
+## modelled on Yenifer's code
 LMB_dend.add_dist_to_parent <- function(dend, dist_to_parent=0){
   ## note: distance to parent is fed in at the start of the function
   attributes(dend) <- c(attributes(dend), dist_to_parent=dist_to_parent)
@@ -147,6 +147,7 @@ LMB_dend.add_dist_to_parent <- function(dend, dist_to_parent=0){
 }
 sim_tree <- LMB_dend.add_dist_to_parent(sim_tree)
 
+## modelled on Yenifer's code
 LMB_dend.add_weights <- function(dend, weight_of_parent=0){
   weight <- (attributes(dend)$dist_to_parent / attributes(dend)$members) + weight_of_parent 
   attributes(dend) <- c(attributes(dend), weight=weight)
@@ -246,6 +247,20 @@ for(i in 1:length(specificity_measures)){
 ## e.g. Feed in P1, P2, n, num_perm,
 ## also Feed in similarity function, clustering function (since these might be variable later)
 ## calc similarity matrix -> calc similarity tree -> calc sample weights
+
+library(doParallel)
+library(foreach)
+registerDoParallel(detectCores())
+
+test_results <- foreach(x=1:10, .final = function(x) setNames(x,paste("abc",1:10))  ) %dopar% {
+  x
+}
+
+num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
+real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,paste("n=",n,sep = ""))  ) %dopar% {
+  list("a","b",n)
+}
+
 
 appended_te_to_weighted_zscore <- function(P1,P2,weights,size_of_selection,number_of_permutations){
   results_list <- list()
