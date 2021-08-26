@@ -84,7 +84,7 @@ rownames(exp_mat) <- gtex$Name
 ```{r measure sample similarity}
 ### to do: justify method for measuring sample similarity - may require comparison or refs
 calc_zscore_matrix<- function(dat) {
-  zscores <- matrix(NA, nrow = nrow(dat), ncol = ncol(dat))
+  zscores <- dat; zscores[] <- 0 
   means <- rowMeans(dat)
   sds <- as.numeric(rep(NA,length(means)))
   which <- which(means != 0)
@@ -95,6 +95,8 @@ calc_zscore_matrix<- function(dat) {
 
 calc_dot_product_similarity_matrix <- function(dat) {
   dot_product_similarity_matrix <- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  colnames(dot_product_similarity_matrix) <- colnames(dat)
+  rownames(dot_product_similarity_matrix) <- colnames(dat)
   for(i in 1:ncol(dat)){
     for(j in 1:ncol(dat)){
       which_i <- which(!is.na(dat[,i])) ## ignore NAs
@@ -105,10 +107,9 @@ calc_dot_product_similarity_matrix <- function(dat) {
   return(dot_product_similarity_matrix)
 }
 
+## together these are a similarity function 
 zscores <- calc_zscore_matrix(exp_mat) 
 dot_sim <- calc_dot_product_similarity_matrix(zscores)
-colnames(dot_sim) <- colnames(exp_mat)
-rownames(dot_sim) <- colnames(exp_mat)
 
 ### validate choice
 ##use dist=1-dot_sim(zscores(log10(tpm+1))), single linkage clustering for now 
@@ -182,7 +183,10 @@ ggplot( data.frame(names=names(weights), weights=weights),aes(x=names, y=weights
 library(dplyr)
 library('Hmisc')
 ## order weights to match columns of expression matrix
-names(weights) <- factor(names(weights), levels = colnames(exp_mat))
+weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
+weights <- weights[order(factor(names(weights),levels = colnames(exp_mat)))]
+
+
 weights <- weights[order(names(weights))]
 
 
@@ -234,11 +238,17 @@ spec_mat <- calc_weighted_zscore_matrix(exp_mat, weights)
 # compare
 
 ### generalizing a list to store results in - this will make it easier to extend later if necessary.
-specificity_measures <- c("Zscore", "Tau", "Tsi","Gini")
+## Note: only need the weighted version of each equation as each simplifies to flat version when all weights are 1
+specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
+                             funcs=list(Zscore=calc_weighted_zscore_matrix,
+                                        Tau=NA,
+                                        Tsi=NA,
+                                        Gini=NA
+                             ))
 robustness_test_results <- list( )
-for(i in 1:length(specificity_measures)){
+for(i in 1:length(specificity_measures$func_names)){
   el_names <- paste( c("P1_weighted_", "P1_flat_", "P2_weighted_", "P2_flat_")
-                     , specificity_measures[i], sep="")
+                     , specificity_measures$func_names[i], sep="")
   temp_list <- setNames(list(list(),list(),list(),list()), nm=el_names  )
   robustness_test_results <- c(robustness_test_results, temp_list )
 }
@@ -252,49 +262,48 @@ library(doParallel)
 library(foreach)
 registerDoParallel(detectCores())
 
-test_results <- foreach(x=1:10, .final = function(x) setNames(x,paste("abc",1:10))  ) %dopar% {
-  x
-}
+
 
 num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
+## P1 and notP1 are contant throughout, so set these outside loops
+P1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = TRUE)])
+notP1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = FALSE)])
+## use general similarity_func and cluster_func in case we want to test more later
+similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
+cluster_func <- function(sim_mat){LMB_dend.add_weights(LMB_dend.add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+
 real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,paste("n=",n,sep = ""))  ) %dopar% {
-  list("a","b",n)
-}
-
-
-appended_te_to_weighted_zscore <- function(P1,P2,weights,size_of_selection,number_of_permutations){
-  results_list <- list()
-  for (i in 1:size_of_selection){
-    for (j in 1:number_of_permutations){
-      selected_columns <- sample(P2, size_of_selection)
-      df <- data.frame(P1,selected_columns)
-      weights_sub <- left_join(data.frame(name=colnames(df)),weights,by="name")
-      weighted_te_matrix <- matrix(nrow=nrow(df),ncol=ncol(df))
-      for (i in 1:nrow(weight_vector)){
-        weighted_te_matrix[,i] <- weight_vector[i,2]*df[,i]
-      }
-      colnames(weighted_te_matrix) <- colnames(df)
-      weighted_means <- c(1:nrow(weighted_te_matrix))
-      sum_of_weights <- sum(weight_vector[,2])
-      for (i in 1:nrow(weighted_te_matrix)){
-        weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum_of_weights
-      }
-      weighted_var <- matrix(nrow=nrow(df),ncol=1)
-      for (i in 1:nrow(df)){
-        weighted_var[i] <- wtd.var(df[i,],weights=weight_vector[,2])
-      }
-      weighted_sd <- sqrt(weighted_var)
-      for (i in 1:nrow(df)){
-        df[i,] <- (df[i,]-weighted_means[i])/weighted_sd[i]
-      }
-      weighted_zscores <- na.omit(df)
-      weighted_zscores <- weighted_zscores[,1:ncol(P1)]
-      output <- list(weighted_zscores)
-      results_list <- append(results_list,output)
+  for(measure in specificity_measures$func_names){
+    ## P2_baseline is P1 + each column of P2 so we can calculate once before of rep's loop
+    specificity_func <- specificity_measures$funcs[[measure]]
+    if(is.na(specifcity_func)){print(paste(measure, "func is NA"))}
+    P2_flat_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
+    P2_weighted_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
+    for(i in 1:ncol(notP1)){
+      P1uP2 <- cbind(P1,notP1[,i,drop=F])
+      sim_mat <- similarity_func(P1uP2)
+      sim_tree <- cluster_func(sim_mat)
+      ## get the weights in proper order
+      weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
+      weights <- weights[order(factor(names(weights),levels = colnames(P1uP2)))]
+      ## flat is equivalent to all weights equal to 1
+      flat <- weights; flat[1:length(flat)] <- 1
+      
+      P2_flat_baseline[,i] <- specificity_func(P1uP2, flat)
+      P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)
+    }
+    
+    for(rep in 1:num_reps){
+      ## P1_baseline should include 1 brain sample chosen at random, since this is random, we want to associate this within each replicate
+      P1_baseline
+      samp <- sample(1:ncol(notP1), n)
+      P2 <- notP1[,samp]
+      P1uP2 <- cbind(P1,P2)
+      
     }
   }
-  return(results_list)
 }
+
 
 
 ```
