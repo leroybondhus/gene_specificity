@@ -206,3 +206,47 @@ dend %>% unclass %>% str
 
 
 ```
+
+
+```{r temp_consolidate_with_main_tomorrow_08262021}
+
+### note: should add the weight calculation step inside this function
+## e.g. Feed in P1, P2, n, num_perm,
+## also Feed in similarity function, clustering function (since these might be variable later)
+## calc similarity matrix -> calc similarity tree -> calc sample weights
+
+appended_te_to_weighted_zscore <- function(P1,P2,weights,size_of_selection,number_of_permutations){
+  results_list <- list()
+  for (i in 1:size_of_selection){
+    for (j in 1:number_of_permutations){
+      selected_columns <- sample(P2, size_of_selection)
+      df <- data.frame(P1,selected_columns)
+      weights_sub <- left_join(data.frame(name=colnames(df)),weights,by="name")
+      weighted_te_matrix <- matrix(nrow=nrow(df),ncol=ncol(df))
+      for (i in 1:nrow(weight_vector)){
+        weighted_te_matrix[,i] <- weight_vector[i,2]*df[,i]
+      }
+      colnames(weighted_te_matrix) <- colnames(df)
+      weighted_means <- c(1:nrow(weighted_te_matrix))
+      sum_of_weights <- sum(weight_vector[,2])
+      for (i in 1:nrow(weighted_te_matrix)){
+        weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum_of_weights
+      }
+      weighted_var <- matrix(nrow=nrow(df),ncol=1)
+      for (i in 1:nrow(df)){
+        weighted_var[i] <- wtd.var(df[i,],weights=weight_vector[,2])
+      }
+      weighted_sd <- sqrt(weighted_var)
+      for (i in 1:nrow(df)){
+        df[i,] <- (df[i,]-weighted_means[i])/weighted_sd[i]
+      }
+      weighted_zscores <- na.omit(df)
+      weighted_zscores <- weighted_zscores[,1:ncol(P1)]
+      output <- list(weighted_zscores)
+      results_list <- append(results_list,output)
+    }
+  }
+  return(results_list)
+}
+
+```
