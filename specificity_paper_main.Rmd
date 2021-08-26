@@ -15,6 +15,10 @@ library("roxygen2")
 install("./../GeneSpecificityFuncs")
 ```
 
+```{r libraries}
+library(ggplot2)
+```
+
 ## load gtex here
 ```{r import dataset}
 ## import gtex medians data
@@ -160,9 +164,15 @@ sim_tree <- LMB_dend.add_weights(sim_tree)
 ## plot tree with weights
 library(dendextend)
 sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2.2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
-barplot(get_leaves_attr(sim_tree,"weight"))
+
 
 weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
+
+
+ggplot( data.frame(names=names(weights), weights=weights),aes(x=names, y=weights))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
 ### create: weights
 ```
 
@@ -179,7 +189,7 @@ weights <- weights[order(names(weights))]
 ## was te_to_weighted_zscore
 ## now assumes weights are sorted in same order at mat samples
 calc_weighted_zscore_matrix <- function(mat, weights){
-  if(any( colnames(mat) != names(weights) )){print("WARNING: mismatch in weights names and matrix colnames")}
+  if(any( colnames(mat) != names(weights) )){print("WARNING: mismatch in weights names and matrix colnames order")}
   weighted_mat <- matrix(nrow=nrow(mat),ncol=ncol(mat))
   for (i in 1:length(weights)){
     weighted_mat[,i] <- weights[i]*mat[,i]
@@ -216,9 +226,60 @@ spec_mat <- calc_weighted_zscore_matrix(exp_mat, weights)
 
 
 ```{r validation with variable sample set}
+## for i in 1:num(brain_samples)
+# get P1 and P2
+# expression mat -> calc sample sim -> create tree -> calc weight -> specificity 
+# save results
+# compare
+
+### generalizing a list to store results in - this will make it easier to extend later if necessary.
+specificity_measures <- c("Zscore", "Tau", "Tsi","Gini")
+robustness_test_results <- list( )
+for(i in 1:length(specificity_measures)){
+  el_names <- paste( c("P1_weighted_", "P1_flat_", "P2_weighted_", "P2_flat_")
+                     , specificity_measures[i], sep="")
+  temp_list <- setNames(list(list(),list(),list(),list()), nm=el_names  )
+  robustness_test_results <- c(robustness_test_results, temp_list )
+}
+
+### note: should add the weight calculation step inside this function
+## e.g. Feed in P1, P2, n, num_perm,
+## also Feed in similarity function, clustering function (since these might be variable later)
+## calc similarity matrix -> calc similarity tree -> calc sample weights
+
+appended_te_to_weighted_zscore <- function(P1,P2,weights,size_of_selection,number_of_permutations){
+  results_list <- list()
+  for (i in 1:size_of_selection){
+    for (j in 1:number_of_permutations){
+      selected_columns <- sample(P2, size_of_selection)
+      df <- data.frame(P1,selected_columns)
+      weights_sub <- left_join(data.frame(name=colnames(df)),weights,by="name")
+      weighted_te_matrix <- matrix(nrow=nrow(df),ncol=ncol(df))
+      for (i in 1:nrow(weight_vector)){
+        weighted_te_matrix[,i] <- weight_vector[i,2]*df[,i]
+      }
+      colnames(weighted_te_matrix) <- colnames(df)
+      weighted_means <- c(1:nrow(weighted_te_matrix))
+      sum_of_weights <- sum(weight_vector[,2])
+      for (i in 1:nrow(weighted_te_matrix)){
+        weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum_of_weights
+      }
+      weighted_var <- matrix(nrow=nrow(df),ncol=1)
+      for (i in 1:nrow(df)){
+        weighted_var[i] <- wtd.var(df[i,],weights=weight_vector[,2])
+      }
+      weighted_sd <- sqrt(weighted_var)
+      for (i in 1:nrow(df)){
+        df[i,] <- (df[i,]-weighted_means[i])/weighted_sd[i]
+      }
+      weighted_zscores <- na.omit(df)
+      weighted_zscores <- weighted_zscores[,1:ncol(P1)]
+      output <- list(weighted_zscores)
+      results_list <- append(results_list,output)
+    }
+  }
+  return(results_list)
+}
 
 
 ```
-
-
-
