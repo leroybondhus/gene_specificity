@@ -254,6 +254,7 @@ for(i in 1:length(specificity_measures$func_names)){
   robustness_test_results <- c(robustness_test_results, temp_list )
 }
 
+
 ### note: should add the weight calculation step inside this function
 ## e.g. Feed in P1, P2, n, num_perm,
 ## also Feed in similarity function, clustering function (since these might be variable later)
@@ -284,6 +285,7 @@ notP1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = FALSE)])
 for(measure in specificity_measures$func_names){
   specificity_func <- specificity_measures$funcs[[measure]]
   if(is.na(specificity_func)){print(paste(measure, "func is NA")); next;}
+  ## P2_baseline is P1 + each column of P2 so we can calculate once before of rep's loop
   P2_flat_baseline <- notP1; P2_flat_baseline[] <-0
   P2_weighted_baseline <- notP1; P2_weighted_baseline[] <-0
   for(i in colnames(notP1)){
@@ -298,21 +300,20 @@ for(measure in specificity_measures$func_names){
     P2_flat_baseline[,i] <- specificity_func(P1uP2, flat)[,i]
     P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)[,i]
   }  
-  real_results <- foreach(perm=1:length(permutation_matrix),
-                          .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = "")) )%dopar% {  
-  
-    ## P2_baseline is P1 + each column of P2 so we can calculate once before of rep's loop
+  result <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = ""))) %dopar% {
+    # P1_baseline is just P1 at n=1
+    P2 <- notP1[,sample(1:ncol(notP1), n)]
+    P1uP2 <- cbind(P1,P2)
     
-    
-    #### NOTE:: MIGHT REMOVE THIS LOOP IF USING A PERMUTATION TABLE :0
-    for(rep in 1:num_reps){
-      ## P1_baseline should include 1 brain sample chosen at random, since this is random, we want to associate this within each replicate
-      P1_baseline
-      P2 <- notP1[,sample(1:ncol(notP1), n)]
-      P1uP2 <- cbind(P1,P2)
-    }
+    # need to fill in these with spec_score matrices for each n for each method
+    # names should match 
+    list(
+      P1_weighted_spec_score = NA,
+      P1_flat_spec_score = NA,
+      P2_weighted_spec_score = NA,
+      P2_flat_spec_score = NA
+    )
   }
-}
 
 
 for(i in 1:ncol(P2_flat_baseline)){
