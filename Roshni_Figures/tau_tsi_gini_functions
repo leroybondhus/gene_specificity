@@ -16,7 +16,7 @@ specificity_by_tsi <- function(te_matrix){
 
 
 
-
+library('reldist')
 specificity_by_gini <- function(te_matrix){
   gini_values <- list()
   for (i in 1:nrow(te_matrix)){
