@@ -280,7 +280,7 @@ real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,p
     if(is.na(specificity_func)){print(paste(measure, "func is NA")); next;}
     P2_flat_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
     P2_weighted_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
-    for(i in 1:ncol(notP1)){
+    for(i in colnames(notP1)){
       P1uP2 <- cbind(P1,notP1[,i,drop=F])
       sim_mat <- similarity_func(P1uP2)
       sim_tree <- cluster_func(sim_mat)
@@ -296,8 +296,7 @@ real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,p
     for(rep in 1:num_reps){
       ## P1_baseline should include 1 brain sample chosen at random, since this is random, we want to associate this within each replicate
       P1_baseline
-      samp <- sample(1:ncol(notP1), n)
-      P2 <- notP1[,samp]
+      P2 <- notP1[,sample(1:ncol(notP1), n)]
       P1uP2 <- cbind(P1,P2)
       
     }
