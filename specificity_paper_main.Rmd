@@ -278,8 +278,8 @@ real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,p
     ## P2_baseline is P1 + each column of P2 so we can calculate once before of rep's loop
     specificity_func <- specificity_measures$funcs[[measure]]
     if(is.na(specificity_func)){print(paste(measure, "func is NA")); next;}
-    P2_flat_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
-    P2_weighted_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
+    P2_flat_baseline <- notP1; P2_flat_baseline[] <-0
+    P2_weighted_baseline <- notP1; P2_weighted_baseline[] <-0
     for(i in colnames(notP1)){
       P1uP2 <- cbind(P1,notP1[,i,drop=F])
       sim_mat <- similarity_func(P1uP2)
@@ -304,6 +304,9 @@ real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,p
 }
 
 
+for(i in 1:ncol(P2_flat_baseline)){
+  plot(P2_flat_baseline[,i],P2_weighted_baseline[,i])
+}
 
 ```
 
