@@ -264,8 +264,8 @@ library(foreach)
 registerDoParallel(detectCores())
 
 
-
 num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
+num_reps <- 5
 ## P1 and notP1 are contant throughout, so set these outside loops
 P1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = TRUE)])
 notP1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = FALSE)])
@@ -273,7 +273,21 @@ notP1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = FALSE)])
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
 
-real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,paste("n=",n,sep = ""))  ) %dopar% {
+### define 1-n trajectories ahead of time since i+1 should be referenced against i.
+## do foreach over each element of permuation matrix lol so clever ## use arrayInd to get row/col given perm number
+permutation_matrix <- matrix(nrow = num_brain_samples, ncol = num_reps )
+for(rep in 1:num_reps){
+  permutation_matrix[,rep] <- sample(colnames(notP1),num_brain_samples, replace = FALSE)
+}
+
+
+real_results <- foreach(perm=1:length(permutation_matrix),
+                        .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = "")) )%dopar% {
+  paste("rep=", arrayInd(perm, dim(permutation_matrix))[,1], ",n=", arrayInd(perm, dim(permutation_matrix ))[,2], sep = "")
+}
+
+real_results <- foreach(perm=1:length(permutation_matrix),
+                        .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = "")) )%dopar% {
   for(measure in specificity_measures$func_names){
     ## P2_baseline is P1 + each column of P2 so we can calculate once before of rep's loop
     specificity_func <- specificity_measures$funcs[[measure]]
@@ -293,6 +307,7 @@ real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,p
       P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)[,i]
     }
     
+    #### NOTE:: MIGHT REMOVE THIS LOOP IF USING A PERMUTATION TABLE :0
     for(rep in 1:num_reps){
       ## P1_baseline should include 1 brain sample chosen at random, since this is random, we want to associate this within each replicate
       P1_baseline
