@@ -1,0 +1,28 @@
+specificity_by_tau <- function(te_matrix){
+  x_hat <- te_matrix/max(te_matrix)
+  tau <- sum(1-x_hat) / (NROW(te_matrix)-1)
+}
+
+
+
+
+
+specificity_by_tsi <- function(te_matrix){
+  a <- max(te_matrix)
+  b <- sum(te_matrix)
+  tsi <- a/b
+}
+
+
+
+
+
+specificity_by_gini <- function(te_matrix){
+  gini_values <- list()
+  for (i in 1:nrow(te_matrix)){
+    temp <- as.numeric(te_matrix[i,])
+    temp <- gini(temp)
+    gini_values <- append(gini_values,temp)
+  }
+  return(gini_values)
+}
