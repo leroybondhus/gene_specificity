@@ -266,46 +266,43 @@ registerDoParallel(detectCores())
 
 num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
 num_reps <- 5
-## P1 and notP1 are contant throughout, so set these outside loops
-P1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = TRUE)])
-notP1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = FALSE)])
 ## use general similarity_func and cluster_func in case we want to test more later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
 
 ### define 1-n trajectories ahead of time since i+1 should be referenced against i.
-## do foreach over each element of permuation matrix lol so clever ## use arrayInd to get row/col given perm number
+## do foreach over each element of permuation matrix ## use arrayInd to get row/col given perm number
 permutation_matrix <- matrix(nrow = num_brain_samples, ncol = num_reps )
 for(rep in 1:num_reps){
   permutation_matrix[,rep] <- sample(colnames(notP1),num_brain_samples, replace = FALSE)
 }
 
+## P1 and notP1 are contant throughout, so set these outside loops
+P1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = TRUE)])
+notP1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = FALSE)])
 
-real_results <- foreach(perm=1:length(permutation_matrix),
-                        .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = "")) )%dopar% {
-  paste("rep=", arrayInd(perm, dim(permutation_matrix))[,1], ",n=", arrayInd(perm, dim(permutation_matrix ))[,2], sep = "")
-}
-
-real_results <- foreach(perm=1:length(permutation_matrix),
-                        .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = "")) )%dopar% {
-  for(measure in specificity_measures$func_names){
+for(measure in specificity_measures$func_names){
+  specificity_func <- specificity_measures$funcs[[measure]]
+  if(is.na(specificity_func)){print(paste(measure, "func is NA")); next;}
+  P2_flat_baseline <- notP1; P2_flat_baseline[] <-0
+  P2_weighted_baseline <- notP1; P2_weighted_baseline[] <-0
+  for(i in colnames(notP1)){
+    P1uP2 <- cbind(P1,notP1[,i,drop=F])
+    sim_mat <- similarity_func(P1uP2)
+    sim_tree <- cluster_func(sim_mat)
+    ## get the weights in proper order
+    weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
+    weights <- weights[order(factor(names(weights),levels = colnames(P1uP2)))]
+    ## flat is equivalent to all weights equal to 1
+    flat <- weights; flat[1:length(flat)] <- 1
+    P2_flat_baseline[,i] <- specificity_func(P1uP2, flat)[,i]
+    P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)[,i]
+  }  
+  real_results <- foreach(perm=1:length(permutation_matrix),
+                          .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = "")) )%dopar% {  
+  
     ## P2_baseline is P1 + each column of P2 so we can calculate once before of rep's loop
-    specificity_func <- specificity_measures$funcs[[measure]]
-    if(is.na(specificity_func)){print(paste(measure, "func is NA")); next;}
-    P2_flat_baseline <- notP1; P2_flat_baseline[] <-0
-    P2_weighted_baseline <- notP1; P2_weighted_baseline[] <-0
-    for(i in colnames(notP1)){
-      P1uP2 <- cbind(P1,notP1[,i,drop=F])
-      sim_mat <- similarity_func(P1uP2)
-      sim_tree <- cluster_func(sim_mat)
-      ## get the weights in proper order
-      weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
-      weights <- weights[order(factor(names(weights),levels = colnames(P1uP2)))]
-      ## flat is equivalent to all weights equal to 1
-      flat <- weights; flat[1:length(flat)] <- 1
-      P2_flat_baseline[,i] <- specificity_func(P1uP2, flat)[,i]
-      P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)[,i]
-    }
+    
     
     #### NOTE:: MIGHT REMOVE THIS LOOP IF USING A PERMUTATION TABLE :0
     for(rep in 1:num_reps){
@@ -313,7 +310,6 @@ real_results <- foreach(perm=1:length(permutation_matrix),
       P1_baseline
       P2 <- notP1[,sample(1:ncol(notP1), n)]
       P1uP2 <- cbind(P1,P2)
-      
     }
   }
 }
