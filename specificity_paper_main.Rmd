@@ -25,6 +25,9 @@ library(ggplot2)
 temp <- tempfile()
 download.file("https://storage.googleapis.com/gtex_analysis_v8/rna_seq_data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz",temp)
 gtex <- read.table( temp, skip=2, header = TRUE, sep = "\t")
+gtex_rowinfo <- data.frame(Name=gtex$Name, Description=gtex$Description)
+rownames(gtex) <- gtex$Name
+gtex <- as.matrix(gtex[,3:ncol(gtex)])
 unlink(temp); rm(temp)
 
 
@@ -45,35 +48,33 @@ genes <- genes[which(is.element(genes$chromosome_name, c(1:22, "X", "Y", "MT")) 
 ```{r clean dataset}
 ## show mitochondrial genes drive a large part of sample similarity
 ## Note sum of medians in gtex not quite 1M - likely artifact of taking medians
-barplot(colSums(gtex[,3:ncol(gtex)]))
-which <- which(genes$chromosome_name != "MT" )
-whichMT <- which(genes$chromosome_name == "MT" )
+barplot(colSums(gtex))
 library(stringr)
 ## match genes between gtex and ensembl
-gtex_names <- str_split_fixed(gtex$Name, "[.]", 2)[,1]
+gtex_names <- str_split_fixed(gtex_rowinfo$Name, "[.]", 2)[,1]
+which <- which(genes$chromosome_name != "MT" )
 gtex_cleaned <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
-gtex_cleanedMT <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[whichMT])),]
+which <- which(genes$chromosome_name == "MT" )
+gtex_cleanedMT <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
 
 ##non-mitochondrial TPM sum
-barplot(colSums(gtex_cleaned[,3:ncol(gtex_cleaned)]))
+barplot(colSums(gtex_cleaned))
 ##mitochondrial TPM sum
-barplot(colSums(gtex_cleanedMT[,3:ncol(gtex_cleanedMT)]))
+barplot(colSums(gtex_cleanedMT))
 ## non-mito + mito TPM sum
-barplot(colSums(gtex_cleaned[,3:ncol(gtex_cleaned)])+colSums(gtex_cleanedMT[,3:ncol(gtex_cleanedMT)]))
-
+barplot(colSums(gtex_cleaned)+colSums(gtex_cleanedMT))
+rm(gtex_cleanedMT)
 ##renormalize TPM without mitochondrial genes
-gtex_cleaned_renorm <- gtex_cleaned
-for(i in 3:ncol(gtex_cleaned_renorm)){
-  gtex_cleaned_renorm[,i] <- (gtex_cleaned_renorm[,i]*1e6 / sum(gtex_cleaned_renorm[,i]))
+for(i in 1:ncol(gtex_cleaned)){
+  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
 }
-barplot(colSums(gtex_cleaned_renorm[,3:ncol(gtex_cleaned_renorm)]))
+barplot(colSums(gtex_cleaned))
 
 #### Supplemental Figure (Fraction of TPM from chr==M )
-gtex <- gtex_cleaned_renorm
-exp_mat <- gtex[,3:ncol(gtex)]
+gtex <- gtex_cleaned; rm(gtex_cleaned)
+exp_mat <- gtex
 ## log10(TPM+1) transform of data
 exp_mat <- log10(exp_mat+1)
-rownames(exp_mat) <- gtex$Name
 
 #### Supplemental Figure (heatmap cluster of samples )
 
@@ -131,7 +132,7 @@ sim_tree <- as.dendrogram(hclust(as.dist(1-dot_sim),method = "single"))
 ```{r calculate sample weights}
 ### uses Equation 1. 
 ## modelled on Yenifer's code
-LMB_dend.add_dist_to_parent <- function(dend, dist_to_parent=0){
+add_dist_to_parent <- function(dend, dist_to_parent=0){
   ## note: distance to parent is fed in at the start of the function
   attributes(dend) <- c(attributes(dend), dist_to_parent=dist_to_parent)
   ## test if at leaf node
@@ -141,15 +142,15 @@ LMB_dend.add_dist_to_parent <- function(dend, dist_to_parent=0){
   for(i in 1:length(dend)){ ## length of dend should be number of child nodes
     ## distance to parent is simply the difference in height between parent and child
     dist_to_parent <- attributes(dend)$height - attributes(dend[[i]])$height 
-    dend[[i]] <- LMB_dend.add_dist_to_parent(dend[[i]], 
+    dend[[i]] <- add_dist_to_parent(dend[[i]], 
                                              dist_to_parent = dist_to_parent)
   }
   return(dend)
 }
-sim_tree <- LMB_dend.add_dist_to_parent(sim_tree)
+sim_tree <- add_dist_to_parent(sim_tree)
 
 ## modelled on Yenifer's code
-LMB_dend.add_weights <- function(dend, weight_of_parent=0){
+add_weights <- function(dend, weight_of_parent=0){
   weight <- (attributes(dend)$dist_to_parent / attributes(dend)$members) + weight_of_parent 
   attributes(dend) <- c(attributes(dend), weight=weight)
   ## test if at leaf node
@@ -157,11 +158,11 @@ LMB_dend.add_weights <- function(dend, weight_of_parent=0){
     return(dend)
   }
   for(i in 1:length(dend)){ ## length of dend should be number of child nodes
-    dend[[i]] <- LMB_dend.add_weights(dend[[i]], weight_of_parent=weight)
+    dend[[i]] <- add_weights(dend[[i]], weight_of_parent=weight)
   }
   return(dend)
 }
-sim_tree <- LMB_dend.add_weights(sim_tree)
+sim_tree <- add_weights(sim_tree)
 
 ## plot tree with weights
 library(dendextend)
@@ -214,8 +215,11 @@ calc_weighted_zscore_matrix <- function(mat, weights){
   return(weighted_zscores)
 }
 
-spec_mat <- calc_weighted_zscore_matrix(exp_mat, weights)
-
+spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights)
+flat <- weights; flat[1:length(flat)] <- 1
+spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
+plot(as.matrix(spec_mat_weighted),as.matrix(spec_mat_flat))
+abline(h=c(0,2,4), v=c(0,2,4))
 ### use Roshni's Code
 
 
@@ -267,13 +271,13 @@ P1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = TRUE)])
 notP1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = FALSE)])
 ## use general similarity_func and cluster_func in case we want to test more later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
-cluster_func <- function(sim_mat){LMB_dend.add_weights(LMB_dend.add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
 
 real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,paste("n=",n,sep = ""))  ) %dopar% {
   for(measure in specificity_measures$func_names){
     ## P2_baseline is P1 + each column of P2 so we can calculate once before of rep's loop
     specificity_func <- specificity_measures$funcs[[measure]]
-    if(is.na(specificity_func)){print(paste(measure, "func is NA"))}
+    if(is.na(specificity_func)){print(paste(measure, "func is NA")); next;}
     P2_flat_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
     P2_weighted_baseline <- matrix(nrow = nrow(notP1),ncol =  ncol(notP1))
     for(i in 1:ncol(notP1)){
@@ -301,5 +305,8 @@ real_results <- foreach(n=1:num_brain_samples, .final = function(n) setNames(n,p
 }
 
 
-temp_zflat2 <- calc_weighted_zscore_matrix(exp_mat, weights)
+
 ```
+
+
+
