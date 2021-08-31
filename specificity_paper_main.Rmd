@@ -259,9 +259,9 @@ specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              ))
 robustness_test_results <- list( )
 for(i in 1:length(specificity_measures$func_names)){
-  el_names <- paste( c("P2_baseline_", "P1_", "P2_")
+  el_names <- paste( c( "P1_", "P2_")
                      , specificity_measures$func_names[i], sep="")
-  temp_list <- setNames(list(list(), list(), list()), nm=el_names  )
+  temp_list <- setNames(list(list(), list()), nm=el_names  )
   robustness_test_results <- c(robustness_test_results, temp_list )
 }
 
@@ -277,7 +277,7 @@ registerDoParallel(detectCores())
 
 
 num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-num_reps <- 1
+num_reps <- 2
 ## use general similarity_func and cluster_func in case we want to test more later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
@@ -297,24 +297,6 @@ for(rep in 1:num_reps){
 for(measure in specificity_measures$func_names){
   specificity_func <- specificity_measures$funcs[[measure]]
   if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
-  ## P2_baseline is P1 + each column of P2 so we can calculate once before of rep's loop
-  P2_flat_baseline <- notP1; P2_flat_baseline[] <-0
-  P2_weighted_baseline <- notP1; P2_weighted_baseline[] <-0
-  for(i in colnames(notP1)){
-    P1uP2 <- cbind(P1,notP1[,i,drop=F])
-    sim_mat <- similarity_func(P1uP2)
-    sim_tree <- cluster_func(sim_mat)
-    ## get the weights in proper order
-    weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
-    weights <- weights[order(factor(names(weights),levels = colnames(P1uP2)))]
-    ## flat is equivalent to all weights equal to 1
-    flat <- weights; flat[1:length(flat)] <- 1
-    P2_flat_baseline[,i] <- specificity_func(P1uP2, flat)[,i]
-    P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)[,i]
-  }  
-  ## save baseline
-  robustness_test_results[[paste("P2_baseline_", measure,sep = "")]] <- list(P2_weighted_baseline=P2_weighted_baseline, P2_flat_baseline=P2_flat_baseline) 
-  
   
     results <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
     library('Hmisc')
@@ -345,7 +327,6 @@ for(measure in specificity_measures$func_names){
     )
     }
     
-    results_backup <- results
     results_P1 <- list()
     results_P2 <- list()
     for(i in 1:length(results)){
@@ -359,27 +340,41 @@ for(measure in specificity_measures$func_names){
       results[[name]]$P2_weighted_spec_score <- NULL;  results[[name]]$P2_flat_spec_score<- NULL;  ## large object so delete as we go to avoid copy
     }
     
-    robustness_test_results[[paste("P1_", measure,sep = "")]] <- results_P1
-    robustness_test_results[[paste("P2_", measure,sep = "")]] <- results_P2
+    robustness_test_results[[paste("P1_", measure,sep = "")]] <- results_P1; rm(results_P1)
+    robustness_test_results[[paste("P2_", measure,sep = "")]] <- results_P2; rm(results_P2)
 }
 
 
-for(i in 1:length(robustness_test_results$P1_Zscore)){
-  plot(robustness_test_results$P1_Zscore[[1]]$P1_flat_spec_score[,"Spleen"], robustness_test_results$P1_Zscore[[1]]$P1_flat_spec_score[,"Spleen"]-robustness_test_results$P1_Zscore[[i]]$P1_flat_spec_score[,"Spleen"], main = paste("P1 flat:n =",i))
-}
-
-for(i in 1:length(robustness_test_results$P1_Zscore)){
-  plot(robustness_test_results$P1_Zscore[[1]]$P1_weighted_spec_score[,"Spleen"], robustness_test_results$P1_Zscore[[1]]$P1_weighted_spec_score[,"Spleen"]-robustness_test_results$P1_Zscore[[i]]$P1_weighted_spec_score[,"Spleen"], main = paste("P1 weighted:n =",i))
-}
-
-for(i in 1:length(robustness_test_results$P1_Zscore)){
-  plot(robustness_test_results$P2_Zscore[[1]]$P2_flat_spec_score[,1], robustness_test_results$P2_Zscore[[1]]$P2_flat_spec_score[,1]- robustness_test_results$P2_Zscore[[i]]$P2_flat_spec_score[,1], main = paste("P2 flat:n =",i))
+if(FALSE){ ### these are useful for rough look at trends
+  for(rep in 1: 1){  # ncol(permutation_matrix)){
+    for(n in 1:nrow(permutation_matrix)){
+      name <- paste("rep=", rep,",n=",n, sep="")
+      name_baseline <- paste("rep=", rep,",n=",1, sep="")
+      plot(robustness_test_results$P1_Zscore[[name_baseline]]$P1_flat_spec_score[,"Spleen"], robustness_test_results$P1_Zscore[[name_baseline]]$P1_flat_spec_score[,"Spleen"]-robustness_test_results$P1_Zscore[[name]]$P1_flat_spec_score[,"Spleen"], main = paste("P1 flat:n =",n))
+    }
+  
+    for(n in 1:nrow(permutation_matrix)){
+      name <- paste("rep=", rep,",n=",n, sep="")
+      name_baseline <- paste("rep=", rep,",n=",1, sep="")
+      plot(robustness_test_results$P1_Zscore[[name_baseline]]$P1_weighted_spec_score[,"Spleen"], robustness_test_results$P1_Zscore[[name_baseline]]$P1_weighted_spec_score[,"Spleen"]-robustness_test_results$P1_Zscore[[name]]$P1_weighted_spec_score[,"Spleen"], main = paste("P1 weighted:n =",n))
+    }
+  
+    for(n in 1:nrow(permutation_matrix)){
+      name <- paste("rep=", rep,",n=",n, sep="")
+      name_baseline <- paste("rep=", rep,",n=",1, sep="")
+      plot(robustness_test_results$P2_Zscore[[name_baseline]]$P2_flat_spec_score[,1], robustness_test_results$P2_Zscore[[name_baseline]]$P2_flat_spec_score[,1]- robustness_test_results$P2_Zscore[[name]]$P2_flat_spec_score[,1], main = paste("P2 flat:n =",n))
+      }
+  
+    for(n in 1:nrow(permutation_matrix)){
+      name <- paste("rep=", rep,",n=",n, sep="")
+      name_baseline <- paste("rep=", rep,",n=",1, sep="")
+      plot(robustness_test_results$P2_Zscore[[name_baseline]]$P2_weighted_spec_score[,1], robustness_test_results$P2_Zscore[[name_baseline]]$P2_weighted_spec_score[,1]- robustness_test_results$P2_Zscore[[name]]$P2_weighted_spec_score[,1], main = paste("P2 weighted:n =",n))
+    }
   }
-
-for(i in 1:length(robustness_test_results$P1_Zscore)){
-  plot(robustness_test_results$P2_Zscore[[1]]$P2_weighted_spec_score[,1], robustness_test_results$P2_Zscore[[1]]$P2_weighted_spec_score[,1]- robustness_test_results$P2_Zscore[[i]]$P2_weighted_spec_score[,1], main = paste("P2 weighted:n =",i))
 }
 
+
+## output to look at is robustness_test_results
 ```
 
 
