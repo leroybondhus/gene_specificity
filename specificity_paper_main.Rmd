@@ -162,6 +162,14 @@ add_weights <- function(dend, weight_of_parent=0){
   }
   return(dend)
 }
+
+
+get_weights <- function(dend, name_order){
+  weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
+  weights <- weights[order(factor(names(weights),levels = name_order))]
+  return(weights)
+}
+
 sim_tree <- add_weights(sim_tree)
 
 ## plot tree with weights
@@ -169,8 +177,7 @@ library(dendextend)
 sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2.2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
 
 
-weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
-
+weights <- get_weights(sim_tree, colnames(exp_mat))
 
 ggplot( data.frame(names=names(weights), weights=weights),aes(x=names, y=weights))+
   geom_col()+
@@ -184,10 +191,9 @@ ggplot( data.frame(names=names(weights), weights=weights),aes(x=names, y=weights
 library(dplyr)
 library('Hmisc')
 ## order weights to match columns of expression matrix
-weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
-weights <- weights[order(factor(names(weights),levels = colnames(exp_mat)))]
 
 
+weights <- get_weights(sim_tree, colnames(exp_mat))
 
 # function to calculate weighted zscores
 ## was te_to_weighted_zscore
@@ -253,9 +259,9 @@ specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              ))
 robustness_test_results <- list( )
 for(i in 1:length(specificity_measures$func_names)){
-  el_names <- paste( c("P1_weighted_", "P1_flat_", "P2_weighted_", "P2_flat_")
+  el_names <- paste( c("P2_weighted_baseline_","P2_flat_baseline_", "P1_weighted_", "P1_flat_", "P2_weighted_", "P2_flat_")
                      , specificity_measures$func_names[i], sep="")
-  temp_list <- setNames(list(list(),list(),list(),list()), nm=el_names  )
+  temp_list <- setNames(list(list(), list(), list(),list(),list(),list()), nm=el_names  )
   robustness_test_results <- c(robustness_test_results, temp_list )
 }
 
@@ -271,7 +277,7 @@ registerDoParallel(detectCores())
 
 
 num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-num_reps <- 5
+num_reps <- 1
 ## use general similarity_func and cluster_func in case we want to test more later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
@@ -306,6 +312,9 @@ for(measure in specificity_measures$func_names){
     P2_flat_baseline[,i] <- specificity_func(P1uP2, flat)[,i]
     P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)[,i]
   }  
+  ## save baseline
+  robustness_test_results[paste("P2_weighted_baseline_", measure,sep = "")] <- P2_weighted_baseline
+  robustness_test_results[paste("P2_flat_baseline_", measure,sep = "")] <- P2_weighted_baseline
   
   # ## TEST that foreach loop works as expected  
   # result <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = ""))) %dopar% {
@@ -322,18 +331,28 @@ for(measure in specificity_measures$func_names){
     sample_set <- permutation_matrix[sample_indices, rep_index]
     
     # P1_baseline is just P1 at n=1
-    P2 <- notP1[,sample_set]
+    P2 <- notP1[,sample_set]; colnames(P2) <- make.unique(colnames(P2)) ## make.unique will facilitate sampling with replacement
     P1uP2 <- cbind(P1,P2)
+    
+    ## P1uP2 ## exp_mat > get sim mat > get sim tree > get samp weights > get spec mat
+    sim_mat <- similarity_func(P1uP2)
+    sim_tree <- cluster_func(sim_mat)
+    weights <- get_weights(sim_mat, colnames(P1uP2))
+    flat <- weights; flat[] <- 1
+    spec_mat_flat <- specificity_func(P1uP2, flat)
+    spec_mat_weighted <- specificity_func(P1uP2, flat)
     
     # need to fill in these with spec_score matrices for each n for each method
     # names should match 
-    list(
-      P1_weighted_spec_score = NA,
-      P1_flat_spec_score = NA,
-      P2_weighted_spec_score = NA,
-      P2_flat_spec_score = NA
+    results <- list(
+      P1_weighted_spec_score = spec_mat_weighted[,colnames(P1)],
+      P1_flat_spec_score = spec_mat_flat[,colnames(P1)],
+      P2_weighted_spec_score = spec_mat_weighted[,colnames(P2)],
+      P2_flat_spec_score = spec_mat_flat[,colnames(P2)]
     )
-  }
+    results
+    }
+    
 }
 
 for(i in 1:ncol(P2_flat_baseline)){
