@@ -316,22 +316,16 @@ for(measure in specificity_measures$func_names){
   robustness_test_results[paste("P2_weighted_baseline_", measure,sep = "")] <- P2_weighted_baseline
   robustness_test_results[paste("P2_flat_baseline_", measure,sep = "")] <- P2_weighted_baseline
   
-  # ## TEST that foreach loop works as expected  
-  # result <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = ""))) %dopar% {
-  #   
-  #   sample_indices <- 1:arrayInd(perm, dim(permutation_matrix))[1] ## row is sample name, all names in a row up to top are choices for n=1,2..i
-  #   rep_index <- arrayInd(perm, dim(permutation_matrix))[2] ## column is replicate number
-  #   temp <- list(rep_index, sample_indices)
-  # } 
   
     result <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = ""))) %dopar% {
-    
+    library('Hmisc')
+    library(dendextend)
     sample_indices <- 1:arrayInd(perm, dim(permutation_matrix))[1] ## row is sample name, all names in a row up to top are choices for n=1,2..i
     rep_index <- arrayInd(perm, dim(permutation_matrix))[2] ## column is replicate number
     sample_set <- permutation_matrix[sample_indices, rep_index]
     
     # P1_baseline is just P1 at n=1
-    P2 <- notP1[,sample_set]; colnames(P2) <- make.unique(colnames(P2)) ## make.unique will facilitate sampling with replacement
+    P2 <- notP1[,sample_set, drop=F]; colnames(P2) <- make.unique(colnames(P2)) ## make.unique will facilitate sampling with replacement
     P1uP2 <- cbind(P1,P2)
     
     ## P1uP2 ## exp_mat > get sim mat > get sim tree > get samp weights > get spec mat
@@ -350,7 +344,7 @@ for(measure in specificity_measures$func_names){
       P2_weighted_spec_score = spec_mat_weighted[,colnames(P2)],
       P2_flat_spec_score = spec_mat_flat[,colnames(P2)]
     )
-    results
+    
     }
     
 }
