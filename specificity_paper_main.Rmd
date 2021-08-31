@@ -317,7 +317,7 @@ for(measure in specificity_measures$func_names){
   robustness_test_results[paste("P2_flat_baseline_", measure,sep = "")] <- P2_weighted_baseline
   
   
-    result <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,1], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,2], sep = ""))) %dopar% {
+    result <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
     library('Hmisc')
     library(dendextend)
     sample_indices <- 1:arrayInd(perm, dim(permutation_matrix))[1] ## row is sample name, all names in a row up to top are choices for n=1,2..i
@@ -349,9 +349,6 @@ for(measure in specificity_measures$func_names){
     
 }
 
-for(i in 1:ncol(P2_flat_baseline)){
-  plot(P2_flat_baseline[,i],P2_weighted_baseline[,i])
-}
 
 ```
 
