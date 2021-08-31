@@ -313,8 +313,8 @@ for(measure in specificity_measures$func_names){
     P2_weighted_baseline[,i] <- specificity_func(P1uP2, weights)[,i]
   }  
   ## save baseline
-  robustness_test_results[paste("P2_weighted_baseline_", measure,sep = "")] <- P2_weighted_baseline
-  robustness_test_results[paste("P2_flat_baseline_", measure,sep = "")] <- P2_weighted_baseline
+  robustness_test_results[[paste("P2_weighted_baseline_", measure,sep = "")]] <- P2_weighted_baseline
+  robustness_test_results[[paste("P2_flat_baseline_", measure,sep = "")]] <- P2_flat_baseline
   
   
     result <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
