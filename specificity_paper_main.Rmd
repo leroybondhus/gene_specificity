@@ -440,4 +440,35 @@ for(measure in specificity_measures$func_names){
    # png(filename = "weighted_Z_minus_flat_Z_top10_bottom10_delta_each_tissue.png", width = 720, height=1200)
     Heatmap(spec_mat_weighted[gene_list,]-spec_mat_flat[gene_list,], column_order=col_order, row_order = gene_list, show_row_names= F)
   #dev.off()
+}
+  
+  
+  
+## Sliding Jaccard Index  
+
+df_sliding_jaccard <- data.frame(samp=character(), zcut=numeric(), jacc=numeric(), brain=logical(), unionsize=numeric() )
+for(samp in colnames(spec_mat_flat)){
+  for(zcut in seq(0,max(spec_mat_flat, na.rm = T)+1, by=0.25 )){
+   vflat <- names(spec_mat_flat[which(spec_mat_flat[,samp] > zcut),samp])
+   vweight <- names(spec_mat_weighted[which(spec_mat_weighted[,samp] > zcut),samp])
+   jacc <-length(intersect(vflat,vweight))/length(union(vflat,vweight))
+   brain <- grepl("Brain", samp)
+   df_temp <- data.frame(samp=samp,zcut=zcut,jacc=jacc, brain=brain, unionsize=length(union(vflat,vweight)) )
+   df_sliding_jaccard <- rbind(df_sliding_jaccard, df_temp)
+  }
+}
+
+ggplot(df_sliding_jaccard[which(rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
+  geom_line()
+ggplot(df_sliding_jaccard[which(df_sliding_jaccard$brain & rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
+  geom_line()
+ggplot(df_sliding_jaccard[which(!df_sliding_jaccard$brain & rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
+  geom_line()
+
+png(filename = "jaccard_weighted_v_flat_slidingzcut_bbrainvnotbrain.png", width = 1620, height=720)
+ggplot(df_sliding_jaccard[which(rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc))+
+  geom_line(aes( color=samp, color=unionsize))+
+  facet_wrap(~brain)
+dev.off()
+    
 ```
