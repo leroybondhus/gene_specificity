@@ -378,4 +378,66 @@ if(FALSE){ ### these are useful for rough look at trends
 ```
 
 
+```{r flat v weighted comparisons}
+specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
+                             funcs=list(Zscore=calc_weighted_zscore_matrix,
+                                        Tau=NA,
+                                        Tsi=NA,
+                                        Gini=NA
+                             ))
+similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
+cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
 
+
+for(measure in specificity_measures$func_names){
+  specificity_func <- specificity_measures$funcs[[measure]]
+  if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
+  sim_mat <- similarity_func(exp_mat)
+  sim_tree <- cluster_func(sim_mat)
+  weights <- get_weights(sim_mat, colnames(exp_mat))
+  flat <- weights; flat[] <- 1
+  spec_mat_flat <- specificity_func(exp_mat, flat)
+  spec_mat_weighted <- specificity_func(exp_mat, weights)
+  
+  library(ComplexHeatmap)
+  
+  library(circlize)
+  col_fun = colorRamp2(c(-4, -2 ,0, 2, 4), c("black", "blue", "white", "yellow", "red"))
+  
+  delta_row_var <- abs(apply(spec_mat_flat, 1, var)
+                       - apply(spec_mat_weighted, 1, var) )
+  which <- order(delta_row_var, decreasing = TRUE)[1:10000]
+  which <- which(delta_row_var > 0.3)
+  h1 <- Heatmap(spec_mat_flat[which,], show_row_names = F, col=col_fun) #, row_order = 1:length(which))
+  h1_list <- draw(h1)
+  col_order <- column_order(h1_list)
+  h1+
+    Heatmap(spec_mat_weighted[which,], column_order = col_order, show_row_names = F, col=col_fun) #+
+  #  Heatmap(abs(spec_mat_weighted[which,]-spec_mat_flat[which,]), column_order=col_order, show_row_names= F)
+  
+  gene_list <- list() 
+  for(i in 1:ncol(spec_mat_weighted)){
+    gene_list[[i]] <- list()
+    gene_list[[i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_weighted[,i]-spec_mat_flat[,i]), decreasing = TRUE)[1:5]])
+  }
+  for(i in 1:ncol(spec_mat_weighted)){
+    gene_list[[ncol(spec_mat_weighted)+i]] <- list()
+     gene_list[[ncol(spec_mat_weighted)+i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_flat[,i]-spec_mat_weighted[,i]), decreasing = TRUE)[1:5]])
+  }
+ 
+  gene_list <- unique(unlist(gene_list))
+  col_fun = colorRamp2(c(min(as.vector(spec_mat_flat[gene_list,]),as.vector(spec_mat_weighted[gene_list,]) ),
+                         -2 ,0, 2, 4,
+                         max(as.vector(spec_mat_flat[gene_list,]),as.vector(spec_mat_weighted[gene_list,]) )), c("black", "blue", "white", "yellow", "red", "red4"))
+  
+  h1 <- Heatmap(spec_mat_flat[gene_list,], show_row_names = F, col=col_fun, row_order = gene_list, column_order = colnames(spec_mat_flat) )
+  h1_list <- draw(h1)
+  col_order <- column_order(h1_list)
+ # png(filename = "weighted_Z_minus_flat_Z_top10_bottom10_rawanddelta_each_tissue.png", width = 1620, height=1200)
+  h1+
+    Heatmap(spec_mat_weighted[gene_list,], column_order = col_order,  row_order = gene_list, show_row_names = F , col=col_fun) +
+    
+   # png(filename = "weighted_Z_minus_flat_Z_top10_bottom10_delta_each_tissue.png", width = 720, height=1200)
+    Heatmap(spec_mat_weighted[gene_list,]-spec_mat_flat[gene_list,], column_order=col_order, row_order = gene_list, show_row_names= F)
+  #dev.off()
+```
