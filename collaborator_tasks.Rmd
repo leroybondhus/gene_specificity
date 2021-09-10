@@ -12,8 +12,8 @@ output: html_document
 
 ## Leroy's Tasks
 ### To Do
-* Organize github repository for collaboration
-* Assign specific tasks to Roshni and Yenifer 
+* Map workflow and functions for general package setup
+* Generate list of prelim figures and share with Roshni and Yenifer
 
 ### Completed
 *

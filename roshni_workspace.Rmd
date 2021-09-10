@@ -1,67 +1,350 @@
----
-title: "roshni_workspace"
-output: html_document
----
-```{r}
-# function that drops certain tissues from gene_x_expression matrix
-curate_te_matrix <- function(te_matrix, drop_col_name){
-  a <- which(colnames(te_matrix)==drop_col_name)
-  te_matrix <- te_matrix[-a]
+# loading packages
+library('tidyr')
+library('dplyr') 
+library('tibble') 
+library('RColorBrewer') 
+library('ggplot2') 
+library('lubridate') 
+library('gridExtra')
+library('devtools')
+library('circlepackeR')
+library('Hmisc')
+library('ggpubr')
+library('grid')
+library('lattice')
+library('gdata')
+library('parallel')
+library('doParallel')
+library('data.table')
+library('graphics')
+library('viridis')
+
+registerDoParallel(cores=4)
+
+
+
+
+
+##### loading and wrangling GTEX data
+
+# loading te matrix
+GTEX.data <- read.csv("gtex_medians_PC_only_wo_MT.csv", header=T, sep=",")
+
+# function that drops certain columns from a te matrix
+drop_cols <- function(te_matrix, ...){
+  cols_to_drop <- list(...)
+  for (col in cols_to_drop){
+    a <- which(colnames(te_matrix)==col)
+    te_matrix <- te_matrix[-a]
+  }
   return(te_matrix)
 }
-```
-```{r}
-# Z-SCORE FUNCTION
-# function that calculates SDs of genes given a tissue expression matrix
-z_score <- function(te_matrix){
-  mean_expression <- rowMeans(te_matrix)
-  std_expression <- apply(te_matrix,1,sd)
-  std_matrix <- (te_matrix - mean_expression) / std_expression
-  std_matrix[is.na(std_matrix)] <- -1
-  return(std_matrix)
+
+# using above function to subset te matrix to only include tissue expression values
+GTEX.subset <- drop_cols(GTEX.data,"X","Name","Description")
+
+# subset data set to only include certain indices
+drop_index <- function(te_matrix, ...){
+  cols_to_drop <- list(...)
+  name_list <- c()
+  for (col in cols_to_drop){
+    name_list <- append(name_list, colnames(te_matrix[col]))
+  }
+  for (name in name_list){
+    a <- which(colnames(te_matrix)==name)
+    te_matrix <- te_matrix[-a]
+  }
+  return(te_matrix)
 }
 
-# function that outputs a list of gene indices above a specific SD cutoff given a matrix of standard deviations
-specific_genes_by_zscore <- function(std_matrix, tissue_of_interest, std_cutoff){
-  index <- which(colnames(std_matrix)==tissue_of_interest)
-  print(which(std_matrix[,index]>std_cutoff))
-}
-```
-```{r}
-# COUNTS FUNCTION
-specificity_by_counts <- function(te_matrix,gene_of_interest_index,expressed_cutoff,specific_cutoff){
-  a <- which(te_matrix[gene_of_interest_index,]>=expressed_cutoff)
-  if(length(a)<=specific_cutoff){
-    print(colnames(te_matrix[a]))
+# creating one dataset with no brain columns and one dataset with only brain columns
+GTEX.NoBrain <- drop_index(GTEX.subset,8:20)
+GTEX.Brain <- drop_index(GTEX.subset,1:7,21:54)
+
+
+
+
+
+##### generating list of delta z-scores (weighted)
+
+# function to calculate weighted zscores
+te_to_weighted_zscore <- function(te_matrix, weights_vector){
+  weights_vector <- left_join(data.frame(name=colnames(te_matrix)),weights_vector,by="name")
+  weighted_te_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (i in 1:nrow(weights_vector)){
+    weighted_te_matrix[,i] <- weights_vector[i,2]*te_matrix[,i]
   }
+  colnames(weighted_te_matrix) <- colnames(te_matrix)
+  weighted_means <- c(1:nrow(weighted_te_matrix))
+  sum_of_weights <- sum(weights_vector[,2])
+  for (i in 1:nrow(weighted_te_matrix)){
+    weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum_of_weights
+  }
+  weighted_var <- matrix(nrow=nrow(te_matrix),ncol=1)
+  for (i in 1:nrow(te_matrix)){
+    weighted_var[i] <- wtd.var(te_matrix[i,],weights=weights_vector[,2])
+  }
+  weighted_sd <- sqrt(weighted_var)
+  for (i in 1:nrow(te_matrix)){
+    te_matrix[i,] <- (te_matrix[i,]-weighted_means[i])/weighted_sd[i]
+  }
+  weighted_zscores <- na.omit(te_matrix)
 }
-```
-```{r}
-# TAU FUNCTION
-specificity_by_tau <- function(te_matrix, gene_of_interest_index){
-   x_hat <- (te_matrix[gene_of_interest_index,]) / (max(te_matrix[gene_of_interest_index,]))
-   tau <- sum(x_hat) / (ncol(te_matrix)-2)
-   print(tau)
+
+# function to calculate weighted zscores based on randomly added samples
+appended_te_to_weighted_zscore <- function(P1,P2,weights_vector,size_of_selection,number_of_permutations){
+  size_of_selection <- c(1:size_of_selection)
+  number_of_permutations <- c(1:number_of_permutations)
+  results_list <- list()
+  for (i in size_of_selection){
+    for (j in number_of_permutations){
+      selected_columns <- sample(P2, size_of_selection)
+      df <- data.frame(P1,selected_columns)
+      weight_vector <- left_join(data.frame(name=colnames(df)),weights_vector,by="name")
+      weighted_te_matrix <- matrix(nrow=nrow(df),ncol=ncol(df))
+      for (i in 1:nrow(weight_vector)){
+        weighted_te_matrix[,i] <- weight_vector[i,2]*df[,i]
+      }
+      colnames(weighted_te_matrix) <- colnames(df)
+      weighted_means <- c(1:nrow(weighted_te_matrix))
+      sum_of_weights <- sum(weight_vector[,2])
+      for (i in 1:nrow(weighted_te_matrix)){
+        weighted_means[i] <- sum(weighted_te_matrix[i,]) / sum_of_weights
+      }
+      weighted_var <- matrix(nrow=nrow(df),ncol=1)
+      for (i in 1:nrow(df)){
+        weighted_var[i] <- wtd.var(df[i,],weights=weight_vector[,2])
+      }
+      weighted_sd <- sqrt(weighted_var)
+      for (i in 1:nrow(df)){
+        df[i,] <- (df[i,]-weighted_means[i])/weighted_sd[i]
+      }
+      weighted_zscores <- na.omit(df)
+      weighted_zscores <- weighted_zscores[,1:ncol(P1)]
+      output <- list(weighted_zscores)
+      results_list <- append(results_list,output)
+    }
+  }
+  return(results_list)
 }
-```
-```{r}
-# TISSUE SPECIFICITY INDEX FUNCTION
-specificity_by_tsi <- function(te_matrix,gene_of_interest_index){
-  a <- max(te_matrix[gene_of_interest_index,])
-  b <- sum(te_matrix[gene_of_interest_index,])
-  tsi <- a/b
-  print(tsi)
+
+# function to take the difference in values between two dfs
+delta <- function(df_1,df_2){
+  store1 <- as.data.frame(df_1)
+  store2 <- as.data.frame(df_2)
+  df_1 <- as.data.frame(df_1)
+  df_2 <- as.data.frame(df_2)
+  df_1_names <- row.names(df_1)
+  df_2_names <- row.names(df_2)
+  df_1$rowid <- df_1_names
+  df_2$rowid <- df_2_names
+  temp <- inner_join(df_1, df_2, by="rowid")
+  df_1 <- temp[,1:ncol(store1)]
+  df_2 <- temp[,(ncol(store1)+2):ncol(temp)]
+  output <- list((df_1-df_2))
+  return(output)
 }
-```
-```{r}
-# GINI FUNCTION
-specificity_by_gini <- function(te_matrix,gene_of_interest_index){
-  xi <- sort(te_matrix[gene_of_interest_index,],decreasing = FALSE)
-  print(xi)
-  firstterm <- (ncol(te_matrix)+1) / ncol(te_matrix)
-  secondtermnum <- 2*sum(ncol(te_matrix)+1-(1:ncol(te_matrix)))*xi
-  secondtermden <- (ncol(te_matrix))*sum(xi)
-  gini <- firstterm - (secondtermnum/secondtermden)
-  print(gini)
+
+# reading in weights vector
+similarity_weights <- read.csv("weights_simi_.csv")
+
+# creating df of weighted P1 z-scores
+weighted_similarity_zscores <- te_to_weighted_zscore(GTEX.NoBrain,similarity_weights)
+
+# creating list of dfs of weighted P1 z-scores calculated based on added brain columns
+permutation_similarity_data <- appended_te_to_weighted_zscore(GTEX.NoBrain,GTEX.Brain,similarity_weights,13,3)
+
+# creating list of dfs of delta(weighted P1 z-scores) NoBrain - Brain
+permutations <- c(1:length(permutation_similarity_data))
+delta_similarity <- c()
+for (i in permutations){
+  output <- delta(weighted_similarity_zscores,permutation_similarity_data[i])
+  delta_similarity <- append(delta_similarity,output)
 }
-```
+
+
+
+
+
+##### generating list of delta z-scores (flat)
+
+# function to calculate flat zscores
+specificity_by_zscore <- function(te_matrix){
+  mean_expression <- rowMeans(te_matrix)
+  std_expression <- apply(te_matrix,1,sd)
+  zscore_matrix <- (te_matrix - mean_expression) / std_expression
+  return(zscore_matrix)
+}
+
+# function to calculate flat zscores based on randomly added samples
+appended_te_to_flat_zscore <- function(P1,P2,size_of_selection,number_of_permutations){
+  size_of_selection <- c(1:size_of_selection)
+  number_of_permutations <- c(1:number_of_permutations)
+  results_list <- list()
+  for (i in size_of_selection){
+    for (j in number_of_permutations){
+      selected_columns <- sample(P2, size_of_selection)
+      df <- data.frame(P1,selected_columns)
+      mean_expression <- rowMeans(df)
+      std_expression <- apply(df,1,sd)
+      zscore_matrix <- (df - mean_expression) / std_expression
+      zscore_matrix <- na.omit(zscore_matrix)
+      zscore_matrix <- zscore_matrix[,1:ncol(P1)]
+      output <- list(zscore_matrix)
+      results_list <- append(results_list,output)
+    }
+  }
+  return(results_list)
+}
+
+# creating df of flat P1 z-scores
+flat_zscores <- specificity_by_zscore(GTEX.NoBrain)
+flat_zscores <- na.omit(flat_zscores)
+
+# creating list of dfs of flat P1 z-scores calculated based on added brain columns
+permutation_flat_data <- appended_te_to_flat_zscore(GTEX.NoBrain,GTEX.Brain,13,3)
+
+# creating list of dfs of delta(flat P1 z-scores) NoBrain - Brain
+permutations <- c(1:length(permutation_flat_data))
+delta_flat <- c()
+for (i in permutations){
+  output <- delta(flat_zscores,permutation_flat_data[i])
+  delta_flat <- append(delta_flat,output)
+}
+
+
+
+
+
+##### plotting weighted delta z-scores
+
+copy_del_sim <- delta_similarity
+copy_del_sim_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:13){
+  copy_del_sim_temp_df <- unlist(data.frame(copy_del_sim[[3*i]]))
+  copy_del_sim_temp_hist <- hist(copy_del_sim_temp_df, breaks = 100, plot=F)
+  copy_del_sim_hist_objs <- rbind(copy_del_sim_hist_objs, data.frame(counts=copy_del_sim_temp_hist$counts, mids=copy_del_sim_temp_hist$mids, sample_num=rep(i, length(copy_del_sim_temp_hist$counts))))
+}
+ggplot(copy_del_sim_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Weighted Z-Score for Added Brain Columns", x="Change in Weighted Z-Score", y="Number of Brain Columns Added", fill="Counts") + 
+  theme(plot.title=element_text(hjust=0.5))
+
+
+
+
+
+##### plotting flat delta z-scores
+
+copy_del_flat <- delta_flat
+copy_del_flat_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:13){
+  copy_del_flat_temp_df <- unlist(data.frame(copy_del_flat[[3*i]]))
+  copy_del_flat_temp_hist <- hist(copy_del_flat_temp_df, breaks = 100, plot=F)
+  copy_del_flat_hist_objs <- rbind(copy_del_flat_hist_objs, data.frame(counts=copy_del_flat_temp_hist$counts, mids=copy_del_flat_temp_hist$mids, sample_num=rep(i, length(copy_del_flat_temp_hist$counts))))
+}
+ggplot(copy_del_flat_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Flat Z-Score for Added Brain Columns", x="Change in Flat Z-Score", y="Number of Brain Columns Added", fill="Counts") + 
+  theme(plot.title=element_text(hjust=0.5))
+
+
+
+
+
+##### creating one dataset with one brain column and one dataset with the rest of the brain columns
+
+# randomly sample to get one brain column
+one_brain <- sample(GTEX.Brain,1)
+
+# add one brain column to the NoBrain dataset
+GTEX.OneBrain <- cbind(GTEX.NoBrain, one_brain)
+
+# function to drop a column by name
+drop_cols <- function(te_matrix, ...){
+  cols_to_drop <- list(...)
+  for (col in cols_to_drop){
+    a <- which(colnames(te_matrix)==col)
+    te_matrix <- te_matrix[-a]
+  }
+  return(te_matrix)
+}
+
+# drop randomly sampled column from the Brain dataset
+GTEX.TwelveBrain <- drop_cols(GTEX.Brain, "Brain...Hippocampus")
+
+
+
+
+
+##### generating list of delta z-scores (weighted) with baseline of 1
+
+# creating df of weighted P1 z-scores
+weighted_similarity_zscores_1 <- te_to_weighted_zscore(GTEX.OneBrain,similarity_weights)
+
+# creating list of dfs of weighted P1 z-scores calculated based on added brain columns
+permutation_similarity_data_1 <- appended_te_to_weighted_zscore(GTEX.OneBrain,GTEX.TwelveBrain,similarity_weights,12,3)
+
+# creating list of dfs of delta(weighted P1 z-scores) NoBrain - Brain
+permutations <- c(1:length(permutation_similarity_data_1))
+delta_similarity_1 <- c()
+for (i in permutations){
+  output <- delta(weighted_similarity_zscores_1,permutation_similarity_data_1[i])
+  delta_similarity_1 <- append(delta_similarity_1,output)
+}
+
+
+
+
+
+##### generating list of delta z-scores (flat) with baseline of 1
+
+# creating df of flat P1 z-scores
+flat_zscores_1 <- specificity_by_zscore(GTEX.OneBrain)
+flat_zscores_1 <- na.omit(flat_zscores_1)
+
+# creating list of dfs of flat P1 z-scores calculated based on added brain columns
+permutation_flat_data_1 <- appended_te_to_flat_zscore(GTEX.OneBrain,GTEX.TwelveBrain,12,3)
+
+# creating list of dfs of delta(flat P1 z-scores) NoBrain - Brain
+permutations <- c(1:length(permutation_flat_data_1))
+delta_flat_1 <- c()
+for (i in permutations){
+  output <- delta(flat_zscores_1,permutation_flat_data_1[i])
+  delta_flat_1 <- append(delta_flat_1,output)
+}
+
+
+
+# plotting weighted baseline 1
+copy_del_sim_1 <- delta_similarity_1
+copy_del_sim_hist_objs_1 <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:12){
+  copy_del_sim_temp_df_1 <- unlist(data.frame(copy_del_sim_1[[3*i]]))
+  copy_del_sim_temp_hist_1 <- hist(copy_del_sim_temp_df_1, breaks = 100, plot=F)
+  copy_del_sim_hist_objs_1 <- rbind(copy_del_sim_hist_objs_1, data.frame(counts=copy_del_sim_temp_hist_1$counts, mids=copy_del_sim_temp_hist_1$mids, sample_num=rep(i, length(copy_del_sim_temp_hist_1$counts))))
+}
+ggplot(copy_del_sim_hist_objs_1, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Weighted Z-Score for Added Brain Columns, Baseline 1", x="Change in Weighted Z-Score", y="Number of Brain Columns Added", fill="Counts") + 
+  theme(plot.title=element_text(hjust=0.5))
+
+
+
+
+# plotting flat baseline 1
+copy_del_flat_1 <- delta_flat_1
+copy_del_flat_hist_objs_1 <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:12){
+  copy_del_flat_temp_df_1 <- unlist(data.frame(copy_del_flat_1[[3*i]]))
+  copy_del_flat_temp_hist_1 <- hist(copy_del_flat_temp_df_1, breaks = 100, plot=F)
+  copy_del_flat_hist_objs_1 <- rbind(copy_del_flat_hist_objs_1, data.frame(counts=copy_del_flat_temp_hist_1$counts, mids=copy_del_flat_temp_hist_1$mids, sample_num=rep(i, length(copy_del_flat_temp_hist_1$counts))))
+}
+ggplot(copy_del_flat_hist_objs_1, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Flat Z-Score for Added Brain Columns, Baseline 1", x="Change in Flat Z-Score", y="Number of Brain Columns Added", fill="Counts") + 
+  theme(plot.title=element_text(hjust=0.5))
