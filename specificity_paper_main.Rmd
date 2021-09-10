@@ -165,7 +165,7 @@ add_weights <- function(dend, weight_of_parent=0){
 
 
 get_weights <- function(dend, name_order){
-  weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
+  weights <- setNames(get_leaves_attr(dend,"weight"),nm=get_leaves_attr(dend,"lab") )
   weights <- weights[order(factor(names(weights),levels = name_order))]
   return(weights)
 }
@@ -199,7 +199,7 @@ weights <- get_weights(sim_tree, colnames(exp_mat))
 ## was te_to_weighted_zscore
 ## now assumes weights are sorted in same order at mat samples
 calc_weighted_zscore_matrix <- function(mat, weights){
-  if(any( colnames(mat) != names(weights) )){print("WARNING: mismatch in weights names and matrix colnames order")}
+  if(any( colnames(mat) != names(weights) )){stop("WARNING: mismatch in weights names and matrix colnames order")}
   weighted_mat <- mat; weighted_mat[] <- 0
   for (i in 1:length(weights)){
     weighted_mat[,i] <- weights[i]*mat[,i]
@@ -298,11 +298,11 @@ for(measure in specificity_measures$func_names){
   specificity_func <- specificity_measures$funcs[[measure]]
   if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
   
-    results <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
+    results <- foreach(perm=1:length(permutation_matrix), .errorhandling = "pass", .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
     library('Hmisc')
     library(dendextend)
-    sample_indices <- 1:arrayInd(perm, dim(permutation_matrix))[1] ## row is sample name, all names in a row up to top are choices for n=1,2..i
-    rep_index <- arrayInd(perm, dim(permutation_matrix))[2] ## column is replicate number
+    sample_indices <- 1:(arrayInd(perm, dim(permutation_matrix))[,1]) ## row is sample name, all names in a row up to top are choices for n=1,2..i
+    rep_index <- arrayInd(perm, dim(permutation_matrix))[,2] ## column is replicate number
     sample_set <- permutation_matrix[sample_indices, rep_index]
     
     # P1_baseline is just P1 at n=1
@@ -312,13 +312,14 @@ for(measure in specificity_measures$func_names){
     ## P1uP2 ## exp_mat > get sim mat > get sim tree > get samp weights > get spec mat
     sim_mat <- similarity_func(P1uP2)
     sim_tree <- cluster_func(sim_mat)
-    weights <- get_weights(sim_mat, colnames(P1uP2))
+    weights <- get_weights(sim_tree, colnames(P1uP2))
     flat <- weights; flat[] <- 1
     spec_mat_flat <- specificity_func(P1uP2, flat)
     spec_mat_weighted <- specificity_func(P1uP2, weights)
     
     # need to fill in these with spec_score matrices for each n for each method
     # names should match 
+    ### restore once error fixed
     result <- list(
       P1_weighted_spec_score = spec_mat_weighted[,colnames(P1), drop=F],
       P1_flat_spec_score = spec_mat_flat[,colnames(P1), drop=F],
@@ -379,7 +380,9 @@ if(FALSE){ ### these are useful for rough look at trends
 
 
 ```{r flat v weighted comparisons}
-specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
+
+if(FALSE){
+  specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              funcs=list(Zscore=calc_weighted_zscore_matrix,
                                         Tau=NA,
                                         Tsi=NA,
@@ -470,5 +473,5 @@ ggplot(df_sliding_jaccard[which(rowSums(is.na(df_sliding_jaccard))==0),], aes(x=
   geom_line(aes( color=samp, color=unionsize))+
   facet_wrap(~brain)
 dev.off()
-    
+}
 ```
