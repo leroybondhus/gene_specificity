@@ -374,5 +374,32 @@ if(FALSE){ ### these are useful for rough look at trends
 ## output to look at is robustness_test_results
 ```
 
+```{r}
+if (!require("RColorBrewer")) {
+install.packages("RColorBrewer")
+library(RColorBrewer)
+}
+
+
+
+display.brewer.all()
+   #another function takes gene name finds corresponding row 
+ add_gene_exp <- function(dend, vect){
+  if(!is.null(attributes(dend)$leaf) && attributes(dend)$leaf){
+    gene_exp<-vect[attributes(dend)$label]
+    print(gene_exp)
+    attributes(dend)<- c(attributes(dend), gene_exp=gene_exp)
+    return(dend)
+   }
+  
+  for(i in 1:length(dend)){ 
+    dend[[i]] <- add_gene_exp(dend[[i]],vect)
+  }
+  return(dend)
+}
+
+ 
+ ```
+
 
 
