@@ -1,0 +1,492 @@
+---
+title: "specificity_paper_main_LeroyCopy"
+author: "Leroy Bondhus"
+date: "9/10/2021"
+output: html_document
+---
+
+## NOTE: most functions live in GeneSpecificityFuncs package for 
+##       this project. Load this package here
+## 
+```{r set up package of functions used}
+library("devtools")
+library("roxygen2")
+install("./../GeneSpecificityFuncs")
+```
+
+```{r libraries}
+library(ggplot2)
+```
+
+
+```{r functions}
+calc_zscore_matrix<- function(dat) {
+  zscores <- dat; zscores[] <- 0 
+  means <- rowMeans(dat)
+  sds <- as.numeric(rep(NA,length(means)))
+  which <- which(means != 0)
+  sds[which] <- apply(dat[which,],1,sd)
+  for(j in 1:ncol(dat)){zscores[,j] <- (dat[,j] - means)/sds  }
+  return(zscores)
+}
+
+calc_dot_product_similarity_matrix <- function(dat) {
+  dot_product_similarity_matrix <- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  colnames(dot_product_similarity_matrix) <- colnames(dat)
+  rownames(dot_product_similarity_matrix) <- colnames(dat)
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)){
+      which_i <- which(!is.na(dat[,i])) ## ignore NAs
+      which_j <- which(!is.na(dat[,j])) ## ignore NAs
+      dot_product_similarity_matrix[i,j] <- sum(dat[which_i,i] * dat[which_j,j]) / (norm(dat[which_i,i],"2")*norm(dat[which_j,j],"2"))
+    }
+  }
+  return(dot_product_similarity_matrix)
+}
+
+### uses Equation 1. 
+## modelled on Yenifer's code
+add_dist_to_parent <- function(dend, dist_to_parent=0){
+  ## note: distance to parent is fed in at the start of the function
+  attributes(dend) <- c(attributes(dend), dist_to_parent=dist_to_parent)
+  ## test if at leaf node
+  if(!is.null(attributes(dend)$leaf) && attributes(dend)$leaf){
+    return(dend)
+  }
+  for(i in 1:length(dend)){ ## length of dend should be number of child nodes
+    ## distance to parent is simply the difference in height between parent and child
+    dist_to_parent <- attributes(dend)$height - attributes(dend[[i]])$height 
+    dend[[i]] <- add_dist_to_parent(dend[[i]], 
+                                             dist_to_parent = dist_to_parent)
+  }
+  return(dend)
+}
+
+## modelled on Yenifer's code
+add_weights <- function(dend, weight_of_parent=0){
+  weight <- (attributes(dend)$dist_to_parent / attributes(dend)$members) + weight_of_parent 
+  attributes(dend) <- c(attributes(dend), weight=weight)
+  ## test if at leaf node
+  if(!is.null(attributes(dend)$leaf) && attributes(dend)$leaf){
+    return(dend)
+  }
+  for(i in 1:length(dend)){ ## length of dend should be number of child nodes
+    dend[[i]] <- add_weights(dend[[i]], weight_of_parent=weight)
+  }
+  return(dend)
+}
+
+get_weights <- function(dend, name_order){
+  weights <- setNames(get_leaves_attr(sim_tree,"weight"),nm=get_leaves_attr(sim_tree,"lab") )
+  weights <- weights[order(factor(names(weights),levels = name_order))]
+  return(weights)
+}
+
+
+# function to calculate weighted zscores
+## was te_to_weighted_zscore
+## now assumes weights are sorted in same order at mat samples
+calc_weighted_zscore_matrix <- function(mat, weights){
+  if(any( colnames(mat) != names(weights) )){print("WARNING: mismatch in weights names and matrix colnames order")}
+  weighted_mat <- mat; weighted_mat[] <- 0
+  for (i in 1:length(weights)){
+    weighted_mat[,i] <- weights[i]*mat[,i]
+  }
+  weighted_means <- numeric(length = nrow(weighted_mat))
+  sum_of_weights <- sum(weights)
+  for (i in 1:nrow(weighted_mat)){
+    weighted_means[i] <- sum(weighted_mat[i,]) / sum_of_weights
+  }
+  weighted_var <- numeric(length=nrow(mat))
+  for (i in 1:nrow(mat)){
+    weighted_var[i] <- wtd.var(mat[i,],weights=weights)
+  }
+  weighted_sd <- sqrt(weighted_var)
+  for(i in 1:ncol(mat)){
+    mat[,i] <- (mat[,i]-weighted_means)/weighted_sd
+  }
+  weighted_zscores <- mat
+  return(weighted_zscores)
+}
+
+
+```
+
+
+## try load full gtex here 
+```{r import dataset}
+## import gtex medians data
+temp <- tempfile(fileext = ".gz")
+download.file("https://storage.googleapis.com/gtex_analysis_v8/rna_seq_data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz",temp)
+library(data.table)
+library(R.utils)
+gtex <- fread(temp, skip=2, header = TRUE, sep="\t")  ## unzipped this is about 8Gb
+
+temp <- tempfile(fileext = ".txt")
+download.file("https://storage.googleapis.com/gtex_analysis_v8/annotations/GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt",temp)
+gtex_sample_attributes <- fread(temp, header = TRUE, sep="\t")
+which <- which(is.element(gtex_sample_attributes$SAMPID, colnames(gtex)))
+gtex_sample_attributes <- gtex_sample_attributes[which,]
+
+gtex_rowinfo <- data.frame(Name=gtex$Name, Description=gtex$Description)
+rownames(gtex) <- gtex$Name
+gtex <- as.matrix(gtex[,3:ncol(gtex)])
+unlink(temp); rm(temp)
+
+
+library(biomaRt)
+## import ensembl gene data
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", GRCh=37)
+genes <- getBM(attributes=c('chromosome_name','start_position','end_position','hgnc_symbol', 'ensembl_gene_id','gene_biotype'),
+                 filters = list('biotype'='protein_coding'),
+                 mart = ensembl, useCache = F) 
+genes <- genes[which(is.element(genes$chromosome_name, c(1:22, "X", "Y", "MT")) & genes$hgnc_symbol != "" ) ,]
+
+
+
+```
+
+
+
+## clean gtex dataset here
+```{r clean dataset}
+## show mitochondrial genes drive a large part of sample similarity
+## Note sum of medians in gtex not quite 1M - likely artifact of taking medians
+barplot(colSums(gtex))
+library(stringr)
+## match genes between gtex and ensembl
+gtex_names <- str_split_fixed(gtex_rowinfo$Name, "[.]", 2)[,1]
+which <- which(genes$chromosome_name != "MT" )
+gtex_cleaned <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
+which <- which(genes$chromosome_name == "MT" )
+gtex_cleanedMT <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
+
+##non-mitochondrial TPM sum
+barplot(colSums(gtex_cleaned))
+##mitochondrial TPM sum
+barplot(colSums(gtex_cleanedMT))
+## non-mito + mito TPM sum
+barplot(colSums(gtex_cleaned)+colSums(gtex_cleanedMT))
+rm(gtex_cleanedMT)
+##renormalize TPM without mitochondrial genes
+for(i in 1:ncol(gtex_cleaned)){
+  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
+}
+barplot(colSums(gtex_cleaned))
+
+#### Supplemental Figure (Fraction of TPM from chr==M )
+gtex <- gtex_cleaned; rm(gtex_cleaned)
+exp_mat <- gtex
+## log10(TPM+1) transform of data
+exp_mat <- log10(exp_mat+1)
+
+#### Supplemental Figure (heatmap cluster of samples )
+
+## remove mitochondrial contribution
+```
+
+
+```{r measure sample similarity}
+### to do: justify method for measuring sample similarity - may require comparison or refs
+
+
+## together these are a similarity function 
+zscores <- calc_zscore_matrix(exp_mat) 
+dot_sim <- calc_dot_product_similarity_matrix(zscores)
+
+### validate choice
+##use dist=1-dot_sim(zscores(log10(tpm+1))), single linkage clustering for now 
+plot(hclust(as.dist(1-dot_sim),method = "single"), hang = -1, main = "dot_sim,single_clust")
+sim_mat <- dot_sim
+### create: sim_mat # sample similarity matrix
+```
+
+
+```{r hierarchical clustering on sample similarity}
+### to do: justify method for hierarchical clustering - may require comparison or refs
+
+sim_tree <- as.dendrogram(hclust(as.dist(1-dot_sim),method = "single"))
+
+### create: sim_tree # sample similarity tree
+```
+
+
+```{r calculate sample weights}
+
+sim_tree <- add_dist_to_parent(sim_tree)
+sim_tree <- add_weights(sim_tree)
+
+## plot tree with weights
+library(dendextend)
+sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2.2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
+weights <- get_weights(sim_tree, colnames(exp_mat))
+
+
+ggplot( data.frame(names=names(weights), weights=weights),aes(x=names, y=weights))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+### create: weights
+```
+
+
+```{r calculate specificity}
+library(dplyr)
+library('Hmisc')
+## order weights to match columns of expression matrix
+
+
+weights <- get_weights(sim_tree, colnames(exp_mat))
+
+
+spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights)
+flat <- weights; flat[1:length(flat)] <- 1
+spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
+plot(as.matrix(spec_mat_weighted),as.matrix(spec_mat_flat))
+
+plot(spec_mat_weighted[,grep("Brain",colnames(spec_mat_flat))],spec_mat_flat[,grep("Brain",colnames(spec_mat_flat))])
+
+abline(h=c(0,2,4), v=c(0,2,4))
+
+abline(0,1, col="red")
+### use Roshni's Code
+
+
+
+### creates: spec_mat # specificity matrix
+```
+
+
+
+
+
+```{r validation with variable sample set}
+## for i in 1:num(brain_samples)
+# get P1 and P2
+# expression mat -> calc sample sim -> create tree -> calc weight -> specificity 
+# save results
+# compare
+
+### generalizing a list to store results in - this will make it easier to extend later if necessary.
+## Note: only need the weighted version of each equation as each simplifies to flat version when all weights are 1
+specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
+                             funcs=list(Zscore=calc_weighted_zscore_matrix,
+                                        Tau=NA,
+                                        Tsi=NA,
+                                        Gini=NA
+                             ))
+robustness_test_results <- list( )
+for(i in 1:length(specificity_measures$func_names)){
+  el_names <- paste( c( "P1_", "P2_")
+                     , specificity_measures$func_names[i], sep="")
+  temp_list <- setNames(list(list(), list()), nm=el_names  )
+  robustness_test_results <- c(robustness_test_results, temp_list )
+}
+
+
+### note: should add the weight calculation step inside this function
+## e.g. Feed in P1, P2, n, num_perm,
+## also Feed in similarity function, clustering function (since these might be variable later)
+## calc similarity matrix -> calc similarity tree -> calc sample weights
+
+library(doParallel)
+library(foreach)
+registerDoParallel(detectCores())
+
+
+num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
+num_reps <- 2
+## use general similarity_func and cluster_func in case we want to test more later
+similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
+cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+
+## P1 and notP1 are contant throughout, so set these outside loops
+P1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = TRUE)])
+notP1 <- as.matrix(exp_mat[,grep("[Bb]rain",colnames(exp_mat), invert = FALSE)])
+
+### define 1-n trajectories ahead of time since i+1 should be referenced against i.
+## do foreach over each element of permuation matrix ## use arrayInd to get row/col given perm number
+permutation_matrix <- matrix(nrow = num_brain_samples, ncol = num_reps )
+for(rep in 1:num_reps){
+  permutation_matrix[,rep] <- sample(colnames(notP1),num_brain_samples, replace = FALSE)
+}
+
+
+for(measure in specificity_measures$func_names){
+  specificity_func <- specificity_measures$funcs[[measure]]
+  if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
+  
+    results <- foreach(perm=1:length(permutation_matrix), .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
+    library('Hmisc')
+    library(dendextend)
+    sample_indices <- 1:arrayInd(perm, dim(permutation_matrix))[1] ## row is sample name, all names in a row up to top are choices for n=1,2..i
+    rep_index <- arrayInd(perm, dim(permutation_matrix))[2] ## column is replicate number
+    sample_set <- permutation_matrix[sample_indices, rep_index]
+    
+    # P1_baseline is just P1 at n=1
+    P2 <- notP1[,sample_set, drop=F]; colnames(P2) <- make.unique(colnames(P2)) ## make.unique will facilitate sampling with replacement
+    P1uP2 <- cbind(P1,P2)
+    
+    ## P1uP2 ## exp_mat > get sim mat > get sim tree > get samp weights > get spec mat
+    sim_mat <- similarity_func(P1uP2)
+    sim_tree <- cluster_func(sim_mat)
+    weights <- get_weights(sim_mat, colnames(P1uP2))
+    flat <- weights; flat[] <- 1
+    spec_mat_flat <- specificity_func(P1uP2, flat)
+    spec_mat_weighted <- specificity_func(P1uP2, weights)
+    
+    # need to fill in these with spec_score matrices for each n for each method
+    # names should match 
+    result <- list(
+      P1_weighted_spec_score = spec_mat_weighted[,colnames(P1), drop=F],
+      P1_flat_spec_score = spec_mat_flat[,colnames(P1), drop=F],
+      P2_weighted_spec_score = spec_mat_weighted[,colnames(P2), drop=F],
+      P2_flat_spec_score = spec_mat_flat[,colnames(P2), drop=F]
+    )
+    }
+    
+    results_P1 <- list()
+    results_P2 <- list()
+    for(i in 1:length(results)){
+      name <- names(results)[i]
+      rep <- str_split_fixed(names(results)[1], "[=,]", n=4)[,2]
+      n <- str_split_fixed(names(results)[1], "[=,]", n=4)[,4]
+      results_P1[[name]] <- list(P1_weighted_spec_score = results[[name]]$P1_weighted_spec_score, P1_flat_spec_score = results[[name]]$P1_flat_spec_score)
+      results[[name]]$P1_weighted_spec_score <- NULL;  results[[name]]$P1_flat_spec_score <- NULL;  ## large object so delete as we go to avoid copy
+      
+      results_P2[[name]] <- list(P2_weighted_spec_score = results[[name]]$P2_weighted_spec_score, P2_flat_spec_score = results[[name]]$P2_flat_spec_score)
+      results[[name]]$P2_weighted_spec_score <- NULL;  results[[name]]$P2_flat_spec_score<- NULL;  ## large object so delete as we go to avoid copy
+    }
+    
+    robustness_test_results[[paste("P1_", measure,sep = "")]] <- results_P1; rm(results_P1)
+    robustness_test_results[[paste("P2_", measure,sep = "")]] <- results_P2; rm(results_P2)
+}
+
+
+if(FALSE){ ### these are useful for rough look at trends
+  for(rep in 1: 1){  # ncol(permutation_matrix)){
+    for(n in 1:nrow(permutation_matrix)){
+      name <- paste("rep=", rep,",n=",n, sep="")
+      name_baseline <- paste("rep=", rep,",n=",1, sep="")
+      plot(robustness_test_results$P1_Zscore[[name_baseline]]$P1_flat_spec_score[,"Spleen"], robustness_test_results$P1_Zscore[[name_baseline]]$P1_flat_spec_score[,"Spleen"]-robustness_test_results$P1_Zscore[[name]]$P1_flat_spec_score[,"Spleen"], main = paste("P1 flat:n =",n))
+    }
+  
+    for(n in 1:nrow(permutation_matrix)){
+      name <- paste("rep=", rep,",n=",n, sep="")
+      name_baseline <- paste("rep=", rep,",n=",1, sep="")
+      plot(robustness_test_results$P1_Zscore[[name_baseline]]$P1_weighted_spec_score[,"Spleen"], robustness_test_results$P1_Zscore[[name_baseline]]$P1_weighted_spec_score[,"Spleen"]-robustness_test_results$P1_Zscore[[name]]$P1_weighted_spec_score[,"Spleen"], main = paste("P1 weighted:n =",n))
+    }
+  
+    for(n in 1:nrow(permutation_matrix)){
+      name <- paste("rep=", rep,",n=",n, sep="")
+      name_baseline <- paste("rep=", rep,",n=",1, sep="")
+      plot(robustness_test_results$P2_Zscore[[name_baseline]]$P2_flat_spec_score[,1], robustness_test_results$P2_Zscore[[name_baseline]]$P2_flat_spec_score[,1]- robustness_test_results$P2_Zscore[[name]]$P2_flat_spec_score[,1], main = paste("P2 flat:n =",n))
+      }
+  
+    for(n in 1:nrow(permutation_matrix)){
+      name <- paste("rep=", rep,",n=",n, sep="")
+      name_baseline <- paste("rep=", rep,",n=",1, sep="")
+      plot(robustness_test_results$P2_Zscore[[name_baseline]]$P2_weighted_spec_score[,1], robustness_test_results$P2_Zscore[[name_baseline]]$P2_weighted_spec_score[,1]- robustness_test_results$P2_Zscore[[name]]$P2_weighted_spec_score[,1], main = paste("P2 weighted:n =",n))
+    }
+  }
+}
+
+
+## output to look at is robustness_test_results
+```
+
+
+```{r flat v weighted comparisons}
+specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
+                             funcs=list(Zscore=calc_weighted_zscore_matrix,
+                                        Tau=NA,
+                                        Tsi=NA,
+                                        Gini=NA
+                             ))
+similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
+cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+
+
+for(measure in specificity_measures$func_names){
+  specificity_func <- specificity_measures$funcs[[measure]]
+  if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
+  sim_mat <- similarity_func(exp_mat)
+  sim_tree <- cluster_func(sim_mat)
+  weights <- get_weights(sim_mat, colnames(exp_mat))
+  flat <- weights; flat[] <- 1
+  spec_mat_flat <- specificity_func(exp_mat, flat)
+  spec_mat_weighted <- specificity_func(exp_mat, weights)
+  
+  library(ComplexHeatmap)
+  
+  library(circlize)
+  col_fun = colorRamp2(c(-4, -2 ,0, 2, 4), c("black", "blue", "white", "yellow", "red"))
+  
+  delta_row_var <- abs(apply(spec_mat_flat, 1, var)
+                       - apply(spec_mat_weighted, 1, var) )
+  which <- order(delta_row_var, decreasing = TRUE)[1:10000]
+  which <- which(delta_row_var > 0.3)
+  h1 <- Heatmap(spec_mat_flat[which,], show_row_names = F, col=col_fun) #, row_order = 1:length(which))
+  h1_list <- draw(h1)
+  col_order <- column_order(h1_list)
+  h1+
+    Heatmap(spec_mat_weighted[which,], column_order = col_order, show_row_names = F, col=col_fun) #+
+  #  Heatmap(abs(spec_mat_weighted[which,]-spec_mat_flat[which,]), column_order=col_order, show_row_names= F)
+  
+  gene_list <- list() 
+  for(i in 1:ncol(spec_mat_weighted)){
+    gene_list[[i]] <- list()
+    gene_list[[i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_weighted[,i]-spec_mat_flat[,i]), decreasing = TRUE)[1:5]])
+  }
+  for(i in 1:ncol(spec_mat_weighted)){
+    gene_list[[ncol(spec_mat_weighted)+i]] <- list()
+     gene_list[[ncol(spec_mat_weighted)+i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_flat[,i]-spec_mat_weighted[,i]), decreasing = TRUE)[1:5]])
+  }
+ 
+  gene_list <- unique(unlist(gene_list))
+  col_fun = colorRamp2(c(min(as.vector(spec_mat_flat[gene_list,]),as.vector(spec_mat_weighted[gene_list,]) ),
+                         -2 ,0, 2, 4,
+                         max(as.vector(spec_mat_flat[gene_list,]),as.vector(spec_mat_weighted[gene_list,]) )), c("black", "blue", "white", "yellow", "red", "red4"))
+  
+  h1 <- Heatmap(spec_mat_flat[gene_list,], show_row_names = F, col=col_fun, row_order = gene_list, column_order = colnames(spec_mat_flat) )
+  h1_list <- draw(h1)
+  col_order <- column_order(h1_list)
+ # png(filename = "weighted_Z_minus_flat_Z_top10_bottom10_rawanddelta_each_tissue.png", width = 1620, height=1200)
+  h1+
+    Heatmap(spec_mat_weighted[gene_list,], column_order = col_order,  row_order = gene_list, show_row_names = F , col=col_fun) +
+    
+   # png(filename = "weighted_Z_minus_flat_Z_top10_bottom10_delta_each_tissue.png", width = 720, height=1200)
+    Heatmap(spec_mat_weighted[gene_list,]-spec_mat_flat[gene_list,], column_order=col_order, row_order = gene_list, show_row_names= F)
+  #dev.off()
+}
+  
+  
+  
+## Sliding Jaccard Index  
+
+df_sliding_jaccard <- data.frame(samp=character(), zcut=numeric(), jacc=numeric(), brain=logical(), unionsize=numeric() )
+for(samp in colnames(spec_mat_flat)){
+  for(zcut in seq(0,max(spec_mat_flat, na.rm = T)+1, by=0.25 )){
+   vflat <- names(spec_mat_flat[which(spec_mat_flat[,samp] > zcut),samp])
+   vweight <- names(spec_mat_weighted[which(spec_mat_weighted[,samp] > zcut),samp])
+   jacc <-length(intersect(vflat,vweight))/length(union(vflat,vweight))
+   brain <- grepl("Brain", samp)
+   df_temp <- data.frame(samp=samp,zcut=zcut,jacc=jacc, brain=brain, unionsize=length(union(vflat,vweight)) )
+   df_sliding_jaccard <- rbind(df_sliding_jaccard, df_temp)
+  }
+}
+
+ggplot(df_sliding_jaccard[which(rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
+  geom_line()
+ggplot(df_sliding_jaccard[which(df_sliding_jaccard$brain & rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
+  geom_line()
+ggplot(df_sliding_jaccard[which(!df_sliding_jaccard$brain & rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
+  geom_line()
+
+png(filename = "jaccard_weighted_v_flat_slidingzcut_bbrainvnotbrain.png", width = 1620, height=720)
+ggplot(df_sliding_jaccard[which(rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc))+
+  geom_line(aes( color=samp, color=unionsize))+
+  facet_wrap(~brain)
+dev.off()
+    
+```
