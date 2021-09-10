@@ -4,6 +4,8 @@ output: html_document
 ---
 
 ```{r}
+ 
+ 
 GTEX.data <-read.csv("/Users/yeniferhernandez/Desktop/Arboleda_Lab/gtex_medians_PC_only_wo_MT.csv", header = TRUE, sep=",")  
 num_cols <- unlist(lapply(GTEX.data , is.numeric))
 GTEX.data_num <- GTEX.data[ , num_cols]  
@@ -45,6 +47,8 @@ cosine_simi[x,y] <- cos_sin
 View(cosine_simi)
 
 }
+
+cosine_similarity_matrix(GTEX.data_num,54)
 #actual standard deviations matrix
 actual_sdev_matrix<- function(data,mean,sd,row_num,col_num) {
 actu_sdev <- matrix(0, nrow = row_num, ncol = col_num)
@@ -232,11 +236,12 @@ dist_df_temp <- data.frame(t(combn(54,2)), as.numeric(dist_mat_norm), stringsAsF
 names(dist_df_temp) <- c("sample1","sample2", "norm_distance")
 hist(dist_mat_norm,breaks = 1000)
 
-dist_vector<-as.vector(unlist(dist_df_temp))
+     dist_vector<-as.vector(unlist(dist_df_temp))
 
 
 distance_tree <- GeneSpecificityFuncs::LMB_htf.dist_tree(dist_df = dist_df_temp)
 count_number_descendant(distance_tree)
+
 tree<-calc_node_weight(distance_tree)
 tree_vector<-as.vector(unlist(tree))
 cosine_tree<-data.frame(tree_vector)
@@ -249,12 +254,13 @@ for (i in 1:54){
   
 }
 
-
+write.csv(weights_cosine,"/Users/yeniferhernandez/Desktop/Arboleda_Lab/weights_cosine_.csv", row.names = FALSE)
 
 
 ```
 #Standard deviations
 ```{r}
+ 
 actu_sdev <- matrix(0, nrow = 19193, ncol = 54) 
 for(j in 1:54) {
   for(i in 1:19193)  {
@@ -308,8 +314,8 @@ for (i in 1:54){
   
 }
 
-
-
+write.csv(weights_simi,"/Users/yeniferhernandez/Desktop/Arboleda_Lab/weights_simi_.csv", row.names = FALSE)
+names
 
 ```
 #Pearson Coefficients
@@ -345,10 +351,12 @@ dist_pearson_temp <- data.frame(t(combn(54,2)), as.numeric(dist_pearson_norm), s
 names(dist_pearson_temp) <- c("sample1","sample2", "norm_distance")
 hist(dist_pearson_norm,breaks = 1000)
 
-dist_pearson_vector<-as.vector(unlist(dist_pearson_temp))
+ dist_pearson_vector<-as.vector(unlist(dist_pearson_temp))
+
 
 
 distance_pearson_tree <- GeneSpecificityFuncs::LMB_htf.dist_tree(dist_df = dist_pearson_temp)
+View(ggdend(distance_pearson_tree))
 count_number_descendant(distance_pearson_tree)
 tree_pearson<-calc_node_weight(distance_pearson_tree)
 tree_pearson_vector<-as.vector(unlist(tree_pearson))
@@ -361,6 +369,151 @@ list_names<-(colnames(GTEX.data_num))
 for (i in 1:54){
   weights_pearson$name[weights_pearson$name == i] <- list_names[i]
   
+}
+write.csv(weights_pearson,"/Users/yeniferhernandez/Desktop/Arboleda_Lab/weights_pearson_.csv", row.names = FALSE)
+
+```
+#distance function 
+```{r}
+cosine_similarity_matrix <- function(data_set,col_num) {
+cosine_simi<- matrix(0, nrow = col_num, ncol = col_num)
+for(y in 1:col_num) {
+  for(x in 1:col_num) {
+product_xy <- data_set[,x] * data_set[,y]
+sum_xy <- sum(product_xy)
+magnitude_x <- data_set[,x]^2
+magnitude_x<- sum(magnitude_x)
+magn_x <- sqrt(magnitude_x)
+magnitude_y <- data_set[,y]^2
+magnitude_y <- sum(magnitude_y)
+magn_y <- sqrt(magnitude_y)
+magn_z <- magn_x * magn_y
+cos_sin <-  sum_xy/magn_z
+colnames(cosine_simi)<-colnames(data_set)
+rownames(cosine_simi)<-colnames(GTEX.data_num)
+cosine_simi[x,y] <- cos_sin
+  }
+}
+mat <- cosine_simi 
+dist_mat <- matrix(nrow = length(54), ncol = length(54))
+dist_mat <- dist(t(mat), diag = F, upper = F)
+dist_mat_norm <- dist_mat / max(dist_mat)  ## constrain domain of distance values to 0-1
+dist_df_temp <- data.frame(t(combn(54,2)), as.numeric(dist_mat_norm), stringsAsFactors = F)
+}
+cosine_similarity_matrix(GTEX.data_num,54)
+View(dist)
+```
+#Clustering functions 
+```{r}
+library(ggpubr)
+library(ggplot2)
+
+b <- ggplot(df, aes(x = GTEX.data_num[,1], y = median_log))
+
+# Scatter plot with regression line
+b + geom_point()+ geom_smooth(method = "lm") 
+     
+# Add a loess smoothed fit curve
+b + geom_point()+
+  geom_smooth(method = "loess")+ geom_density_2d()
+
+
+
+
+  
+sp<-ggplot(df, aes(GTEX.data_num[,25], median_log)) +
+  geom_point(color = "lightgray")
+sp + geom_density_2d()
+
+
+sp + stat_density_2d(aes(fill = ..level..), geom = "polygon") +
+  scale_fill_gradientn(colors = c("#FFEDA0", "#FEB24C", "#F03B20"))
+
+
+
+
+
+m <- ggplot(df, aes(x = GTEX.data_num[,1], y = median_log)) +
+ geom_point() 
+
+# contour lines
+m + geom_density_2d() 
+
+png(filename = "example_graph.png",width = 980)
+m <- ggplot(df, aes(x = log(GTEX.data_num[,1]), y = median_log)) +
+ geom_point() 
+m + geom_density_2d() 
+dev.off()
+
+install.packages("ggplot2")
+library("ggplot2")
+final_plot <- m + geom_density_2d() + geom_line(aes(y=0,colour="red"))+ labs(y="Median - Gene Expression", x = "Gene Expression",subtitle="log10 (TPM)")+ggtitle(names[col_num])
+
+median_exp_deviation(GTEX.data_num,54)
+////////////
+calc_manhattan_matrix<- function(dat) {
+   manhatt<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       x<-dat[,i]
+       y<-dat[,j]
+       manhatt[j,i]<-sum(x[i]-x[j] + y[i]-y[j])
+    }
+  }
+    
+  return(manhatt)
+}
+
+calc_mean_char_dif_matrix<- function(dat) {
+   mcd<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       x<-dat[,i]
+       y<-dat[,j]
+       h<-sum(abs(x[i]-x[j] + y[i]-y[j]))
+       n<-(1/i) * h
+       mcd[j,i]<- n 
+    }
+  }
+    
+  return(mcd)
+}
+
+
+calc_canberra_matrix<- function(dat) {
+   canberra<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+   rownames(canberra) = rownames(dat)#add to rest / column names 
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       x<-dat[,i]
+       y<-dat[,j]
+       h<-sum(abs(x[i]-x[j] + y[i]-y[j]))
+       g<-sum(x[i]+x[j] + y[i]+y[j])
+       n<-h/g
+       canberra[j,i]<- n 
+    }
+  }
+    
+  return(canberra)
+}
+
+calc_coefficient_divergence<- function(dat) {
+   cdiv<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       x<-dat[,i]
+       y<-dat[,j]
+       h<-sum(x[i]-x[j] + y[i]-y[j])
+       g<-sum(x[i]+x[j] + y[i]+y[j])
+       n<-h/g
+       n = n^2 
+       n = n * (1/i)
+       n = n^(1/2)
+       cdiv[j,i]<- n 
+    }
+  }
+    
+  return(cdiv)
 }
 
 
