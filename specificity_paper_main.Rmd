@@ -241,15 +241,9 @@ spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
 
 
 ```{r validation with variable sample set}
-## for i in 1:num(brain_samples)
-# get P1 and P2
-# expression mat -> calc sample sim -> create tree -> calc weight -> specificity 
-# save results
-# compare
 
 ## Use this variable to control whether performing random or true brain-non-brain partition
-random_partition = TRUE
-
+random_partition = FALSE
 
 ### generalizing a list to store results in - this will make it easier to extend later if necessary.
 ## Note: only need the weighted version of each equation as each simplifies to flat version when all weights are 1
@@ -279,7 +273,7 @@ registerDoParallel(detectCores())
 
 
 num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-num_reps <- 2
+num_reps <- 5
 ## use general similarity_func and cluster_func in case we want to test more later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
@@ -354,43 +348,36 @@ for(measure in specificity_measures$func_names){
     robustness_test_results[[paste("P2_", measure,sep = "")]] <- results_P2; rm(results_P2)
 }
 
-
-if(FALSE){ ### these are useful for rough look at trends
-  for(rep in 1: 1){  # ncol(permutation_matrix)){
-    for(n in 1:nrow(permutation_matrix)){
-      name <- paste("rep=", rep,",n=",n, sep="")
-      name_baseline <- paste("rep=", rep,",n=",1, sep="")
-      plot(robustness_test_results$P1_Zscore[[name_baseline]]$P1_flat_spec_score[,"Spleen"], robustness_test_results$P1_Zscore[[name_baseline]]$P1_flat_spec_score[,"Spleen"]-robustness_test_results$P1_Zscore[[name]]$P1_flat_spec_score[,"Spleen"], main = paste("P1 flat:n =",n))
-    }
-  
-    for(n in 1:nrow(permutation_matrix)){
-      name <- paste("rep=", rep,",n=",n, sep="")
-      name_baseline <- paste("rep=", rep,",n=",1, sep="")
-      plot(robustness_test_results$P1_Zscore[[name_baseline]]$P1_weighted_spec_score[,"Spleen"], robustness_test_results$P1_Zscore[[name_baseline]]$P1_weighted_spec_score[,"Spleen"]-robustness_test_results$P1_Zscore[[name]]$P1_weighted_spec_score[,"Spleen"], main = paste("P1 weighted:n =",n))
-    }
-  
-    for(n in 1:nrow(permutation_matrix)){
-      name <- paste("rep=", rep,",n=",n, sep="")
-      name_baseline <- paste("rep=", rep,",n=",1, sep="")
-      plot(robustness_test_results$P2_Zscore[[name_baseline]]$P2_flat_spec_score[,1], robustness_test_results$P2_Zscore[[name_baseline]]$P2_flat_spec_score[,1]- robustness_test_results$P2_Zscore[[name]]$P2_flat_spec_score[,1], main = paste("P2 flat:n =",n))
-      }
-  
-    for(n in 1:nrow(permutation_matrix)){
-      name <- paste("rep=", rep,",n=",n, sep="")
-      name_baseline <- paste("rep=", rep,",n=",1, sep="")
-      plot(robustness_test_results$P2_Zscore[[name_baseline]]$P2_weighted_spec_score[,1], robustness_test_results$P2_Zscore[[name_baseline]]$P2_weighted_spec_score[,1]- robustness_test_results$P2_Zscore[[name]]$P2_weighted_spec_score[,1], main = paste("P2 weighted:n =",n))
-    }
-  }
-}
-
-
 ## output to look at is robustness_test_results
 ```
 
 
 ```{r flat v weighted comparisons}
+system("mkdir figures")
+figures_dir <- paste(getwd(),"figures", sep = "/")
+date <- format(Sys.time(), format="%Y%m%d") 
 
-if(FALSE){
+## jaccard between n = 1 and n = num_brain_samples for brain v non-brain OR P1 v P2 
+
+df <- data.frame(n=numeric(), rep=numeric(),
+                 jaccard=numeric(), P1orP2=character(),
+                 brain=logical() )
+nums = as.numeric(unique(str_split_fixed(names(robustness_test_results$P1_Zscore), "[=,]", n=4 )[,4]))
+reps = as.numeric(unique(str_split_fixed(names(robustness_test_results$P1_Zscore), "[=,]", n=4 )[,2]))
+
+for(el in names(robustness_test_results)){
+  P1orP2 <- str_split_fixed(el,"_",n=2)[1]
+  for(n in nums){
+    for(rep in reps){
+      data.frame(n=n, rep=rep, jaccard= -1 , P1orP2=P1orP2, brain= -1)
+    }
+    
+    
+  }
+}
+
+
+if(TRUE){
   specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              funcs=list(Zscore=calc_weighted_zscore_matrix,
                                         Tau=NA,
@@ -406,7 +393,7 @@ for(measure in specificity_measures$func_names){
   if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
   sim_mat <- similarity_func(exp_mat)
   sim_tree <- cluster_func(sim_mat)
-  weights <- get_weights(sim_mat, colnames(exp_mat))
+  weights <- get_weights(sim_tree, colnames(exp_mat))
   flat <- weights; flat[] <- 1
   spec_mat_flat <- specificity_func(exp_mat, flat)
   spec_mat_weighted <- specificity_func(exp_mat, weights)
@@ -477,10 +464,10 @@ ggplot(df_sliding_jaccard[which(df_sliding_jaccard$brain & rowSums(is.na(df_slid
 ggplot(df_sliding_jaccard[which(!df_sliding_jaccard$brain & rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
   geom_line()
 
-png(filename = "jaccard_weighted_v_flat_slidingzcut_bbrainvnotbrain.png", width = 1620, height=720)
+#png(filename = "jaccard_weighted_v_flat_slidingzcut_bbrainvnotbrain.png", width = 1620, height=720)
 ggplot(df_sliding_jaccard[which(rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc))+
   geom_line(aes( color=samp, color=unionsize))+
   facet_wrap(~brain)
-dev.off()
+#dev.off()
 }
 ```
