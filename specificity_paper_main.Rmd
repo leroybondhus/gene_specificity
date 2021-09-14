@@ -361,18 +361,21 @@ date <- format(Sys.time(), format="%Y%m%d")
 
 df <- data.frame(n=numeric(), rep=numeric(),
                  jaccard=numeric(), P1orP2=character(),
-                 brain=logical() )
-nums = as.numeric(unique(str_split_fixed(names(robustness_test_results$P1_Zscore), "[=,]", n=4 )[,4]))
-reps = as.numeric(unique(str_split_fixed(names(robustness_test_results$P1_Zscore), "[=,]", n=4 )[,2]))
+                 weighted=logical(), samp=character() )
 
 for(el in names(robustness_test_results)){
   P1orP2 <- str_split_fixed(el,"_",n=2)[1]
-  for(n in nums){
-    for(rep in reps){
-      data.frame(n=n, rep=rep, jaccard= -1 , P1orP2=P1orP2, brain= -1)
-    }
+  measure <- str_split_fixed(el,"_",n=2)[2]
+  for(i in 1:length(robustness_test_results[[el]]) ){
+    n = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,4])
+    rep = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,2])
     
-    
+    flat <- robustness_test_results[[el]][[i]][grep("flat", names(robustness_test_results[[el]][[i]]))]
+    weighted <- robustness_test_results[[el]][[i]][grep("weighted", names(robustness_test_results[[el]][[i]]))]
+    for(s in 1:ncol(flat) )  
+    data.frame(n=n, rep=rep,
+               jaccard= -1 , P1orP2=P1orP2,
+               weighted=weighted, samp= -1)
   }
 }
 
