@@ -9,7 +9,7 @@ output: html_document
 ```{r set up package of functions used}
 library("devtools")
 library("roxygen2")
-install("./../GeneSpecificityFuncs")
+
 ```
 
 ```{r libraries}
@@ -19,7 +19,7 @@ library(ggplot2)
 ## load gtex here
 ```{r import dataset}
 ## import gtex medians data
-temp <- tempfile()
+ temp <- tempfile()
 download.file("https://storage.googleapis.com/gtex_analysis_v8/rna_seq_data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz",temp)
 gtex <- read.table( temp, skip=2, header = TRUE, sep = "\t")
 gtex_rowinfo <- data.frame(Name=gtex$Name, Description=gtex$Description)
@@ -28,7 +28,7 @@ gtex <- as.matrix(gtex[,3:ncol(gtex)])
 unlink(temp); rm(temp)
 
 
-
+#BiocManager::install("biomaRt")
 library(biomaRt)
 ## import ensembl gene data
 ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", GRCh=37)
@@ -167,6 +167,7 @@ get_weights <- function(dend, name_order){
   return(weights)
 }
 
+
 sim_tree <- add_weights(sim_tree)
 
 ## plot tree with weights
@@ -191,6 +192,8 @@ library('Hmisc')
 
 
 weights <- get_weights(sim_tree, colnames(exp_mat))
+
+
 
 # function to calculate weighted zscores
 ## was te_to_weighted_zscore
@@ -219,7 +222,7 @@ calc_weighted_zscore_matrix <- function(mat, weights){
 }
 
 spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights)
-flat <- weights; flat[1:length(flat)] <- 1
+#flat <- weights; flat[1:length(flat)] <- 1
 spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
 plot(as.matrix(spec_mat_weighted),as.matrix(spec_mat_flat))
 
@@ -237,9 +240,8 @@ abline(0,1, col="red")
 
 
 
-
-
-```{r validation with variable sample set}
+```{r validation with variable sample set,eval=FALSE}
+if(FALSE){
 ## for i in 1:num(brain_samples)
 # get P1 and P2
 # expression mat -> calc sample sim -> create tree -> calc weight -> specificity 
@@ -369,21 +371,29 @@ if(FALSE){ ### these are useful for rough look at trends
     }
   }
 }
-
+}
 
 ## output to look at is robustness_test_results
 ```
 
 ```{r}
+
 if (!require("RColorBrewer")) {
 install.packages("RColorBrewer")
 library(RColorBrewer)
 }
 
-
-
 display.brewer.all()
-   #another function takes gene name finds corresponding row 
+
+ get_gene<- function(gene_name,data_set){
+   gtex[gene_name,]
+ }
+ #"" on gene_name 
+ get_gene("ENSG00000227232.5",gtex)
+ 
+
+  
+
  add_gene_exp <- function(dend, vect){
   if(!is.null(attributes(dend)$leaf) && attributes(dend)$leaf){
     gene_exp<-vect[attributes(dend)$label]
@@ -396,10 +406,113 @@ display.brewer.all()
     dend[[i]] <- add_gene_exp(dend[[i]],vect)
   }
   return(dend)
-}
+ }
+vect<-get_gene("ENSG00000227232.5",gtex)
+stree<-add_gene_exp(sim_tree,vect)
+attributes(stree)
+attributes(stree)$gene_exp
+#mapping between colors and values 
+library(RColorBrewer)
+library(ggplot2)
+
+
+install.packages("scales")
+library("scales")
+pal <- col_numeric(palette = "Blues",domain =(get_leaves_attr(stree,"gene_exp")))
+library(dendextend)
+attributes(stree)
+pal
+temp_colors <-brewer.pal(5,"Blues")
+stree %>% set("leaves_pch",19) %>%set("leaves_cex",2*(get_leaves_attr(stree,"weight")))%>%set("leaves_col",pal(get_leaves_attr(stree,"gene_exp"))) %>%plot 
+(get_leaves_attr(stree,"gene_exp"))[1:7]
+(get_leaves_attr(stree,"label"))[1:7]
+stree %>%set("leaves_col",pal(get_leaves_attr(stree,"gene_exp"))) %>%plot 
 
  
- ```
+(get_leaves_attr(stree,"gene_exp"),"Blues")
+#add lines to dendrogram 
+#spec_mat_flat/weighted greatest difference between them 
+#compiling list of different markers 
+#size of node/expression 
+#color specificity value
+```
+#Reweighting weights functions 
+```{r}
+  get_weights <- function(dend, name_order){
+  weights <- setNames(get_leaves_attr(dend,"weight"),nm=get_leaves_attr(dend,"lab") )
+  weights <- weights[order(factor(names(weights),levels = name_order))]
+  return(weights)
+   }
+
+weight1<-function(dat){
+  zcores_w<-calc_zscore_matrix(exp_mat)
+   dot_sim_w<-calc_dot_product_similarity_matrix(zcores_w)
+   sim_mat_w <- dot_sim_w
+   sim_tree_w <- as.dendrogram(hclust(as.dist(1-dot_sim_w),method = "single"))
+   sim_tree_w <- add_dist_to_parent(sim_tree_w)
+   sim_tree_w <- add_weights(sim_tree_w)
+   weights_w <- get_weights(sim_tree_w, colnames(exp_mat))
+  
+}
+weight2<-function(dat,weights_w){
+  mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights_w)
+   dot_sim_w2<-calc_dot_product_similarity_matrix(mat_weighted)
+   sim_mat_w2 <- dot_sim_w2
+   sim_tree_w2 <- as.dendrogram(hclust(as.dist(1-dot_sim_w2),method = "single"))
+   sim_tree_w2 <- add_dist_to_parent(sim_tree_w2)
+   sim_tree_w2 <- add_weights(sim_tree_w2)
+   weights_w2 <- get_weights(sim_tree_w2, colnames(exp_mat))
+}
+
+
+
+comparing_weights<-function(w_1,w_2){
+  
+      which_i <- which(!is.na(w_1)) ## ignore NAs
+      which_j <- which(!is.na(w_2)) ## ignore NAs
+      dot_product_weight <- sum(which_i * which_j) / (norm(which_i,"2")*norm(which_j,"2"))
+      
+      return(dot_product_weight)
+}
+
+
+
+cosine_simi<-function(x,y){
+product_xy <- x * y
+sum_xy <- sum(product_xy)
+magnitude_x <- x^2
+magnitude_x<- sum(magnitude_x)
+magn_x <- sqrt(magnitude_x)
+magnitude_y <- y^2
+magnitude_y <- sum(magnitude_y)
+magn_y <- sqrt(magnitude_y)
+magn_z <- magn_x * magn_y
+cos_sin <-  sum_xy/magn_z
+return(cos_sin)
+}
+
+
+```
+#iteration function
+```{r}
+
+weight_simi_it<-function(dat){
+  pct = 4 
+count = 0 
+original_weight_1<-weight1(exp_mat)
+weight_1<-weight1(exp_mat)
+while(pct > .01){
+ count = count + 1
+ weight_2<-weight2(exp_mat,weight_1)
+ pct<-cosine_simi(original_weight_1,weight_2)/100
+ weight_1<-weight_2
+}
+print(pct)
+return(count)
+}
+weight_simi_it(exp_mat)
+```
+
 
 
 
