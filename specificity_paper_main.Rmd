@@ -362,17 +362,32 @@ date <- format(Sys.time(), format="%Y%m%d")
 df <- data.frame(n=numeric(), rep=numeric(),
                  jaccard=numeric(), P1orP2=character(),
                  weighted=logical(), samp=character() )
-
+## nested for loop builds df of jaccard results for plotting
 for(el in names(robustness_test_results)){
   P1orP2 <- str_split_fixed(el,"_",n=2)[1]
   measure <- str_split_fixed(el,"_",n=2)[2]
   for(i in 1:length(robustness_test_results[[el]]) ){
     n = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,4])
     rep = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,2])
+    for(weighted_or_flat in c("weighted","flat")){
+      baseline_name <- names(robustness_test_results[[el]])[grep(paste("rep=",rep,",n=",1,"$", sep = ""),names(robustness_test_results[[el]]) )] 
+      baseline_weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[baseline_name]]))
+      baseline_mat <-  robustness_test_results[[el]][[baseline_name]][baseline_weighted_flat_index]
+      
+      
+      weighted <- grepl(weighted_or_flat)
+      temp_mat <- robustness_test_results[[el]][[i]][grep(weighted_or_flat, names(robustness_test_results[[el]][[i]]))]
+      ncols <- ncol(temp_mat)
+      temp_df <- data.frame(n=numeric(rep(n, ncols) ), rep=numeric(rep(rep, ncols)),
+                   jaccard=numeric(length=ncols), P1orP2=character(rep(P1orP2, ncols)),
+                   weighted=logical(rep(weighted, ncols)), samp=character(length=ncols) )
+      for(s in 1:ncol(temp_mat) ){  ## add a row to df for each sample 
+        ## need to get the baseline for comparison
+        temp_df[s,]$samp <- -1
+        temp_df[s,]$jaccard <- -1
+      }  
+    }
     
-    flat <- robustness_test_results[[el]][[i]][grep("flat", names(robustness_test_results[[el]][[i]]))]
-    weighted <- robustness_test_results[[el]][[i]][grep("weighted", names(robustness_test_results[[el]][[i]]))]
-    for(s in 1:ncol(flat) )  
     data.frame(n=n, rep=rep,
                jaccard= -1 , P1orP2=P1orP2,
                weighted=weighted, samp= -1)
