@@ -371,16 +371,15 @@ for(el in names(robustness_test_results)){
     rep = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,2])
     for(weighted_or_flat in c("weighted","flat")){
       baseline_name <- names(robustness_test_results[[el]])[grep(paste("rep=",rep,",n=",1,"$", sep = ""),names(robustness_test_results[[el]]) )] 
-      baseline_weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[baseline_name]]))
-      baseline_mat <-  robustness_test_results[[el]][[baseline_name]][baseline_weighted_flat_index]
+      weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[baseline_name]]))
+      baseline_mat <-  robustness_test_results[[el]][[baseline_name]][weighted_flat_index]
       
-      
-      weighted <- grepl(weighted_or_flat)
-      temp_mat <- robustness_test_results[[el]][[i]][grep(weighted_or_flat, names(robustness_test_results[[el]][[i]]))]
+      weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[i]]))
+      temp_mat <- robustness_test_results[[el]][[i]][weighted_flat_index]
       ncols <- ncol(temp_mat)
       temp_df <- data.frame(n=numeric(rep(n, ncols) ), rep=numeric(rep(rep, ncols)),
                    jaccard=numeric(length=ncols), P1orP2=character(rep(P1orP2, ncols)),
-                   weighted=logical(rep(weighted, ncols)), samp=character(length=ncols) )
+                   weighted=logical(rep( grepl(weighted_or_flat), ncols)), samp=character(length=ncols) )
       for(s in 1:ncol(temp_mat) ){  ## add a row to df for each sample 
         ## need to get the baseline for comparison
         temp_df[s,]$samp <- -1
