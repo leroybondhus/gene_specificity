@@ -359,20 +359,31 @@ date <- format(Sys.time(), format="%Y%m%d")
 
 ## jaccard between n = 1 and n = num_brain_samples for brain v non-brain OR P1 v P2 
 
-df <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
+df_ext <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
                  jaccard=numeric(), P1orP2=character(),
                  weighted=logical(), samp=character() )
 ## nested for loop builds df of jaccard results for plotting
+Sys.time()
 for(el in names(robustness_test_results)){
+  if(length(robustness_test_results[[el]])==0 ){next;}
   P1orP2 <- str_split_fixed(el,"_",n=2)[1]
   measure <- str_split_fixed(el,"_",n=2)[2]
   if(measure == "Zscore"){cuts <- seq(0,4,0.25)   ## set cutoffs
   }else{ cuts <- seq(0,1,0.05)}
-  for(i in 1:length(robustness_test_results[[el]]) ){
+  
+ # for(i in 1:length(robustness_test_results[[el]]) ){   ### foreach at this level if implementing foreach
+  df_temp <- foreach(i=1:length(robustness_test_results[[el]]), .errorhandling = "pass", .combine = rbind) %dopar% {
+    #foreach(perm=1:length(permutation_matrix), .errorhandling = "pass", .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
+    
+    df <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
+                 jaccard=numeric(), P1orP2=character(),
+                 weighted=logical(), samp=character() )
+    
     n = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,4])
     rep = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,2])
     for(weighted_or_flat in c("weighted","flat")){
-      baseline_name <- names(robustness_test_results[[el]])[grep(paste("rep=",rep,",n=",1,"$", sep = ""),names(robustness_test_results[[el]]) )] 
+      baseline_name <- names(robustness_test_results[[el]])[grep(paste("rep=",rep,",n=",1,"$", sep = ""),names(robustness_test_results[[el]]) )]
+      
       weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[baseline_name]]))
       baseline_mat <-  robustness_test_results[[el]][[baseline_name]][[weighted_flat_index]]
       
@@ -382,9 +393,9 @@ for(el in names(robustness_test_results)){
       temp_df <- data.frame(n=rep(n, ncols*ncuts), rep=rep(rep, ncols*ncuts), cut_point=numeric(length=ncols*ncuts),
                    jaccard=numeric(length=ncols*ncuts), P1orP2=rep(P1orP2, ncols*ncuts),
                    weighted=rep( grepl("weighted", weighted_or_flat), ncols*ncuts), samp=character(length=ncols*ncuts) )
-      for(s in 1:ncol(temp_mat) ){  ## add a row to df for each sample 
+      for(s in 1:ncol(temp_mat) ){  ## add a row to df for each sample   
         for(cut_index in 1:length(cuts)){
-          ind <- s*(length(cuts)-1)+cut_index  ### use arr_ind here instead
+          ind <- (s-1)*length(cuts)+cut_index  ### use arr_ind here instead
           temp_df[ind,]$cut_point <- cuts[cut_index]
           temp_df[ind,]$jaccard <- (  length( which(baseline_mat[,s]>cuts[cut_index] & temp_mat[,s]>cuts[cut_index]  )) /
                                       length( which(baseline_mat[,s]>cuts[cut_index] | temp_mat[,s]>cuts[cut_index]  )) ) 
@@ -393,8 +404,11 @@ for(el in names(robustness_test_results)){
       }
       df <- rbind(df, temp_df)
     }
+    df
   }
+  df_ext <- rbind(df_ext, df_temp)
 }
+Sys.time()
 
 for(samp in unique(df$samp)){
   gg<-ggplot(df[which(df$samp==samp),], aes(x=cut_point, y=jaccard, color=n, group=n))+
