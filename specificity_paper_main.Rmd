@@ -359,7 +359,7 @@ date <- format(Sys.time(), format="%Y%m%d")
 
 ## jaccard between n = 1 and n = num_brain_samples for brain v non-brain OR P1 v P2 
 
-df_ext <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
+df <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
                  jaccard=numeric(), P1orP2=character(),
                  weighted=logical(), samp=character() )
 ## nested for loop builds df of jaccard results for plotting
@@ -375,7 +375,7 @@ for(el in names(robustness_test_results)){
   df_temp <- foreach(i=1:length(robustness_test_results[[el]]), .errorhandling = "pass", .combine = rbind) %dopar% {
     #foreach(perm=1:length(permutation_matrix), .errorhandling = "pass", .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
     
-    df <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
+    df_internal <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
                  jaccard=numeric(), P1orP2=character(),
                  weighted=logical(), samp=character() )
     
@@ -402,14 +402,15 @@ for(el in names(robustness_test_results)){
           temp_df[ind,]$samp <- unique(colnames(baseline_mat[,s,drop=FALSE] ),colnames(temp_mat[,s,drop=FALSE] ) )  
         }
       }
-      df <- rbind(df, temp_df)
+      df_internal <- rbind(df_internal, temp_df)
     }
-    df
+    df_internal
   }
-  df_ext <- rbind(df_ext, df_temp)
+  df <- rbind(df, df_temp)
 }
 Sys.time()
 
+df$jaccard[which(is.na(df$jaccard))] <- 0
 for(samp in unique(df$samp)){
   gg<-ggplot(df[which(df$samp==samp),], aes(x=cut_point, y=jaccard, color=n, group=n))+
     geom_line()+
