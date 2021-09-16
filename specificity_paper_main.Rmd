@@ -421,10 +421,10 @@ df_summary <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=
 names(df_summary)[length(names(df_summary))] <- "jaccard_mean"
 df_summary$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) sd(x,na.rm = TRUE) )$x 
 
-df$brain <- grepl("Brain", df$samp)
-df_summary_by_brain <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,brain=df$brain), FUN=function(x) mean(x,na.rm=TRUE) )
-names(df_summary_by_brain)[length(names(df_summary_by_brain))] <- "jaccard_mean"
-df_summary_by_brain$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,brain=df$brain), FUN=function(x) sd(x,na.rm = TRUE) )$x 
+#df$brain <- grepl("Brain", df$samp)
+df_summary_by_partition <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) mean(x,na.rm=TRUE) )
+names(df_summary_by_partition)[length(names(df_summary_by_partition))] <- "jaccard_mean"
+df_summary_by_partition$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) sd(x,na.rm = TRUE) )$x 
 
 for(samp in unique(df_summary$samp)){
   gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=jaccard_mean, color=n, group=n))+
@@ -434,14 +434,15 @@ for(samp in unique(df_summary$samp)){
  plot(gg)
 }
 
-gg <- ggplot(df_summary_by_brain, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=n, fill=n))+
-  ggtitle("jaccard index for brain and  non-brain, weighted and flat measures")+
+gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=n, fill=n))+
+  ggtitle("jaccard index for P1 and  P2, weighted and flat measures")+
   geom_ribbon(alpha=.3)+
    geom_line(aes(color=n))+
-  facet_wrap(brain ~ weighted, labeller=labeller(brain=c("TRUE"="brain", "FALSE"="non-brain"), weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 gg
-ggsave( paste( figures_dir, "/", date, "_jaccard_index_brain_v_nonbrain_flat_v_weighted_v01.png",sep = "") , gg,
+ggsave( paste( figures_dir, "/", date, "real_partition_jaccard_index_P1_v_P2_flat_v_weighted_v01.png",sep = "") , gg,
         device = "png", dpi=300, width = 8, height = 8)
+
 ```
 
 ```{r testing aggregate}
