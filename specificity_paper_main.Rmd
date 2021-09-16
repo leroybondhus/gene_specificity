@@ -352,7 +352,7 @@ for(measure in specificity_measures$func_names){
 ```
 
 
-```{r flat v weighted comparisons}
+```{r flat v weighted jaccard plot}
 system("mkdir figures")
 figures_dir <- paste(getwd(),"figures", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
@@ -377,7 +377,7 @@ for(el in names(robustness_test_results)){
       baseline_mat <-  robustness_test_results[[el]][[baseline_name]][[weighted_flat_index]]
       
       weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[i]]))
-      temp_mat <- robustness_test_results[[el]][[i]][[weighted_flat_index]]
+      temp_mat <- robustness_test_results[[el]][[i]][[weighted_flat_index]][,colnames(baseline_mat),drop=FALSE]
       ncols <- ncol(temp_mat); ncuts <- length(cuts)
       temp_df <- data.frame(n=rep(n, ncols*ncuts), rep=rep(rep, ncols*ncuts), cut_point=numeric(length=ncols*ncuts),
                    jaccard=numeric(length=ncols*ncuts), P1orP2=rep(P1orP2, ncols*ncuts),
@@ -396,10 +396,24 @@ for(el in names(robustness_test_results)){
   }
 }
 
-ggplot(df, aes(x=cut_point, y=jaccard, color=n, group=n))+
-  geom_line()+
+for(samp in unique(df$samp)){
+  gg<-ggplot(df[which(df$samp==samp),], aes(x=cut_point, y=jaccard, color=n, group=n))+
+    geom_line()+
+    facet_wrap( ~ weighted)
+ plot(gg)
+}
+ggplot(df, aes(x=cut_point, y=jaccard, color=n))+
+  geom_smooth()+
   facet_wrap( ~ weighted)
 
+ggplot(df, aes(x=cut_point, y=jaccard, color=n, group=n))+
+  geom_smooth()+
+  facet_wrap( ~ weighted)
+  
+```
+
+
+```{r  flat v weighted comparisons}
 if(TRUE){
   specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              funcs=list(Zscore=calc_weighted_zscore_matrix,
