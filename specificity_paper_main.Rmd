@@ -353,7 +353,7 @@ for(measure in specificity_measures$func_names){
 
 
 ```{r flat v weighted jaccard plot}
-system("mkdir figures")
+#system("mkdir figures")
 figures_dir <- paste(getwd(),"figures", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
 
@@ -368,7 +368,7 @@ for(el in names(robustness_test_results)){
   if(length(robustness_test_results[[el]])==0 ){next;}
   P1orP2 <- str_split_fixed(el,"_",n=2)[1]
   measure <- str_split_fixed(el,"_",n=2)[2]
-  if(measure == "Zscore"){cuts <- seq(0,4,0.25)   ## set cutoffs
+  if(measure == "Zscore"){cuts <- seq(-4,4,0.5)   ## set cutoffs
   }else{ cuts <- seq(0,1,0.05)}
   
  # for(i in 1:length(robustness_test_results[[el]]) ){   ### foreach at this level if implementing foreach
@@ -397,8 +397,13 @@ for(el in names(robustness_test_results)){
         for(cut_index in 1:length(cuts)){
           ind <- (s-1)*length(cuts)+cut_index  ### use arr_ind here instead
           temp_df[ind,]$cut_point <- cuts[cut_index]
-          temp_df[ind,]$jaccard <- (  length( which(baseline_mat[,s]>cuts[cut_index] & temp_mat[,s]>cuts[cut_index]  )) /
-                                      length( which(baseline_mat[,s]>cuts[cut_index] | temp_mat[,s]>cuts[cut_index]  )) ) 
+          if(cuts[cut_index]<0){
+            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] < cuts[cut_index] & temp_mat[,s] < cuts[cut_index]  )) /
+                                        length( which( baseline_mat[,s] < cuts[cut_index] | temp_mat[,s] < cuts[cut_index]  )) )
+          } else {
+            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] > cuts[cut_index] & temp_mat[,s] > cuts[cut_index]  )) /
+                                        length( which( baseline_mat[,s] > cuts[cut_index] | temp_mat[,s] > cuts[cut_index]  )) )
+          }
           temp_df[ind,]$samp <- unique(colnames(baseline_mat[,s,drop=FALSE] ),colnames(temp_mat[,s,drop=FALSE] ) )  
         }
       }
@@ -410,30 +415,29 @@ for(el in names(robustness_test_results)){
 }
 Sys.time()
 
-df$jaccard[which(is.na(df$jaccard))] <- 0
+#df$jaccard[which(is.na(df$jaccard))] <- 0
 
-df_summary <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=mean ) 
+df_summary <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp),FUN=function(x) mean(x,na.rm=TRUE) ) 
 names(df_summary)[length(names(df_summary))] <- "jaccard_mean"
-df_summary$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=sd )$x 
+df_summary$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) sd(x,na.rm = TRUE) )$x 
+
+df$brain <- grepl("Brain", df$samp)
+df_summary_by_brain <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,brain=df$brain), FUN=function(x) mean(x,na.rm=TRUE) )
+names(df_summary_by_brain)[length(names(df_summary_by_brain))] <- "jaccard_mean"
+df_summary_by_brain$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,brain=df$brain), FUN=function(x) sd(x,na.rm = TRUE) )$x 
 
 for(samp in unique(df_summary$samp)){
   gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=jaccard_mean, color=n, group=n))+
+    ggtitle(paste(samp))+
     geom_line()+
     facet_wrap( ~ weighted)
  plot(gg)
 }
-ggplot(df, aes(x=cut_point, y=jaccard, color=n))+
-  geom_smooth()+
-  facet_wrap( ~ weighted)
 
-ggplot(df, aes(x=cut_point, y=jaccard, color=n, group=n))+
-  geom_smooth()+
-  facet_wrap( ~ weighted)
-
-temp <- df[which(df$weighted & is.element(df$samp, unique(df$samp)[1]) & df$n == 9 ),]
-ggplot(temp, aes(x=cut_point, y=jaccard, color=n ,group=n))+
-  geom_line()+
-facet_wrap( ~ samp)
+ggplot(df_summary_by_brain, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=n, fill=n))+
+  geom_ribbon(alpha=.3)+
+   geom_line(aes(color=n))+
+  facet_wrap(brain ~ weighted)
 ```
 
 ```{r testing aggregate}
