@@ -411,8 +411,13 @@ for(el in names(robustness_test_results)){
 Sys.time()
 
 df$jaccard[which(is.na(df$jaccard))] <- 0
-for(samp in unique(df$samp)){
-  gg<-ggplot(df[which(df$samp==samp),], aes(x=cut_point, y=jaccard, color=n, group=n))+
+
+df_summary <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=mean ) 
+names(df_summary)[length(names(df_summary))] <- "jaccard_mean"
+df_summary$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=sd )$x 
+
+for(samp in unique(df_summary$samp)){
+  gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=jaccard_mean, color=n, group=n))+
     geom_line()+
     facet_wrap( ~ weighted)
  plot(gg)
@@ -424,12 +429,22 @@ ggplot(df, aes(x=cut_point, y=jaccard, color=n))+
 ggplot(df, aes(x=cut_point, y=jaccard, color=n, group=n))+
   geom_smooth()+
   facet_wrap( ~ weighted)
-  
+
+temp <- df[which(df$weighted & is.element(df$samp, unique(df$samp)[1]) & df$n == 9 ),]
+ggplot(temp, aes(x=cut_point, y=jaccard, color=n ,group=n))+
+  geom_line()+
+facet_wrap( ~ samp)
 ```
 
+```{r testing aggregate}
+head(state.x77)
+aggregate(state.x77, list(Region = state.region), mean)
+
+aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=mean ) 
+```
 
 ```{r  flat v weighted comparisons}
-if(TRUE){
+if(FALSE){
   specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              funcs=list(Zscore=calc_weighted_zscore_matrix,
                                         Tau=NA,
