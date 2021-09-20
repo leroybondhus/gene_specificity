@@ -10,9 +10,9 @@ output: html_document
 ##       this project. Load this package here
 ## 
 ```{r set up package of functions used}
-library("devtools")
-library("roxygen2")
-install("./../GeneSpecificityFuncs")
+# library("devtools")
+# library("roxygen2")
+# install("./../GeneSpecificityFuncs")
 ```
 
 ```{r libraries}
@@ -361,7 +361,8 @@ date <- format(Sys.time(), format="%Y%m%d")
 
 df <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
                  jaccard=numeric(), P1orP2=character(),
-                 weighted=logical(), samp=character() )
+                 weighted=logical(), samp=character(),
+                 gene_count=numeric(), gene_overlap_count=numeric())
 ## nested for loop builds df of jaccard results for plotting
 Sys.time()
 for(el in names(robustness_test_results)){
@@ -377,7 +378,8 @@ for(el in names(robustness_test_results)){
     
     df_internal <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
                  jaccard=numeric(), P1orP2=character(),
-                 weighted=logical(), samp=character() )
+                 weighted=logical(), samp=character(),
+                 gene_count=numeric(), gene_overlap_count=numeric() )
     
     n = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,4])
     rep = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,2])
@@ -392,7 +394,8 @@ for(el in names(robustness_test_results)){
       ncols <- ncol(temp_mat); ncuts <- length(cuts)
       temp_df <- data.frame(n=rep(n, ncols*ncuts), rep=rep(rep, ncols*ncuts), cut_point=numeric(length=ncols*ncuts),
                    jaccard=numeric(length=ncols*ncuts), P1orP2=rep(P1orP2, ncols*ncuts),
-                   weighted=rep( grepl("weighted", weighted_or_flat), ncols*ncuts), samp=character(length=ncols*ncuts) )
+                   weighted=rep( grepl("weighted", weighted_or_flat), ncols*ncuts), samp=character(length=ncols*ncuts),
+                   gene_count=numeric(length=ncols*ncuts), gene_overlap_count=numeric(length=ncols*ncuts) )
       for(s in 1:ncol(temp_mat) ){  ## add a row to df for each sample   
         for(cut_index in 1:length(cuts)){
           ind <- (s-1)*length(cuts)+cut_index  ### use arr_ind here instead
@@ -400,9 +403,13 @@ for(el in names(robustness_test_results)){
           if(cuts[cut_index]<0){
             temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] < cuts[cut_index] & temp_mat[,s] < cuts[cut_index]  )) /
                                         length( which( baseline_mat[,s] < cuts[cut_index] | temp_mat[,s] < cuts[cut_index]  )) )
+            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] < cuts[cut_index]  ) )
+            temp_df[ind,]$gene_overlap_count <-  length( which( baseline_mat[,s] < cuts[cut_index] & temp_mat[,s] < cuts[cut_index]  ))
           } else {
             temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] > cuts[cut_index] & temp_mat[,s] > cuts[cut_index]  )) /
                                         length( which( baseline_mat[,s] > cuts[cut_index] | temp_mat[,s] > cuts[cut_index]  )) )
+            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] > cuts[cut_index]  ) )
+            temp_df[ind,]$gene_overlap_count <-  length( which( baseline_mat[,s] > cuts[cut_index] & temp_mat[,s] > cuts[cut_index]  ))
           }
           temp_df[ind,]$samp <- unique(colnames(baseline_mat[,s,drop=FALSE] ),colnames(temp_mat[,s,drop=FALSE] ) )  
         }
@@ -440,8 +447,14 @@ gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jacc
    geom_line(aes(color=n))+
   facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 gg
-ggsave( paste( figures_dir, "/", date, "real_partition_jaccard_index_P1_v_P2_flat_v_weighted_v01.png",sep = "") , gg,
-        device = "png", dpi=300, width = 8, height = 8)
+# ggsave( paste( figures_dir, "/", date, "real_partition_jaccard_index_P1_v_P2_flat_v_weighted_v01.png",sep = "") , gg, device = "png", dpi=300, width = 8, height = 8)
+
+gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=n, fill=n))+
+  ggtitle("jaccard index for P1 and  P2, weighted and flat measures")+
+  geom_ribbon(alpha=.3)+
+   geom_line(aes(color=n))+
+  facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+gg
 
 ```
 
