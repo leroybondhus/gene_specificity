@@ -427,17 +427,36 @@ Sys.time()
 df_summary <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp),FUN=function(x) mean(x,na.rm=TRUE) ) 
 names(df_summary)[length(names(df_summary))] <- "jaccard_mean"
 df_summary$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) sd(x,na.rm = TRUE) )$x 
+df_summary$count_mean <- aggregate(df$gene_count, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) mean(x,na.rm = TRUE) )$x 
+df_summary$count_sd <- aggregate(df$gene_count, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) sd(x,na.rm = TRUE) )$x 
+df_summary$overlap_count_mean <- aggregate(df$gene_overlap_count, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) mean(x,na.rm = TRUE) )$x 
+df_summary$overlap_count_sd <- aggregate(df$gene_overlap_count, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) sd(x,na.rm = TRUE) )$x 
+
+
 
 #df$brain <- grepl("Brain", df$samp)
 df_summary_by_partition <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) mean(x,na.rm=TRUE) )
 names(df_summary_by_partition)[length(names(df_summary_by_partition))] <- "jaccard_mean"
 df_summary_by_partition$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) sd(x,na.rm = TRUE) )$x 
 
+
+
+
 for(samp in unique(df_summary$samp)){
   gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=jaccard_mean, color=n, group=n))+
     ggtitle(paste(samp))+
     geom_line()+
     facet_wrap( ~ weighted)
+ plot(gg)
+ gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=log10(count_mean), color=n, group=n))+
+   ggtitle(paste(samp))+
+   geom_line()+
+   facet_wrap(~ weighted)
+ plot(gg)
+  gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=log10(overlap_count_mean), color=n, group=n))+
+   ggtitle(paste(samp))+
+   geom_line()+
+   facet_wrap(~ weighted)
  plot(gg)
 }
 
@@ -456,6 +475,7 @@ gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jacc
   facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 gg
 
+ggplot(df_s)
 ```
 
 ```{r testing aggregate}
