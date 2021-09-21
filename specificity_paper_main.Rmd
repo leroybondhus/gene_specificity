@@ -445,23 +445,24 @@ df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersec
 
 
 
-
-for(samp in unique(df_summary$samp)[1:15]){
+library(ggpubr)
+for(samp in unique(df_summary$samp)){
+  gglist <- list()
   gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=jaccard_mean, color=n, group=n))+
     ggtitle(paste(samp))+
     geom_line()+
     facet_wrap( ~ weighted)
-  plot(gg)
+  gglist <- append(gglist,list(gg))
   gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=(gene_count/gene_count_baseline), color=n, group=n))+
     ggtitle(paste(samp,"frac_of_baseline_called"))+
     geom_line()+
     facet_wrap( ~ weighted)
-  plot(gg)
+  gglist <- append(gglist,list(gg))
   gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=(gene_count-gene_count_intersect)/gene_count, color=n, group=n))+
     ggtitle(paste(samp,"frac_not_in_baseline"))+
     geom_line()+
     facet_wrap( ~ weighted)
-  plot(gg)
+  gglist <- append(gglist,list(gg))
   
   
   gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=jaccard_mean, color=weighted, group=weighted))+
@@ -469,27 +470,40 @@ for(samp in unique(df_summary$samp)[1:15]){
     geom_line()+
     facet_wrap( n ~ ., strip.position = "top", nrow = n)
     #facet_wrap( n ~ P1orP2)
-  plot(gg)
+  gglist <- append(gglist,list(gg))
+  
+  gg <- ggarrange(plotlist=gglist, ncol=2, nrow=2)
+  ggsave(paste(temp_figures_dir, "/",samp,"_stats.png",sep=""),gg, device = "png", width = 8, height=6)
 }
 
 
+
+figures_dir
+system(paste("mkdir ", figures_dir,"/jaccard_plot_testing",sep="")) 
+temp_figures_dir <- paste(figures_dir,"/jaccard_plot_testing",sep="")
+gglist <- list()
 
 gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=n, fill=n))+
   ggtitle("jaccard index for P1 and  P2, weighted and flat measures")+
   geom_ribbon(alpha=.3)+
    geom_line(aes(color=n))+
   facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-gg
+gglist <- append(gglist,list(gg))
+
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=(gene_count/gene_count_baseline), color=n, group=n))+
   ggtitle(paste("frac_of_baseline_called"))+
   geom_line()+
   facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
+
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=(gene_count-gene_count_intersect)/gene_count, color=n, group=n))+
   ggtitle(paste("frac_not_in_baseline"))+
   geom_line()+
   facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
 
 
 
@@ -499,28 +513,39 @@ gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jacc
   geom_ribbon(alpha=.3)+
    geom_line(aes(color=weighted))+
    facet_grid( P1orP2 ~ n ,  labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-gg
+gglist <- append(gglist,list(gg))
+
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=(gene_count/gene_count_baseline), color=weighted, group=weighted))+
   ggtitle(paste("frac_of_baseline_called"))+
   geom_line()+
   facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
+
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=(gene_count-gene_count_intersect)/gene_count, color=weighted, group=weighted))+
   ggtitle(paste("frac_not_in_baseline"))+
   geom_line()+
   facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
 
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=gene_count_baseline-gene_count_intersect, color=n, group=n))+
   ggtitle(paste("diff baseline - intersecet"))+
   geom_line()+
   facet_grid(P1orP2 ~ weighted , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
+
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=gene_count-gene_count_intersect, color=n, group=n))+
   ggtitle(paste("diff count-intersect "))+
   geom_line()+
   facet_grid(P1orP2 ~ weighted , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
 
 
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=gene_count_baseline-gene_count_intersect, color=weighted, group=weighted))+
@@ -528,11 +553,16 @@ gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=gene_count_baseline-gene_
   geom_line()+
   facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
+
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=gene_count-gene_count_intersect, color=weighted, group=weighted))+
   ggtitle(paste("diff count-intersect "))+
   geom_line()+
   facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
 
 
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=log10(gene_count_baseline-gene_count_intersect), color=n, group=n))+
@@ -540,24 +570,33 @@ gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=log10(gene_count_baseline
   geom_line()+
   facet_grid(P1orP2 ~ weighted , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=log10(gene_count-gene_count_intersect), color=n, group=n))+
   ggtitle(paste("diff count-intersect "))+
   geom_line()+
   facet_grid(P1orP2 ~ weighted , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
 
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=log10(gene_count_baseline-gene_count_intersect), color=weighted, group=weighted))+
   ggtitle(paste("diff baseline - intersecet"))+
   geom_line()+
   facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
+
 gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=log10(gene_count-gene_count_intersect), color=weighted, group=weighted))+
   ggtitle(paste("diff count-intersect "))+
   geom_line()+
   facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 plot(gg)
+gglist <- append(gglist,list(gg))
 
-
+for(i in 1:length(gglist)){
+  ggsave(filename = paste(temp_figures_dir,"/temp_",i,".png",sep=""), gglist[[i]], device="png", dpi = 200, width=6, height=4)
+}
 
 ```
 
