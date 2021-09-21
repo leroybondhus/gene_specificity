@@ -424,26 +424,16 @@ for(measure in specificity_measures$func_names){
   
 
   col_fun = colorRamp2(c(-4, -2 ,0, 2, 4), c("black", "blue", "white", "yellow", "red"))
-  
-  delta_row_var <- abs(apply(spec_mat_flat, 1, var)
-                       - apply(spec_mat_weighted, 1, var) )
-  which <- order(delta_row_var, decreasing = TRUE)[1:10000]
-  which <- which(delta_row_var > 0.3)
-  h1 <- Heatmap(spec_mat_flat[which,], show_row_names = F, col=col_fun) #, row_order = 1:length(which))
-  h1_list <- draw(h1)
-  col_order <- column_order(h1_list)
-  h1+
-    Heatmap(spec_mat_weighted[which,], column_order = col_order, show_row_names = F, col=col_fun) #+
-    Heatmap(abs(spec_mat_weighted[which,]-spec_mat_flat[which,]), column_order=col_order, show_row_names= F)
-  
+
+  n = 5 ## look at top n and bottom n most genes for each tissue (those that are most different between weighted and flat measures)
   gene_list <- list() 
   for(i in 1:ncol(spec_mat_weighted)){
     gene_list[[i]] <- list()
-    gene_list[[i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_weighted[,i]-spec_mat_flat[,i]), decreasing = TRUE)[1:5]])
+    gene_list[[i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_weighted[,i]-spec_mat_flat[,i]), decreasing = TRUE)[1:n]])
   }
   for(i in 1:ncol(spec_mat_weighted)){
     gene_list[[ncol(spec_mat_weighted)+i]] <- list()
-     gene_list[[ncol(spec_mat_weighted)+i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_flat[,i]-spec_mat_weighted[,i]), decreasing = TRUE)[1:5]])
+     gene_list[[ncol(spec_mat_weighted)+i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_flat[,i]-spec_mat_weighted[,i]), decreasing = TRUE)[1:n]])
   }
  
   gene_list <- unique(unlist(gene_list))
@@ -454,13 +444,10 @@ for(measure in specificity_measures$func_names){
   h1 <- Heatmap(spec_mat_flat[gene_list,], show_row_names = F, col=col_fun, row_order = gene_list, column_order = colnames(spec_mat_flat) )
   h1_list <- draw(h1)
   col_order <- column_order(h1_list)
- # png(filename = "weighted_Z_minus_flat_Z_top10_bottom10_rawanddelta_each_tissue.png", width = 1620, height=1200)
-  h1+
+  h1 <- h1+
     Heatmap(spec_mat_weighted[gene_list,], column_order = col_order,  row_order = gene_list, show_row_names = F , col=col_fun) +
-    
-   # png(filename = "weighted_Z_minus_flat_Z_top10_bottom10_delta_each_tissue.png", width = 720, height=1200)
     Heatmap(spec_mat_weighted[gene_list,]-spec_mat_flat[gene_list,], column_order=col_order, row_order = gene_list, show_row_names= F)
-  #dev.off()
+  h1
   }
 }
 ```
