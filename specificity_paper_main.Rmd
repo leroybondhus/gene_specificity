@@ -381,17 +381,7 @@ for(el in names(robustness_test_results)){
 }
 Sys.time()
 
-#df$jaccard[which(is.na(df$jaccard))] <- 0
 
-df_summary <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp),FUN=function(x) mean(x,na.rm=TRUE) ) 
-names(df_summary)[length(names(df_summary))] <- "jaccard_mean"
-df_summary$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) sd(x,na.rm = TRUE) )$x 
-df_summary$gene_count <- aggregate(df$gene_count, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) mean(x,na.rm = TRUE) )$x 
-df_summary$gene_count_baseline <- aggregate(df$gene_count_baseline, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) mean(x,na.rm = TRUE) )$x 
-df_summary$gene_count_intersect <- aggregate(df$gene_count_intersect, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=function(x) mean(x,na.rm = TRUE) )$x 
-
-
-#df$brain <- grepl("Brain", df$samp)
 df_summary_by_partition <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) mean(x,na.rm=TRUE) )
 names(df_summary_by_partition)[length(names(df_summary_by_partition))] <- "jaccard_mean"
 df_summary_by_partition$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) sd(x,na.rm = TRUE) )$x 
@@ -400,185 +390,18 @@ df_summary_by_partition$gene_count_baseline <- aggregate(df$gene_count_baseline,
 df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersect, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) mean(x,na.rm = TRUE) )$x 
 
 
-
-
-for(samp in unique(df_summary$samp)){
-  gglist <- list()
-  gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=jaccard_mean, color=n, group=n))+
-    ggtitle(paste(samp))+
-    geom_line()+
-    facet_wrap( ~ weighted)
-  gglist <- append(gglist,list(gg))
-  gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=(gene_count/gene_count_baseline), color=n, group=n))+
-    ggtitle(paste(samp,"frac_of_baseline_called"))+
-    geom_line()+
-    facet_wrap( ~ weighted)
-  gglist <- append(gglist,list(gg))
-  gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=(gene_count-gene_count_intersect)/gene_count, color=n, group=n))+
-    ggtitle(paste(samp,"frac_not_in_baseline"))+
-    geom_line()+
-    facet_wrap( ~ weighted)
-  gglist <- append(gglist,list(gg))
-  
-  
-  gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=jaccard_mean, color=weighted, group=weighted))+
-    ggtitle(paste(samp))+
-    geom_line()+
-    facet_wrap( n ~ ., strip.position = "top", nrow = n)
-    #facet_wrap( n ~ P1orP2)
-  gglist <- append(gglist,list(gg))
-  
-  gg <- ggarrange(plotlist=gglist, ncol=2, nrow=2)
-  plot(gg)
-  #ggsave(paste(temp_figures_dir, "/",samp,"_stats.png",sep=""),gg, device = "png", width = 8, height=6)
-}
-
-
-
-figures_dir
-system(paste("mkdir ", figures_dir,"/jaccard_plot_testing",sep="")) 
-temp_figures_dir <- paste(figures_dir,"/jaccard_plot_testing",sep="")
-gglist <- list()
-
 gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=n, fill=n))+
   ggtitle("jaccard index for P1 and  P2, weighted and flat measures")+
   geom_ribbon(alpha=.3)+
    geom_line(aes(color=n))+
   facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-gglist <- append(gglist,list(gg))
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=(gene_count/gene_count_baseline), color=n, group=n))+
-  ggtitle(paste("frac_of_baseline_called"))+
-  geom_line()+
-  facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=(gene_count-gene_count_intersect)/gene_count, color=n, group=n))+
-  ggtitle(paste("frac_not_in_baseline"))+
-  geom_line()+
-  facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-
-
-
-gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=weighted, fill=weighted))+
-  ggtitle("jaccard index for P1 and  P2, weighted and flat measures")+
-  geom_ribbon(alpha=.3)+
-   geom_line(aes(color=weighted))+
-   facet_grid( P1orP2 ~ n ,  labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-gglist <- append(gglist,list(gg))
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=(gene_count/gene_count_baseline), color=weighted, group=weighted))+
-  ggtitle(paste("frac_of_baseline_called"))+
-  geom_line()+
-  facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=(gene_count-gene_count_intersect)/gene_count, color=weighted, group=weighted))+
-  ggtitle(paste("frac_not_in_baseline"))+
-  geom_line()+
-  facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=gene_count_baseline-gene_count_intersect, color=n, group=n))+
-  ggtitle(paste("diff baseline - intersecet"))+
-  geom_line()+
-  facet_grid(P1orP2 ~ weighted , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=gene_count-gene_count_intersect, color=n, group=n))+
-  ggtitle(paste("diff count-intersect "))+
-  geom_line()+
-  facet_grid(P1orP2 ~ weighted , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=gene_count_baseline-gene_count_intersect, color=weighted, group=weighted))+
-  ggtitle(paste("diff baseline - intersecet"))+
-  geom_line()+
-  facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=gene_count-gene_count_intersect, color=weighted, group=weighted))+
-  ggtitle(paste("diff count-intersect "))+
-  geom_line()+
-  facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=log10(gene_count_baseline-gene_count_intersect), color=n, group=n))+
-  ggtitle(paste("diff baseline - intersecet"))+
-  geom_line()+
-  facet_grid(P1orP2 ~ weighted , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=log10(gene_count-gene_count_intersect), color=n, group=n))+
-  ggtitle(paste("diff count-intersect "))+
-  geom_line()+
-  facet_grid(P1orP2 ~ weighted , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=log10(gene_count_baseline-gene_count_intersect), color=weighted, group=weighted))+
-  ggtitle(paste("diff baseline - intersecet"))+
-  geom_line()+
-  facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-gg<-ggplot(df_summary_by_partition, aes(x=cut_point, y=log10(gene_count-gene_count_intersect), color=weighted, group=weighted))+
-  ggtitle(paste("diff count-intersect "))+
-  geom_line()+
-  facet_grid(P1orP2 ~ n , labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-plot(gg)
-gglist <- append(gglist,list(gg))
-
-for(i in 1:length(gglist)){
-#  ggsave(filename = paste(temp_figures_dir,"/temp_",i,".png",sep=""), gglist[[i]], device="png", dpi = 200, width=6, height=4)
-}
+gg
 
 ```
 
-```{r testing aggregate}
-head(state.x77)
-aggregate(state.x77, list(Region = state.region), mean)
-
-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted,samp=df$samp), FUN=mean ) 
-  
-gg<-ggplot(df_summary[which(df_summary$samp==samp),], aes(x=cut_point, y=log10(overlap_count_mean), color=n, group=n))+
-   ggtitle(paste(samp))+
-   geom_line()+
-   facet_wrap(~ weighted)
- plot(gg)
- 
-
- ## weighted v flat (is weighted better?)
- ## as n increases (as dataset becomes more unbalanced)
- ## as Z increases (effect around 2-3 most critical)
- ## count baseline -  
- 
-```
 
 ```{r  flat v weighted comparisons}
-if(FALSE){
+if(TRUE){
   specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              funcs=list(Zscore=calc_weighted_zscore_matrix,
                                         Tau=NA,
@@ -611,7 +434,7 @@ for(measure in specificity_measures$func_names){
   col_order <- column_order(h1_list)
   h1+
     Heatmap(spec_mat_weighted[which,], column_order = col_order, show_row_names = F, col=col_fun) #+
-  #  Heatmap(abs(spec_mat_weighted[which,]-spec_mat_flat[which,]), column_order=col_order, show_row_names= F)
+    Heatmap(abs(spec_mat_weighted[which,]-spec_mat_flat[which,]), column_order=col_order, show_row_names= F)
   
   gene_list <- list() 
   for(i in 1:ncol(spec_mat_weighted)){
@@ -638,35 +461,6 @@ for(measure in specificity_measures$func_names){
    # png(filename = "weighted_Z_minus_flat_Z_top10_bottom10_delta_each_tissue.png", width = 720, height=1200)
     Heatmap(spec_mat_weighted[gene_list,]-spec_mat_flat[gene_list,], column_order=col_order, row_order = gene_list, show_row_names= F)
   #dev.off()
-}
-  
-  
-  
-## Sliding Jaccard Index  
-
-df_sliding_jaccard <- data.frame(samp=character(), zcut=numeric(), jacc=numeric(), brain=logical(), unionsize=numeric() )
-for(samp in colnames(spec_mat_flat)){
-  for(zcut in seq(0,max(spec_mat_flat, na.rm = T)+1, by=0.25 )){
-   vflat <- names(spec_mat_flat[which(spec_mat_flat[,samp] > zcut),samp])
-   vweight <- names(spec_mat_weighted[which(spec_mat_weighted[,samp] > zcut),samp])
-   jacc <-length(intersect(vflat,vweight))/length(union(vflat,vweight))
-   brain <- grepl("Brain", samp)
-   df_temp <- data.frame(samp=samp,zcut=zcut,jacc=jacc, brain=brain, unionsize=length(union(vflat,vweight)) )
-   df_sliding_jaccard <- rbind(df_sliding_jaccard, df_temp)
   }
-}
-
-ggplot(df_sliding_jaccard[which(rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
-  geom_line()
-ggplot(df_sliding_jaccard[which(df_sliding_jaccard$brain & rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
-  geom_line()
-ggplot(df_sliding_jaccard[which(!df_sliding_jaccard$brain & rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc, color=samp))+
-  geom_line()
-
-#png(filename = "jaccard_weighted_v_flat_slidingzcut_bbrainvnotbrain.png", width = 1620, height=720)
-ggplot(df_sliding_jaccard[which(rowSums(is.na(df_sliding_jaccard))==0),], aes(x=zcut,y=jacc))+
-  geom_line(aes( color=samp, color=unionsize))+
-  facet_wrap(~brain)
-#dev.off()
 }
 ```
