@@ -393,12 +393,17 @@ df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersec
 
 
 gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=n, fill=n))+
+  theme_bw()+
+  theme(
+        panel.grid.minor.x = element_blank())+
   ggtitle("jaccard index for P1 and  P2, weighted and flat measures")+
-  geom_ribbon(alpha=.3)+
   geom_line(aes(color=n))+
-  facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  scale_color_continuous(low="steelblue2", high="steelblue4")+
+  scale_x_continuous(limits = c(0,4), expand = c(0,0))+
+  scale_y_continuous(breaks=seq(0,1,by=0.2))+
+  facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 gg
-
+ggsave( paste(getwd(), "/figures/Figure_2D_v03_jaccard.png",sep=""), gg, dev="png", height = 3.4, width = 6)
 ```
 
 
