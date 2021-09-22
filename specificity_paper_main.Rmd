@@ -308,7 +308,9 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
 ```
 
 
-```{r flat v weighted jaccard plot}
+
+
+```{r Figure_2D flat v weighted jaccard plot}
 #system("mkdir figures")
 figures_dir <- paste(getwd(),"figures", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
@@ -393,7 +395,7 @@ df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersec
 gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=n, fill=n))+
   ggtitle("jaccard index for P1 and  P2, weighted and flat measures")+
   geom_ribbon(alpha=.3)+
-   geom_line(aes(color=n))+
+  geom_line(aes(color=n))+
   facet_wrap(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 gg
 
@@ -426,28 +428,42 @@ for(measure in specificity_measures$func_names){
   col_fun = colorRamp2(c(-4, -2 ,0, 2, 4), c("black", "blue", "white", "yellow", "red"))
 
   n = 5 ## look at top n and bottom n most genes for each tissue (those that are most different between weighted and flat measures)
-  gene_list <- list() 
+  gene_list <- list(up=list(),down=list()) 
   for(i in 1:ncol(spec_mat_weighted)){
-    gene_list[[i]] <- list()
-    gene_list[[i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_weighted[,i]-spec_mat_flat[,i]), decreasing = TRUE)[1:n]])
+    gene_list$up[[i]] <- list()
+    gene_list$up[[i]] <- list(gene_list$up[[i]], rownames(spec_mat_flat)[order((spec_mat_weighted[,i]-spec_mat_flat[,i]), decreasing = TRUE)[1:n]])
   }
   for(i in 1:ncol(spec_mat_weighted)){
-    gene_list[[ncol(spec_mat_weighted)+i]] <- list()
-     gene_list[[ncol(spec_mat_weighted)+i]] <- list(gene_list[[i]], rownames(spec_mat_flat)[order((spec_mat_flat[,i]-spec_mat_weighted[,i]), decreasing = TRUE)[1:n]])
+    gene_list$down[[i]] <- list()
+     gene_list$down[[i]] <- list(gene_list$down[[i]], rownames(spec_mat_flat)[order((spec_mat_flat[,i]-spec_mat_weighted[,i]), decreasing = TRUE)[1:n]])
   }
  
-  gene_list <- unique(unlist(gene_list))
-  col_fun = colorRamp2(c(min(as.vector(spec_mat_flat[gene_list,]),as.vector(spec_mat_weighted[gene_list,]) ),
+  gene_list$up <- unique(unlist(gene_list$up))
+  gene_list$down <- unique(unlist(gene_list$down))
+  gene_list$full <- unique(c(gene_list$up,gene_list$down))
+  col_fun = colorRamp2(c(min(as.vector(spec_mat_flat[gene_list$full,]),as.vector(spec_mat_weighted[gene_list$full,]) ),
                          -2 ,0, 2, 4,
-                         max(as.vector(spec_mat_flat[gene_list,]),as.vector(spec_mat_weighted[gene_list,]) )), c("black", "blue", "white", "yellow", "red", "red4"))
+                         max(as.vector(spec_mat_flat[gene_list$full,]),as.vector(spec_mat_weighted[gene_list$full,]) )),
+                       c("black", "blue", "white", "yellow", "red", "red4"))
+  col_fun_2 = colorRamp2(c(min(as.vector(spec_mat_weighted[gene_list$full,])-as.vector(spec_mat_flat[gene_list$full,]))  ,
+                         -2 ,0, 2, 
+                         max(as.vector(spec_mat_weighted[gene_list$full,])-as.vector(spec_mat_flat[gene_list$full,])) ), 
+                        c("darkblue","blue", "white", "red", "red4"))
+  for(ud in c("up","down")){
+    h1 <- Heatmap(spec_mat_flat[gene_list[[ud]],], show_row_names = F, col=col_fun, row_order = gene_list[[ud]], column_order = colnames(spec_mat_flat) )
+      h1_list <- draw(h1)
+      col_order <- column_order(h1_list)
+      h1 <- h1+
+        Heatmap(spec_mat_weighted[gene_list[[ud]],], column_order = col_order,  row_order = gene_list[[ud]], show_row_names = F , col=col_fun) +
+        Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
+      draw(h1)
+      h2 <-Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
+      draw(h2)
+  }
   
-  h1 <- Heatmap(spec_mat_flat[gene_list,], show_row_names = F, col=col_fun, row_order = gene_list, column_order = colnames(spec_mat_flat) )
-  h1_list <- draw(h1)
-  col_order <- column_order(h1_list)
-  h1 <- h1+
-    Heatmap(spec_mat_weighted[gene_list,], column_order = col_order,  row_order = gene_list, show_row_names = F , col=col_fun) +
-    Heatmap(spec_mat_weighted[gene_list,]-spec_mat_flat[gene_list,], column_order=col_order, row_order = gene_list, show_row_names= F)
-  h1
+  
+  ## NOTE IDEALLY ADD OTHER 1D MEASURES OF SPECIFICITY AS SEPERATE COLUMNS TO SEE HOW THEY CHANGE FROM FLAT TO WEIGHTED
+  
   }
 }
 ```
