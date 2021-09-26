@@ -1,0 +1,33 @@
+# flat
+specificity_by_tau <- function(te_matrix){
+  x_hat <- te_matrix/max(te_matrix)
+  tau <- sum(1-x_hat) / (NROW(te_matrix)-1)
+}
+
+# weighted
+calc_weighted_tau <- function(te_matrix, weights_vector){
+  for (i in 1:nrow(te_matrix)){
+    for (j in 1:ncol(te_matrix)) {
+      te_matrix[i,j] <- te_matrix[i,j]/max(te_matrix[i,])
+    }
+  }
+  temp_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (i in 1:nrow(te_matrix)){
+    for (j in 1:ncol(te_matrix)){
+      temp_matrix[i,j] <- te_matrix[i,j] * weights_vector[j]
+      temp_matrix[i,j] <- weights_vector[j] - temp_matrix[i,j]
+    }
+  }
+  tau <- c()
+  den <- sum(weights_vector) - 1
+  for (i in 1:nrow(temp_matrix)){
+    temp <- sum(temp_matrix[i,])
+    temp <- temp/den
+    tau <- append(tau,temp)
+  }
+  return(tau)
+}
+
+test <- apply(gtex,1,specificity_by_tau)
+test_weights <- rep(1,54)
+test2 <- calc_weighted_tau(gtex,test_weights)
