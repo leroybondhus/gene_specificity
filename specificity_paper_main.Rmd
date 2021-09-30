@@ -160,6 +160,30 @@ calc_weighted_zscore_matrix <- function(mat, weights){
   return(weighted_zscores)
 }
 
+
+
+# weighted tau
+calc_weighted_tau <- function(te_matrix, weights_vector){
+  xhat_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  te_row_maxima <- apply(te_matrix, 1, max)
+  for(j in 1:ncol(te_matrix)){
+    xhat_matrix[,j] <- te_matrix[,j] / te_row_maxima
+  }
+  temp_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (i in 1:nrow(te_matrix)){
+    temp_matrix[i,] <- weights_vector - (xhat_matrix[i,] * weights_vector)
+  }
+  tau <- c()
+  den <- sum(weights_vector) - 1
+  for (i in 1:nrow(temp_matrix)){
+    temp <- sum(temp_matrix[i,]) / den
+    tau <- append(tau,temp)
+  }
+  ## add normalization (believe this is a numeric instability issue from dividing small numbers)
+  tau <- tau / max(tau, na.rm=T)
+  return(tau)
+}
+
 ```
 
 ```{r organizing functions into lists}
@@ -167,10 +191,14 @@ calc_weighted_zscore_matrix <- function(mat, weights){
 ## Note: only need the weighted version of each equation as each simplifies to flat version when all weights are 1
 specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              funcs=list(Zscore=calc_weighted_zscore_matrix,
-                                        Tau=NA,
+                                        Tau=calc_weighted_tau,
                                         Tsi=NA,
-                                        Gini=NA
-                             ))
+                                        Gini=NA),
+                             out_type=list(Zscore="matrix",
+                                           Tau="vector",
+                                           Tsi="vector",
+                                           Gini="vector")
+                             )
 ## only 1 similarity function tested for now, can make as list later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 ## only 1 clustering fucntion tested for now, can make as a list later
@@ -203,7 +231,8 @@ spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights)
 flat <- weights; flat[1:length(flat)] <- 1
 spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
 ## plot to look at global dif between flat and weighted
-
+tau_flat <- calc_weighted_tau(exp_mat, flat)
+tau_weighted <- calc_weighted_tau(exp_mat, weights)
 ```
 
 
@@ -227,7 +256,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
   
   num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-  num_reps <- 5
+  num_reps <- 2
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
   cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
@@ -271,18 +300,29 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
       sim_tree <- cluster_func(sim_mat)
       weights <- get_weights(sim_tree, colnames(P1uP2))
       flat <- weights; flat[] <- 1
-      spec_mat_flat <- specificity_func(P1uP2, flat)
-      spec_mat_weighted <- specificity_func(P1uP2, weights)
+      
+      
+      specificity_flat <- specificity_func(P1uP2, flat)
+      specificity_weighted <- specificity_func(P1uP2, weights)
       
       # need to fill in these with spec_score matrices for each n for each method
       # names should match 
       ### restore once error fixed
-      result <- list(
-        P1_weighted_spec_score = spec_mat_weighted[,colnames(P1), drop=F],
-        P1_flat_spec_score = spec_mat_flat[,colnames(P1), drop=F],
-        P2_weighted_spec_score = spec_mat_weighted[,colnames(P2), drop=F],
-        P2_flat_spec_score = spec_mat_flat[,colnames(P2), drop=F]
-      )
+      if(specificity_measures$out_type[[measure]]=="matrix"){
+        result <- list(
+          P1_weighted_spec_score = specificity_weighted[,colnames(P1), drop=F],
+          P1_flat_spec_score = specificity_flat[,colnames(P1), drop=F],
+          P2_weighted_spec_score = specificity_weighted[,colnames(P2), drop=F],
+          P2_flat_spec_score = specificity_flat[,colnames(P2), drop=F]
+        )
+      }else if(specificity_measures$out_type[[measure]]=="vector"){
+        result <- list(P1_weighted_spec_score = specificity_weighted,
+                        P1_flat_spec_score = specificity_flat,
+                        P2_weighted_spec_score = specificity_weighted,
+                        P2_flat_spec_score = specificity_flat
+                        )
+      }
+      
       }
       
       results_P1 <- list()
@@ -403,7 +443,8 @@ gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jacc
   scale_y_continuous(breaks=seq(0,1,by=0.2))+
   facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
 gg
-ggsave( paste(getwd(), "/figures/Figure_2D_v03_jaccard.png",sep=""), gg, dev="png", height = 3.4, width = 6)
+
+#ggsave( paste(getwd(), "/figures/Figure_2D_v03_jaccard.png",sep=""), gg, dev="png", height = 3.4, width = 6)
 ```
 
 
@@ -463,7 +504,7 @@ for(measure in specificity_measures$func_names){
         Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
       draw(h1)
       h2 <-Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
-      draw(h2)
+      draw(h2, padding = unit(c(1, 0.1, 0.1, 0.1), "in"))
   }
   
   
