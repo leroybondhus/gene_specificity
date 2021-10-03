@@ -333,54 +333,75 @@ if(FALSE){ ### these are useful for rough look at trends
 ## output to look at is robustness_test_results
 ```
 ```{r}
+##### P1
+
 P1_zscore <- robustness_test_results[[1]]
 P1_zscore_rep1 <- list()
+P1_zscore_weighted_rep1 <- list()
+P1_zscore_flat_rep1 <- list()
 for (i in 1:13){
   P1_zscore_rep1 <- append(P1_zscore_rep1, P1_zscore[[i]])
+  P1_zscore_weighted_rep1 <- append(P1_zscore_weighted_rep1, P1_zscore_rep1[(2*i)-1])
+  P1_zscore_flat_rep1 <- append(P1_zscore_flat_rep1, P1_zscore_rep1[(2*i)])
 }
+
+delta_P1_zscore_weighted_rep1 <- list()
+baseline_P1_zscore_weighted_rep1 <- as.data.frame(P1_zscore_weighted_rep1[[1]])
+for (i in 2:13){
+  temp <- as.data.frame(P1_zscore_weighted_rep1[[i]])
+  temp <- temp - baseline_P1_zscore_weighted_rep1
+  delta_P1_zscore_weighted_rep1 <- append(delta_P1_zscore_weighted_rep1, list(temp))
+}
+
+delta_P1_zscore_flat_rep1 <- list()
+baseline_P1_zscore_flat_rep1 <- as.data.frame(P1_zscore_flat_rep1[[1]])
+for (i in 2:13){
+  temp <- as.data.frame(P1_zscore_flat_rep1[[i]])
+  temp <- temp - baseline_P1_zscore_flat_rep1
+  delta_P1_zscore_flat_rep1 <- append(delta_P1_zscore_flat_rep1, list(temp))
+}
+
 P1_weighted_zscore_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
-for (i in 1:13){
-  P1_weighted_zscore_temp_df <- unlist(data.frame(P1_zscore_rep1[[(2*i)-1]]))
+for (i in 1:12){
+  P1_weighted_zscore_temp_df <- unlist(data.frame(delta_P1_zscore_weighted_rep1[[i]]))
   P1_weighted_zscore_temp_hist <- hist(P1_weighted_zscore_temp_df, breaks = 100, plot=F)
   P1_weighted_zscore_hist_objs <- rbind(P1_weighted_zscore_hist_objs, data.frame(counts=P1_weighted_zscore_temp_hist$counts, mids=P1_weighted_zscore_temp_hist$mids, sample_num=rep(i, length(P1_weighted_zscore_temp_hist$counts))))
 }
 ggplot(P1_weighted_zscore_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
   geom_tile(aes(fill=log10(counts)), alpha=1) +
   scale_fill_viridis_b() +
-  labs(title="Change in Weighted Z-Score for \n Added Brain Columns From N=1 to N=13", x="Change in Weighted Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
-  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-7,10), breaks = seq(-7,10,1)) + scale_y_continuous(limits = c(0.5,13.5), breaks=seq(0,13,1))
-```
-```{r}
+  labs(title="Change in Weighted Z-Score for \n Added Brain Columns From N=1 to N=12", x="Change in Weighted Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
+  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-5.5,2), breaks = seq(-5.5,2,1)) + scale_y_continuous(limits = c(1.5,12.5), breaks=seq(1,12,1))
+
 P1_flat_zscore_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
-for (i in 1:13){
-  P1_flat_zscore_temp_df <- unlist(data.frame(P1_zscore_rep1[[(2*i)]]))
+for (i in 1:12){
+  P1_flat_zscore_temp_df <- unlist(data.frame(delta_P1_zscore_flat_rep1[[i]]))
   P1_flat_zscore_temp_hist <- hist(P1_flat_zscore_temp_df, breaks = 100, plot=F)
   P1_flat_zscore_hist_objs <- rbind(P1_flat_zscore_hist_objs, data.frame(counts=P1_flat_zscore_temp_hist$counts, mids=P1_flat_zscore_temp_hist$mids, sample_num=rep(i, length(P1_flat_zscore_temp_hist$counts))))
 }
 ggplot(P1_flat_zscore_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
   geom_tile(aes(fill=log10(counts)), alpha=1) +
   scale_fill_viridis_b() +
-  labs(title="Change in Flat Z-Score for \n Added Brain Columns From N=1 to N=13", x="Change in Flat Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
-  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-7,8), breaks = seq(-7,8,1)) + scale_y_continuous(limits = c(0.5,13.5), breaks=seq(0,13,1))
-```
-```{r}
+  labs(title="Change in Flat Z-Score for \n Added Brain Columns From N=1 to N=12", x="Change in Flat Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
+  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-7,2.5), breaks = seq(-7,2.5,1)) + scale_y_continuous(limits = c(1.5,12.5), breaks=seq(1,12,1))
+
 P1_weighted_zscore_var <- c()
-for(i in 1:13){
-  P1_weighted_zscore_temp_df_var <- unlist(data.frame(P1_zscore_rep1[[(2*i)-1]]))
+for(i in 1:12){
+  P1_weighted_zscore_temp_df_var <- unlist(data.frame(delta_P1_zscore_weighted_rep1[[i]]))
   P1_weighted_zscore_temp_df_var <- na.omit(P1_weighted_zscore_temp_df_var)
   P1_weighted_zscore_temp_df_var <- var(P1_weighted_zscore_temp_df_var)
   P1_weighted_zscore_var <- append(P1_weighted_zscore_var,P1_weighted_zscore_temp_df_var)
 }
-plot(1:13, P1_weighted_zscore_var)
+plot(1:12, P1_weighted_zscore_var)
 
 P1_flat_zscore_var <- c()
 for(i in 1:13){
-  P1_flat_zscore_temp_df_var <- unlist(data.frame(P1_zscore_rep1[[(2*i)]]))
+  P1_flat_zscore_temp_df_var <- unlist(data.frame(delta_P1_zscore_flat_rep1[[i]]))
   P1_flat_zscore_temp_df_var <- na.omit(P1_flat_zscore_temp_df_var)
   P1_flat_zscore_temp_df_var <- var(P1_flat_zscore_temp_df_var)
   P1_flat_zscore_var <- append(P1_flat_zscore_var,P1_flat_zscore_temp_df_var)
 }
-plot(1:13, P1_flat_zscore_var)
+plot(1:12, P1_flat_zscore_var)
 
 plot(P1_flat_zscore_var,type = "o",col = "red",xlab="Number of Brain Columns Added",ylab="Variance of Change in Z-Score",main="Variance of Change in Z-Score for Weighted vs. Flat Method")
 lines(P1_weighted_zscore_var, type = "o", col = "blue")
@@ -391,8 +412,195 @@ numTicks <- xMax / stepSize
 v1 <- c(0:numTicks)*stepSize
 axis(side=1, at=v1, labels=v1)
 ```
+```{r}
+##### P2
 
+P2_zscore <- robustness_test_results[[2]]
+P2_zscore_rep1 <- list()
+P2_zscore_weighted_rep1 <- list()
+P2_zscore_flat_rep1 <- list()
+for (i in 1:13){
+  P2_zscore_rep1 <- append(P2_zscore_rep1, P2_zscore[[i]])
+  P2_zscore_weighted_rep1 <- append(P2_zscore_weighted_rep1, P2_zscore_rep1[(2*i)-1])
+  P2_zscore_flat_rep1 <- append(P2_zscore_flat_rep1, P2_zscore_rep1[(2*i)])
+}
 
+delta_P2_zscore_weighted_rep1 <- list()
+baseline_P2_zscore_weighted_rep1 <- as.data.frame(P2_zscore_weighted_rep1[[1]])
+for (i in 2:13){
+  temp <- as.data.frame(P2_zscore_weighted_rep1[[i]])
+  temp <- temp[,1:ncol(baseline_P2_zscore_weighted_rep1)]
+  temp <- temp - baseline_P2_zscore_weighted_rep1
+  delta_P2_zscore_weighted_rep1 <- append(delta_P2_zscore_weighted_rep1, list(temp))
+}
+
+delta_P2_zscore_flat_rep1 <- list()
+baseline_P2_zscore_flat_rep1 <- as.data.frame(P2_zscore_flat_rep1[[1]])
+for (i in 2:13){
+  temp <- as.data.frame(P2_zscore_flat_rep1[[i]])
+  temp <- temp[,1:ncol(baseline_P2_zscore_flat_rep1)]
+  temp <- temp - baseline_P2_zscore_flat_rep1
+  delta_P2_zscore_flat_rep1 <- append(delta_P2_zscore_flat_rep1, list(temp))
+}
+
+P2_weighted_zscore_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:12){
+  P2_weighted_zscore_temp_df <- unlist(data.frame(delta_P2_zscore_weighted_rep1[[i]]))
+  P2_weighted_zscore_temp_hist <- hist(P2_weighted_zscore_temp_df, breaks = 100, plot=F)
+  P2_weighted_zscore_hist_objs <- rbind(P2_weighted_zscore_hist_objs, data.frame(counts=P2_weighted_zscore_temp_hist$counts, mids=P2_weighted_zscore_temp_hist$mids, sample_num=rep(i, length(P2_weighted_zscore_temp_hist$counts))))
+}
+ggplot(P2_weighted_zscore_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Weighted Z-Score for \n Added Brain Columns From N=1 to N=12", x="Change in Weighted Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
+  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-4.5,4), breaks = seq(-4.5,4,1)) + scale_y_continuous(limits = c(1.5,12.5), breaks=seq(1,12,1))
+
+P2_flat_zscore_hist_objs <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:12){
+  P2_flat_zscore_temp_df <- unlist(data.frame(delta_P2_zscore_flat_rep1[[i]]))
+  P2_flat_zscore_temp_hist <- hist(P2_flat_zscore_temp_df, breaks = 100, plot=F)
+  P2_flat_zscore_hist_objs <- rbind(P2_flat_zscore_hist_objs, data.frame(counts=P2_flat_zscore_temp_hist$counts, mids=P2_flat_zscore_temp_hist$mids, sample_num=rep(i, length(P2_flat_zscore_temp_hist$counts))))
+}
+ggplot(P2_flat_zscore_hist_objs, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Flat Z-Score for \n Added Brain Columns From N=1 to N=12", x="Change in Flat Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
+  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-6,3.5), breaks = seq(-6,3.5,1)) + scale_y_continuous(limits = c(1.5,12.5), breaks=seq(1,12,1))
+
+P2_weighted_zscore_var <- c()
+for(i in 1:12){
+  P2_weighted_zscore_temp_df_var <- unlist(data.frame(delta_P2_zscore_weighted_rep1[[i]]))
+  P2_weighted_zscore_temp_df_var <- na.omit(P2_weighted_zscore_temp_df_var)
+  P2_weighted_zscore_temp_df_var <- var(P2_weighted_zscore_temp_df_var)
+  P2_weighted_zscore_var <- append(P2_weighted_zscore_var,P2_weighted_zscore_temp_df_var)
+}
+plot(1:12, P2_weighted_zscore_var)
+
+P2_flat_zscore_var <- c()
+for(i in 1:13){
+  P2_flat_zscore_temp_df_var <- unlist(data.frame(delta_P2_zscore_flat_rep1[[i]]))
+  P2_flat_zscore_temp_df_var <- na.omit(P2_flat_zscore_temp_df_var)
+  P2_flat_zscore_temp_df_var <- var(P2_flat_zscore_temp_df_var)
+  P2_flat_zscore_var <- append(P2_flat_zscore_var,P2_flat_zscore_temp_df_var)
+}
+plot(1:12, P2_flat_zscore_var)
+
+plot(P2_flat_zscore_var,type = "o",col = "red",xlab="Number of Brain Columns Added",ylab="Variance of Change in Z-Score",main="Variance of Change in Z-Score for Weighted vs. Flat Method - P2")
+lines(P2_weighted_zscore_var, type = "o", col = "blue")
+
+stepSize <- 1
+xMax <- 13
+numTicks <- xMax / stepSize
+v1 <- c(0:numTicks)*stepSize
+axis(side=1, at=v1, labels=v1)
+```
+```{r}
+##### P1, rep2
+
+P1_zscore <- robustness_test_results[[1]]
+P1_zscore_rep2 <- list()
+P1_zscore_weighted_rep2 <- list()
+P1_zscore_flat_rep2 <- list()
+for (i in 14:26){
+  P1_zscore_rep2 <- append(P1_zscore_rep2, P1_zscore[[i]])
+}
+for (i in 1:13){
+  P1_zscore_weighted_rep2 <- append(P1_zscore_weighted_rep2, P1_zscore_rep2[(2*i)-1])
+  P1_zscore_flat_rep2 <- append(P1_zscore_flat_rep2, P1_zscore_rep2[(2*i)])
+}
+
+delta_P1_zscore_weighted_rep2 <- list()
+baseline_P1_zscore_weighted_rep2 <- as.data.frame(P1_zscore_weighted_rep2[[1]])
+for (i in 2:13){
+  temp <- as.data.frame(P1_zscore_weighted_rep2[[i]])
+  temp <- temp - baseline_P1_zscore_weighted_rep2
+  delta_P1_zscore_weighted_rep2 <- append(delta_P1_zscore_weighted_rep2, list(temp))
+}
+
+delta_P1_zscore_flat_rep2 <- list()
+baseline_P1_zscore_flat_rep2 <- as.data.frame(P1_zscore_flat_rep2[[1]])
+for (i in 2:13){
+  temp <- as.data.frame(P1_zscore_flat_rep2[[i]])
+  temp <- temp - baseline_P1_zscore_flat_rep2
+  delta_P1_zscore_flat_rep2 <- append(delta_P1_zscore_flat_rep2, list(temp))
+}
+
+P1_weighted_zscore_hist_objs_rep2 <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:12){
+  P1_weighted_zscore_temp_df_rep2 <- unlist(data.frame(delta_P1_zscore_weighted_rep2[[i]]))
+  P1_weighted_zscore_temp_hist_rep2 <- hist(P1_weighted_zscore_temp_df_rep2, breaks = 100, plot=F)
+  P1_weighted_zscore_hist_objs_rep2 <- rbind(P1_weighted_zscore_hist_objs_rep2, data.frame(counts=P1_weighted_zscore_temp_hist_rep2$counts, mids=P1_weighted_zscore_temp_hist_rep2$mids, sample_num=rep(i, length(P1_weighted_zscore_temp_hist_rep2$counts))))
+}
+ggplot(P1_weighted_zscore_hist_objs_rep2, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Weighted Z-Score for \n Added Brain Columns From N=1 to N=12, Rep. 2", x="Change in Weighted Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
+  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-5.5,2), breaks = seq(-5.5,2,1)) + scale_y_continuous(limits = c(1.5,12.5), breaks=seq(1,12,1))
+
+P1_flat_zscore_hist_objs_rep2 <- data.frame(counts=numeric(), mids=numeric(), sample_num=numeric())
+for (i in 1:12){
+  P1_flat_zscore_temp_df_rep2 <- unlist(data.frame(delta_P1_zscore_flat_rep2[[i]]))
+  P1_flat_zscore_temp_hist_rep2 <- hist(P1_flat_zscore_temp_df_rep2, breaks = 100, plot=F)
+  P1_flat_zscore_hist_objs_rep2 <- rbind(P1_flat_zscore_hist_objs_rep2, data.frame(counts=P1_flat_zscore_temp_hist_rep2$counts, mids=P1_flat_zscore_temp_hist_rep2$mids, sample_num=rep(i, length(P1_flat_zscore_temp_hist_rep2$counts))))
+}
+ggplot(P1_flat_zscore_hist_objs_rep2, aes(x=mids, y=sample_num, width=1, height=1)) +
+  geom_tile(aes(fill=log10(counts)), alpha=1) +
+  scale_fill_viridis_b() +
+  labs(title="Change in Flat Z-Score for \n Added Brain Columns From N=1 to N=12, Rep. 2", x="Change in Flat Z-Score", y="N = Number of Brain Columns Added", fill="log10(Counts)") + 
+  theme(plot.title=element_text(hjust=0.5)) + scale_x_continuous(limits = c(-7,2.5), breaks = seq(-7,2.5,1)) + scale_y_continuous(limits = c(1.5,12.5), breaks=seq(1,12,1))
+
+P1_weighted_zscore_var_rep2 <- c()
+for(i in 1:12){
+  P1_weighted_zscore_temp_df_var_rep2 <- unlist(data.frame(delta_P1_zscore_weighted_rep2[[i]]))
+  P1_weighted_zscore_temp_df_var_rep2 <- na.omit(P1_weighted_zscore_temp_df_var_rep2)
+  P1_weighted_zscore_temp_df_var_rep2 <- var(P1_weighted_zscore_temp_df_var_rep2)
+  P1_weighted_zscore_var_rep2 <- append(P1_weighted_zscore_var_rep2,P1_weighted_zscore_temp_df_var_rep2)
+}
+plot(1:12, P1_weighted_zscore_var_rep2)
+
+P1_flat_zscore_var_rep2 <- c()
+for(i in 1:13){
+  P1_flat_zscore_temp_df_var_rep2 <- unlist(data.frame(delta_P1_zscore_flat_rep2[[i]]))
+  P1_flat_zscore_temp_df_var_rep2 <- na.omit(P1_flat_zscore_temp_df_var_rep2)
+  P1_flat_zscore_temp_df_var_rep2 <- var(P1_flat_zscore_temp_df_var_rep2)
+  P1_flat_zscore_var_rep2 <- append(P1_flat_zscore_var_rep2,P1_flat_zscore_temp_df_var_rep2)
+}
+plot(1:12, P1_flat_zscore_var_rep2)
+
+plot(P1_flat_zscore_var_rep2,type = "o",col = "red",xlab="Number of Brain Columns Added",ylab="Variance of Change in Z-Score",main="Variance of Change in Z-Score for \nWeighted vs. Flat Method, Rep. 2")
+lines(P1_weighted_zscore_var_rep2, type = "o", col = "blue")
+
+stepSize <- 1
+xMax <- 13
+numTicks <- xMax / stepSize
+v1 <- c(0:numTicks)*stepSize
+axis(side=1, at=v1, labels=v1)
+
+replicates <- c(rep(1,24),rep(2,24))
+type <- c(rep("Flat",12),rep("Weighted",12),rep("Flat",12),rep("Weighted",12))
+var <-c(P1_flat_zscore_var, P1_weighted_zscore_var, P1_flat_zscore_var_rep2, P1_weighted_zscore_var_rep2)
+n <- c(rep(1:12,4))
+boxplot_data <- data.frame(n,type,var,replicates)
+
+boxplot_data$n <- as.factor(boxplot_data$n)
+ggplot(boxplot_data, aes(x=n, y=var, fill=type)) + 
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0,0.06), breaks = seq(0,0.06,0.005)) +
+  stat_summary(fun=median, geom="line", aes(group=factor(type)), size=0.5) +
+  labs(title="Variance in Change in Z-Score \n for Added Brain Columns", x="Number of Added Brain Columns", y="Variance in Change in Z-Score", fill="Method") +
+  theme(plot.title=element_text(hjust=0.5))
+
+boxplot_data$n <- as.numeric(boxplot_data$n)
+ggplot(boxplot_data, aes(x=n, y=var, fill=type, color=type)) + 
+  geom_smooth() +
+  geom_point()+
+  geom_ribbon(aes(ymin=min(var),ymax=max(var),xmin=min(n),xmax=max(n))) +
+  scale_y_continuous(limits = c(0,0.06), breaks = seq(0,0.06,0.005)) +
+  scale_x_continuous(limits = c(1,12), breaks = seq(1,12,1)) +
+  labs(title="Variance in Change in Z-Score \n for Added Brain Columns", x="Number of Added Brain Columns", y="Variance in Change in Z-Score", fill="Method") +
+  theme(plot.title=element_text(hjust=0.5)) +
+  guides(color=FALSE)
+```
 ```{r flat v weighted comparisons}
 if(FALSE){
   specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
