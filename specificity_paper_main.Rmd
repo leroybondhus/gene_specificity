@@ -256,7 +256,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
   
   num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-  num_reps <- 2
+  num_reps <- 5
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
   cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
@@ -345,6 +345,55 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
 } ## end of chunk control
 ## output to look at is robustness_test_results
+```
+
+```{r Figure_2C}
+
+specificity_measures$func_names
+df_robustness_test_results <- data.frame(measure=character(),
+                                         P1orP2=character(),
+                                         weight_or_flat=character(),
+                                         n=numeric(),
+                                         rep=numeric(),
+                                         variance=numeric()
+                                         )
+
+for(el in 1:length(robustness_test_results)){
+  temp_name <- str_split_fixed(names(robustness_test_results[el]),"_",2)
+  
+  temp_len <- length(robustness_test_results[[el]]) ## each has weighted and flat
+  temp_df <- data.frame(measure=rep(temp_name[2],temp_len),
+                        P1orP2=rep(temp_name[1],temp_len),
+                        weight_or_flat=character(temp_len),
+                        n=numeric(temp_len),
+                        rep=numeric(temp_len),
+                        variance=numeric(temp_len))
+  temp_df_list <- list("weighted"=temp_df, "flat"=temp_df)
+  temp_df_list[["weighted"]]$weight_or_flat <- "weighted"
+  temp_df_list[["flat"]]$weight_or_flat <- "flat"
+  
+  ## build the temp_dfs in these loops
+  for(i in 1:length(robustness_test_results[[el]])){
+    for(f_or_w in c("flat","weighted")){
+      temp_name <- str_split_fixed(names(robustness_test_results[[el]][i]),"[,=]",4)
+      temp_df_list[[f_or_w]]$rep[i] <- temp_name[,grep("rep", temp_name)+1]
+      temp_df_list[[f_or_w]]$n[i] <- temp_name[,grep("n", temp_name)+1]
+      temp <- robustness_test_results[[el]][[i]]
+      temp <- temp[[grep(f_or_w, names(temp))]]
+      
+      ## baseline matched on replicate, and is set at n=1
+      temp_baseline <- robustness_test_results[[el]][[paste("rep=",temp_name[,grep("rep", temp_name)+1],",n=1",sep="")]]
+      temp_baseline <- temp_baseline[[grep(f_or_w, names(temp_baseline))]]
+      
+      temp_df_list[[f_or_w]]$variance[i] <- var(as.vector(as.matrix(temp)) - as.vector(as.matrix(temp_baseline)), na.rm=T)
+    }
+  }
+  ## compile temp_dfs into final result
+  df_robustness_test_results <- rbind(df_robustness_test_results, temp_df_list[["weighted"]], temp_df_list[["flat"]])
+  
+}
+
+
 ```
 
 
