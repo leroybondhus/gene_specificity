@@ -513,6 +513,160 @@ return(count)
 weight_simi_it(exp_mat)
 ```
 
+#gene ontology 
+```{r}
+
+#if flat > weight 
+#if flat < weight 
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("clusterProfiler")
+BiocManager::install("DOSE")
+BiocManager::install("org.Hs.eg.db")
+BiocManager::install("pathview")
+library(DOSE)
+library(pathview)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+
+
+tem <- tempfile()
+download.file("https://raw.githubusercontent.com/hbctraining/DGE_workshop_salmon_online/master/data/annotations_ahb.csv",tem)
+annotations_ahb<- read.table( tem, skip=0, header = TRUE, sep = ",")
+```
+#finding specific genes 
+```{r}
+ library(tidyverse)
+y<-rownames(spec_mat_flat)
+gene_names<-str_split_fixed(y,"[.]",2)
+gene_names<-gene_names[,1]
+gene_names[1]
+tissue_names<-colnames(spec_mat_flat)
+x
+genes_spec <- data.frame(NULL,NULL,NULL,NULL)
+
+########
+for(j in 1:ncol(spec_mat_weighted)){
+ for(i in 1:nrow(spec_mat_weighted)){ #get rid of loop
+      if(is.na(spec_mat_flat[i,j]>=2.0 && spec_mat_weighted[i,j]<=2.0)){
+      print("NA")
+    }else if(spec_mat_flat[i,j]>=2.0 && spec_mat_weighted[i,j]<=2.0){ #get rid of this if statement 
+      #which <- which((spec_mat_flat[,j]>=2.0 & spec_mat_weighted[,j]<=2.0))
+      genes_spec[i,1]<- colnames(spec_mat_flat)[j]
+      genes_spec[i,2]<- gene_names[i]
+      genes_spec[i,3]<-spec_mat_flat[i,j] 
+      genes_spec[i,4]<-spec_mat_weighted[i,j]
+      genes_spec[i,5]<-(spec_mat_flat[i,j] - spec_mat_weighted[i,j])
+      genes_spec[i,6]<-(spec_mat_weighted[i,j] - spec_mat_flat[i,j])
+    }else{
+      print("not specific")
+    }
+  }
+}
+########## 
+vec1 <- character()
+#diff_1<-character()
+for(j in 1:ncol(spec_mat_weighted)){
+ which<-which((spec_mat_flat[,j]>=2.0 & spec_mat_weighted[,j]<=2.0))
+which<-as.matrix(which)
+  which<- rownames(which)
+  which<-str_split_fixed(which, "[.]", 2)
+  which<- which[,1]
+   vec1 <- c(vec1, which)
+  # difference1<-as.character(which(spec_mat_flat[,j]>=2.0 & spec_mat_weighted[,j]<=2.0))
+  # diff_1<-c(diff_1,difference1)
+}
+
+
+vec1<-unique(vec1) #unique vector for gene ids of flat >2 and weighted < 2 
+#diff_1<-as.numeric(diff_1)
+#hist(diff_1)
+
+
+
+vec2 <- character()
+#diff_2<-character()
+for(j in 1:ncol(spec_mat_weighted)){
+ which<-which((spec_mat_flat[,j]<=2.0 & spec_mat_weighted[,j]>=2.0))
+which<-as.matrix(which)
+  which<- rownames(which)
+  which<-str_split_fixed(which, "[.]", 2)
+  which<- which[,1]
+   vec2 <- c(vec2, which)
+ #   difference<-as.character(which(spec_mat_flat[,j]<=2.0 & spec_mat_weighted[,j]>=2.0))
+  # diff_2<-c(diff_2,difference)
+}
+
+vec2<-unique(vec2)
+#diff_2<-as.numeric(diff_2)
+#hist(diff_2)
+
+   
+
+
+
+ 
+ 
+ 
+ 
+
+
+```
+#plotting 
+```{r}
+data_spec<-as.data.frame(gene_names)
+library(data.table)
+colnames(data_spec)<- c("gene")
+res_ids <- left_join(data_spec, annotations_ahb, by=c("gene"="gene_id")) 
+res_ids
+
+
+
+
+allOE_genes <- as.character(res_ids$gene)
+## Extract significant results
+sigOE <- vec2 #specific genes 
+names(sigOE)<- c("gene_id")
+sigOE_genes <- as.character(vec2) #specific genes 
+names(sigOE_genes)<- c("gene_id")
+View(allOE_genes)
+View(sigOE_genes)
+View(res_ids)
+
+ego <- enrichGO(gene = sigOE_genes, 
+                universe = allOE_genes,
+                keyType = "ENSEMBL",
+                OrgDb = org.Hs.eg.db, 
+                ont = "BP", 
+                pAdjustMethod = "BH",
+                qvalueCutoff = 0.05,
+                readable = TRUE)
+
+
+
+cluster_summary <- data.frame(ego)
+cluster_summary
+write.csv(cluster_summary, "results/clusterProfiler_Mov10oe.csv")
+
+
+dotplot(ego, showCategory=50)
+
+
+png("weight>flat.png",width=1000,height=900)
+dotplot(ego, showCategory=50)#top 20 
+dev.off()
+
+
+#reference package - methods 
+#fraction that looks like brain 
+#
+
+```
+
+
+
+
 
 
 
