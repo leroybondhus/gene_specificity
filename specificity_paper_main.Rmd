@@ -548,7 +548,7 @@ df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersec
                                                         cut_point=df$cut_point, P1orP2=df$P1orP2,
                                                         weighted=df$weighted),
                                                         FUN=function(x) mean(x,na.rm = TRUE) )$x 
-ggl <- list()
+ggl_jacc <- list()
 for(measure in unique(df_summary_by_partition$measure)){
   which <- which(df_summary_by_partition$measure == measure)
   gg <- ggplot(df_summary_by_partition[which,],
@@ -568,8 +568,31 @@ for(measure in unique(df_summary_by_partition$measure)){
   }else{ gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))}
   gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
   plot(gg)
-  ggl[[measure]] <- gg
+  ggl_jacc[[measure]] <- gg
 }
+
+ggl_count <- list()
+for(measure in unique(df_summary_by_partition$measure)){
+  which <- which(df_summary_by_partition$measure == measure)
+  gg <- ggplot(df_summary_by_partition[which,],
+               aes(x=cut_point, y=gene_count,
+                   group=n, fill=n))+
+    theme_bw()+
+    theme(
+          panel.grid.minor.x = element_blank())+
+    ggtitle(paste("jaccard index for ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
+    geom_line(aes(color=n))+
+    scale_color_continuous(low="steelblue2", high="steelblue4")+
+    scale_y_log10()+
+    facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  if(measure=="Zscore"){gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
+  }else{ gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))}
+  gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  plot(gg)
+  ggl_count[[measure]] <- gg
+}
+
+
 
 #ggsave( paste(getwd(), "/figures/Figure_2D_v03_jaccard.png",sep=""), gg, dev="png", height = 3.4, width = 6)
 ```
