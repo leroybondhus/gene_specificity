@@ -1,58 +1,4 @@
-##### GINI
-
-# weighted
-calc_weighted_gini <- function(te_matrix,weights_vector){
-  first_term <- (sum(weights_vector) + 1) / sum(weights_vector)
-  ordered_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
-  for (i in 1:nrow(te_matrix)){
-    ordered_matrix[i,] <- sort(te_matrix[i,])
-  }
-  weighted_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
-  weights_vector <- as.matrix(weights_vector)
-  for (m in 1:nrow(weights_vector)){
-    weighted_matrix[,m] <- weights_vector[m,1]*ordered_matrix[,m]
-  }
-  sum_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
-  for (i in 1:nrow(te_matrix)){
-    par <- sum(weights_vector) + 1 + i
-    for (j in 1:ncol(te_matrix)){
-      sum_matrix [i,j] <- par*weighted_matrix[i,j]
-    }
-  }
-  row_sums <- apply(sum_matrix,1,sum)
-  row_sums <- 2*row_sums
-  weighted_sums <- apply(weighted_matrix,1,sum)
-  gini <- c()
-  for (i in 1:nrow(te_matrix)){
-    gini_temp <- first_term - (row_sums[i] / (sum(weights_vector) * weighted_sums[i]))
-    gini <- append(gini,gini_temp)
-  }
-  return(gini)
-}
-
-# flat
-specificity_by_gini <- function(te_matrix){
-  gini_values <- list()
-  for (i in 1:nrow(te_matrix)){
-    temp <- as.numeric(te_matrix[i,])
-    temp <- gini(temp)
-    gini_values <- append(gini_values,temp)
-  }
-  return(gini_values)
-}
-
-flat_test <- as.numeric(specificity_by_gini(gtex))
-weighted_test <- calc_weighted_gini(gtex,test_weights)
-
-##### TAU
-
-# flat
-specificity_by_tau <- function(te_matrix){
-  x_hat <- te_matrix/max(te_matrix)
-  tau <- sum(1-x_hat) / (NROW(te_matrix)-1)
-}
-
-# weighted
+```{r}
 calc_weighted_tau <- function(te_matrix, weights_vector){
   xhat_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
   for (i in 1:nrow(te_matrix)){
@@ -76,7 +22,48 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
   }
   return(tau)
 }
+```
+```{r}
+specificity_by_tsi <- function(te_matrix){
+  a <- max(te_matrix)
+  b <- sum(te_matrix)
+  tsi <- a/b
+}
 
-test <- apply(gtex,1,specificity_by_tau) # flat
-test_weights <- rep(1,54)
-test2 <- calc_weighted_tau(gtex,test_weights) # weighted
+calc_weighted_tsi <- function(te_matrix,weights_vector){
+  tsi <- c()
+  weights_vector <- as.matrix(weights_vector)
+  weighted_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (m in 1:nrow(weights_vector)){
+    weighted_matrix[,m] <- weights_vector[m,1]*te_matrix[,m]
+  }
+  for (i in 1:nrow(te_matrix)){
+    num <- max(weighted_matrix[i,])
+    den <- sum(weighted_matrix[i,])
+    temp <- num/den
+    tsi <- append(tsi,temp)
+  }
+  return(tsi)
+}
+```
+```{r}
+specificity_by_gini <- function(te_matrix){
+  gini_values <- list()
+  for (i in 1:nrow(te_matrix)){
+    temp <- as.numeric(te_matrix[i,])
+    temp <- gini(temp)
+    gini_values <- append(gini_values,temp)
+  }
+  return(gini_values)
+}
+
+calc_weighted_gini <- function(te_matrix, weights_vector){
+   gini_values <- list()
+  for (i in 1:nrow(te_matrix)){
+    temp <- as.numeric(te_matrix[i,])
+    temp <- gini(temp, weights_vector)
+    gini_values <- append(gini_values,temp)
+  }
+  return(gini_values)
+}
+```
