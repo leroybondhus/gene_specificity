@@ -256,7 +256,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
   
   num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-  num_reps <- 3
+  num_reps <- 5
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
   cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
@@ -411,16 +411,6 @@ df_summary_by_partition$sd_of_var <- aggregate(df$variance,
                                              n=df$n),
                                      FUN=function(x) sd(x,na.rm=TRUE))$x
 
-ggplot(df_robustness_test_results, aes(x=n, y=variance, group=weight_or_flat, color=weight_or_flat, fill=weight_or_flat)) +
-  geom_line()+
-  facet_grid(measure ~ P1orP2, scales = "free")
-
-which <- which(df_summary_by_partition$measure == "Tau")
-ggplot(df_summary_by_partition[which,], aes(x=n, y=mean_var, group=weight_or_flat, color=weight_or_flat, fill=weight_or_flat)) +
-  geom_line()+
-  facet_grid(P1orP2 ~ . , scales = "free")
-
-
 which <- which(df_summary_by_partition$measure == "Zscore")
 which2 <- which(df_robustness_test_results$measure == "Zscore")
 temp <- df_summary_by_partition
@@ -438,6 +428,7 @@ gg <- ggplot(df_summary_by_partition[which,], aes(x=n, y=mean_var)) +
   scale_x_continuous(limits = c(0,13), breaks=seq(0,12,by=1), expand = c(0,0))+
   facet_grid(P1orP2 ~ . , scales = "free")
 
+gg
 filename <- paste(figures_dir,"/",date,"_variance_non-random.png",sep = "")
 ggsave(filename, gg, device = "png", width = 6, height = 6)
 ```
@@ -454,10 +445,12 @@ date <- format(Sys.time(), format="%Y%m%d")
 
 ## jaccard between n = 1 and n = num_brain_samples for brain v non-brain OR P1 v P2 
 
-df <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
+df <- data.frame(measure=character(), n=numeric(),
+                 rep=numeric(), cut_point=numeric(),
                  jaccard=numeric(), P1orP2=character(),
                  weighted=logical(), samp=character(),
-                 gene_count=numeric(), gene_count_baseline=numeric(), gene_count_intersect=numeric())
+                 gene_count=numeric(), gene_count_baseline=numeric(),
+                 gene_count_intersect=numeric())
 ## nested for loop builds df of jaccard results for plotting
 Sys.time()
 for(el in names(robustness_test_results)){
@@ -471,27 +464,38 @@ for(el in names(robustness_test_results)){
   df_temp <- foreach(i=1:length(robustness_test_results[[el]]), .errorhandling = "pass", .combine = rbind) %dopar% {
     #foreach(perm=1:length(permutation_matrix), .errorhandling = "pass", .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
     
-    df_internal <- data.frame(n=numeric(), rep=numeric(), cut_point=numeric(),
-                 jaccard=numeric(), P1orP2=character(),
-                 weighted=logical(), samp=character(),
-                 gene_count=numeric(), gene_count_baseline=numeric(), gene_count_intersect=numeric())
+    df_internal <- data.frame(measure=character(), n=numeric(),
+                              rep=numeric(), cut_point=numeric(), 
+                              jaccard=numeric(), P1orP2=character(),
+                              weighted=logical(), samp=character(),
+                              gene_count=numeric(), gene_count_baseline=numeric(),
+                              gene_count_intersect=numeric())
     
     n = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,4])
     rep = as.numeric(str_split_fixed(names(robustness_test_results[[el]][i]), "[=,]", n=4 )[,2])
     for(weighted_or_flat in c("weighted","flat")){
       baseline_name <- names(robustness_test_results[[el]])[grep(paste("rep=",rep,",n=",1,"$", sep = ""),names(robustness_test_results[[el]]) )]
       
-      weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[baseline_name]]))
-      baseline_mat <-  robustness_test_results[[el]][[baseline_name]][[weighted_flat_index]]
+      if(specificity_measures$out_type[measure] == "matrix"){
+        weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[baseline_name]]))
+        baseline_mat <-  robustness_test_results[[el]][[baseline_name]][[weighted_flat_index]]
+        weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[i]]))
+        temp_mat <- robustness_test_results[[el]][[i]][[weighted_flat_index]][,colnames(baseline_mat),drop=FALSE]  
+      }else if(specificity_measures$out_type[measure] == "vector"){
+        weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[baseline_name]]))
+        baseline_mat <-  as.matrix(robustness_test_results[[el]][[baseline_name]][[weighted_flat_index]])
+        weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[i]]))
+        temp_mat <- as.matrix(robustness_test_results[[el]][[i]][[weighted_flat_index]])         
+      }else{ stop("WARNING: no out type associated with measure") }
       
-      weighted_flat_index <- grep(weighted_or_flat,names(robustness_test_results[[el]][[i]]))
-      temp_mat <- robustness_test_results[[el]][[i]][[weighted_flat_index]][,colnames(baseline_mat),drop=FALSE]
       ncols <- ncol(temp_mat); ncuts <- length(cuts)
-      temp_df <- data.frame(n=rep(n, ncols*ncuts), rep=rep(rep, ncols*ncuts), cut_point=numeric(length=ncols*ncuts),
-                   jaccard=numeric(length=ncols*ncuts), P1orP2=rep(P1orP2, ncols*ncuts),
-                   weighted=rep( grepl("weighted", weighted_or_flat), ncols*ncuts), samp=character(length=ncols*ncuts),
-                   gene_count=numeric(length=ncols*ncuts), gene_count_baseline=numeric(length=ncols*ncuts),
-                   gene_count_intersect=numeric(length=ncols*ncuts)  )
+      temp_df <- data.frame(measure=rep(measure, ncols*ncuts), n=rep(n, ncols*ncuts),
+                            rep=rep(rep, ncols*ncuts), cut_point=numeric(length=ncols*ncuts),
+                            jaccard=numeric(length=ncols*ncuts), P1orP2=rep(P1orP2, ncols*ncuts),
+                            weighted=rep( grepl("weighted", weighted_or_flat), ncols*ncuts),
+                            samp=character(length=ncols*ncuts),
+                            gene_count=numeric(length=ncols*ncuts), gene_count_baseline=numeric(length=ncols*ncuts),
+                            gene_count_intersect=numeric(length=ncols*ncuts)  )
       for(s in 1:ncol(temp_mat) ){  ## add a row to df for each sample   
         for(cut_index in 1:length(cuts)){
           ind <- (s-1)*length(cuts)+cut_index  ### use arr_ind here instead
@@ -509,7 +513,9 @@ for(el in names(robustness_test_results)){
             temp_df[ind,]$gene_count_baseline <-  length( which(baseline_mat[,s] > cuts[cut_index]  ) )
             temp_df[ind,]$gene_count_intersect <-  length( which( baseline_mat[,s] > cuts[cut_index] & temp_mat[,s] > cuts[cut_index]  ))
           }
-          temp_df[ind,]$samp <- unique(colnames(baseline_mat[,s,drop=FALSE] ),colnames(temp_mat[,s,drop=FALSE] ) )  
+          temp_df[ind,]$samp <- ifelse(!is.null((colnames(baseline_mat[,s,drop=FALSE] ) )),
+                                       unique(colnames(baseline_mat[,s,drop=FALSE] ),
+                                              colnames(temp_mat[,s,drop=FALSE] ) ), NA )
         }
       }
       df_internal <- rbind(df_internal, temp_df)
@@ -521,31 +527,55 @@ for(el in names(robustness_test_results)){
 Sys.time()
 
 
-df_summary_by_partition <-aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) mean(x,na.rm=TRUE) )
+df_summary_by_partition <-aggregate(df$jaccard, by=list(measure=df$measure, n=df$n,
+                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
+                                                        weighted=df$weighted),
+                                    FUN=function(x) mean(x,na.rm=TRUE) )
 names(df_summary_by_partition)[length(names(df_summary_by_partition))] <- "jaccard_mean"
-df_summary_by_partition$jaccard_sd <- aggregate(df$jaccard, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) sd(x,na.rm = TRUE) )$x 
-df_summary_by_partition$gene_count <- aggregate(df$gene_count, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) mean(x,na.rm = TRUE) )$x 
-df_summary_by_partition$gene_count_baseline <- aggregate(df$gene_count_baseline, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) mean(x,na.rm = TRUE) )$x 
-df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersect, by=list(n=df$n,cut_point=df$cut_point,P1orP2=df$P1orP2,weighted=df$weighted), FUN=function(x) mean(x,na.rm = TRUE) )$x 
-
-
-gg <- ggplot(df_summary_by_partition, aes(x=cut_point, y=jaccard_mean, ymin=jaccard_mean-jaccard_sd/num_reps,ymax=jaccard_mean+jaccard_sd/num_reps, group=n, fill=n))+
-  theme_bw()+
-  theme(
-        panel.grid.minor.x = element_blank())+
-  ggtitle("jaccard index for P1 and  P2, weighted and flat measures")+
-  geom_line(aes(color=n))+
-  scale_color_continuous(low="steelblue2", high="steelblue4")+
-  scale_x_continuous(limits = c(0,4), expand = c(0,0))+
-  scale_y_continuous(breaks=seq(0,1,by=0.2))+
-  facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-gg
+df_summary_by_partition$jaccard_sd <- aggregate(df$jaccard, by=list(measure=df$measure, n=df$n,
+                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
+                                                        weighted=df$weighted) ,
+                                                FUN=function(x) sd(x,na.rm = TRUE) )$x 
+df_summary_by_partition$gene_count <- aggregate(df$gene_count,  by=list(measure=df$measure, n=df$n,
+                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
+                                                        weighted=df$weighted)
+                                                , FUN=function(x) mean(x,na.rm = TRUE) )$x 
+df_summary_by_partition$gene_count_baseline <- aggregate(df$gene_count_baseline, by=list(measure=df$measure, n=df$n,
+                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
+                                                        weighted=df$weighted),
+                                                        FUN=function(x) mean(x,na.rm = TRUE) )$x 
+df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersect, by=list(measure=df$measure, n=df$n,
+                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
+                                                        weighted=df$weighted),
+                                                        FUN=function(x) mean(x,na.rm = TRUE) )$x 
+ggl <- list()
+for(measure in unique(df_summary_by_partition$measure)){
+  which <- which(df_summary_by_partition$measure == measure)
+  gg <- ggplot(df_summary_by_partition[which,],
+               aes(x=cut_point, y=jaccard_mean,
+                   ymin=jaccard_mean-jaccard_sd/num_reps, 
+                   ymax=jaccard_mean+jaccard_sd/num_reps,
+                   group=n, fill=n))+
+    theme_bw()+
+    theme(
+          panel.grid.minor.x = element_blank())+
+    ggtitle(paste("jaccard index for ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
+    geom_line(aes(color=n))+
+    scale_color_continuous(low="steelblue2", high="steelblue4")+
+    scale_y_continuous(limits = c(0,1), breaks=seq(0,1,by=0.2))+
+    facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  if(measure=="Zscore"){gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
+  }else{ gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))}
+  gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  plot(gg)
+  ggl[[measure]] <- gg
+}
 
 #ggsave( paste(getwd(), "/figures/Figure_2D_v03_jaccard.png",sep=""), gg, dev="png", height = 3.4, width = 6)
 ```
 
 
-```{r  flat v weighted comparisons}
+```{r  Figure 3AB flat v weighted comparisons}
 if(TRUE){
   specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              funcs=list(Zscore=calc_weighted_zscore_matrix,
