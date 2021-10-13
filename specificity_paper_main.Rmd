@@ -18,6 +18,7 @@ library(foreach)
 registerDoParallel(detectCores())
 library(ComplexHeatmap)
 library(circlize)
+library(scales)
 ```
 
 ## load gtex here
@@ -180,7 +181,9 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
     tau <- append(tau,temp)
   }
   ## add normalization (believe this is a numeric instability issue from dividing small numbers)
-  tau <- tau / max(tau, na.rm=T)
+  # tau <- tau / max(tau, na.rm=T)
+  ## alternative, set all > 1 to 1 (when looking at plots for different cutoffs, normalizing true 1 values causes issue)
+  tau[which(tau > 1)] <- 1
   return(tau)
 }
 
@@ -501,17 +504,17 @@ for(el in names(robustness_test_results)){
           ind <- (s-1)*length(cuts)+cut_index  ### use arr_ind here instead
           temp_df[ind,]$cut_point <- cuts[cut_index]
           if(cuts[cut_index]<0){
-            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] < cuts[cut_index] & temp_mat[,s] < cuts[cut_index]  )) /
-                                        length( which( baseline_mat[,s] < cuts[cut_index] | temp_mat[,s] < cuts[cut_index]  )) )
-            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] < cuts[cut_index]  ) )
-            temp_df[ind,]$gene_count_baseline <- length( which(baseline_mat[,s] < cuts[cut_index]  ) ) 
-            temp_df[ind,]$gene_count_intersect <-  length( which( baseline_mat[,s] < cuts[cut_index] & temp_mat[,s] < cuts[cut_index]  ))
+            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] <= cuts[cut_index] & temp_mat[,s] <= cuts[cut_index]  )) /
+                                        length( which( baseline_mat[,s] <= cuts[cut_index] | temp_mat[,s] <= cuts[cut_index]  )) )
+            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] <= cuts[cut_index]  ) )
+            temp_df[ind,]$gene_count_baseline <- length( which(baseline_mat[,s] <= cuts[cut_index]  ) ) 
+            temp_df[ind,]$gene_count_intersect <-  length( which( baseline_mat[,s] <= cuts[cut_index] & temp_mat[,s] <= cuts[cut_index]  ))
           } else {
-            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] > cuts[cut_index] & temp_mat[,s] > cuts[cut_index]  )) /
-                                        length( which( baseline_mat[,s] > cuts[cut_index] | temp_mat[,s] > cuts[cut_index]  )) )
-            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] > cuts[cut_index]  ) )
-            temp_df[ind,]$gene_count_baseline <-  length( which(baseline_mat[,s] > cuts[cut_index]  ) )
-            temp_df[ind,]$gene_count_intersect <-  length( which( baseline_mat[,s] > cuts[cut_index] & temp_mat[,s] > cuts[cut_index]  ))
+            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] >= cuts[cut_index] & temp_mat[,s] >= cuts[cut_index]  )) /
+                                        length( which( baseline_mat[,s] >= cuts[cut_index] | temp_mat[,s] >= cuts[cut_index]  )) )
+            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] >= cuts[cut_index]  ) )
+            temp_df[ind,]$gene_count_baseline <-  length( which(baseline_mat[,s] >= cuts[cut_index]  ) )
+            temp_df[ind,]$gene_count_intersect <-  length( which( baseline_mat[,s] >= cuts[cut_index] & temp_mat[,s] >= cuts[cut_index]  ))
           }
           temp_df[ind,]$samp <- ifelse(!is.null((colnames(baseline_mat[,s,drop=FALSE] ) )),
                                        unique(colnames(baseline_mat[,s,drop=FALSE] ),
@@ -575,16 +578,19 @@ ggl_count <- list()
 for(measure in unique(df_summary_by_partition$measure)){
   which <- which(df_summary_by_partition$measure == measure)
   gg <- ggplot(df_summary_by_partition[which,],
-               aes(x=cut_point, y=gene_count,
+               aes(x=cut_point, y=gene_count / nrow(genes),
                    group=n, fill=n))+
     theme_bw()+
     theme(
           panel.grid.minor.x = element_blank())+
-    ggtitle(paste("jaccard index for ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
+    ggtitle(paste("Number of genes above threshold for\n ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
     geom_line(aes(color=n))+
     scale_color_continuous(low="steelblue2", high="steelblue4")+
-    scale_y_log10()+
-    facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    #scale_y_log10( #limits = c(1,3e4),
+    scale_y_continuous( limits=c(1e-4,1) , trans = log10_trans(),
+                       breaks = trans_breaks("log10", function(x) 10^x), # ) #,
+                       labels = percent,  )
+    
   if(measure=="Zscore"){gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
   }else{ gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))}
   gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
