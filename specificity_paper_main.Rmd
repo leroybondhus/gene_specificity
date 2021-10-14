@@ -613,58 +613,76 @@ if(TRUE){
 
   ### Matrix built from Z score first then add columns of change in other scores
   ## NOT going to be general to arbitrary sets of matrix measures -> use only Z score and then concatenate other measures
-    
-  for(measure in "Zscore"){
+  spec_mats <- list()
+  
+  sim_mat <- similarity_func(exp_mat)
+  sim_tree <- cluster_func(sim_mat)
+  weights <- get_weights(sim_tree, colnames(exp_mat))
+  flat <- weights; flat[] <- 1
+  for(measure in specificity_measures$func_names){
     specificity_func <- specificity_measures$funcs[[measure]]
     if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
-    sim_mat <- similarity_func(exp_mat)
-    sim_tree <- cluster_func(sim_mat)
-    weights <- get_weights(sim_tree, colnames(exp_mat))
-    flat <- weights; flat[] <- 1
-    spec_mat_flat <- specificity_func(exp_mat, flat)
-    spec_mat_weighted <- specificity_func(exp_mat, weights)
+    if(specificity_measures$out_type[measure]=="matrix"){
+      spec_mat_flat <- specificity_func(exp_mat, flat)
+      spec_mat_weighted <- specificity_func(exp_mat, weights)
+    } else if (specificity_measures$out_type[measure]=="vector"){
+      spec_mat_flat <- as.matrix(specificity_func(exp_mat, flat))
+      rownames(spec_mat_flat) <- rownames(exp_mat)
+      spec_mat_weighted <- as.matrix(specificity_func(exp_mat, weights))
+      rownames(spec_mat_weighted) <- rownames(exp_mat)
+    } else { stop("WARNING: no out type associated with measure") }
     
-  
-    col_fun = colorRamp2(c(-4, -2 ,0, 2, 4), c("black", "blue", "white", "yellow", "red"))
-  
-    n = 5 ## look at top n and bottom n most genes for each tissue (those that are most different between weighted and flat measures)
-    gene_list <- list(up=list(),down=list()) 
-    for(i in 1:ncol(spec_mat_weighted)){
-      gene_list$up[[i]] <- list()
-      gene_list$up[[i]] <- list(gene_list$up[[i]], rownames(spec_mat_flat)[order((spec_mat_weighted[,i]-spec_mat_flat[,i]), decreasing = TRUE)[1:n]])
-    }
-    for(i in 1:ncol(spec_mat_weighted)){
-      gene_list$down[[i]] <- list()
-       gene_list$down[[i]] <- list(gene_list$down[[i]], rownames(spec_mat_flat)[order((spec_mat_flat[,i]-spec_mat_weighted[,i]), decreasing = TRUE)[1:n]])
-    }
-   
-    gene_list$up <- unique(unlist(gene_list$up))
-    gene_list$down <- unique(unlist(gene_list$down))
-    gene_list$full <- unique(c(gene_list$up,gene_list$down))
-    col_fun = colorRamp2(c(min(as.vector(spec_mat_flat[gene_list$full,]),as.vector(spec_mat_weighted[gene_list$full,]) ),
-                           -2 ,0, 2, 4,
-                           max(as.vector(spec_mat_flat[gene_list$full,]),as.vector(spec_mat_weighted[gene_list$full,]) )),
-                         c("black", "blue", "white", "yellow", "red", "red4"))
-    col_fun_2 = colorRamp2(c(min(as.vector(spec_mat_weighted[gene_list$full,])-as.vector(spec_mat_flat[gene_list$full,]))  ,
-                           -2 ,0, 2, 
-                           max(as.vector(spec_mat_weighted[gene_list$full,])-as.vector(spec_mat_flat[gene_list$full,])) ), 
-                          c("darkblue","blue", "white", "red", "red4"))
-    for(ud in c("up","down")){
-      h1 <- Heatmap(spec_mat_flat[gene_list[[ud]],], show_row_names = F, col=col_fun, row_order = gene_list[[ud]], column_order = colnames(spec_mat_flat) )
-        h1_list <- draw(h1)
-        col_order <- column_order(h1_list)
-        h1 <- h1+
-          Heatmap(spec_mat_weighted[gene_list[[ud]],], column_order = col_order,  row_order = gene_list[[ud]], show_row_names = F , col=col_fun) +
-          Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
-        draw(h1)
-        h2 <-Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
-        draw(h2, padding = unit(c(1, 0.1, 0.1, 0.1), "in"))
-    }
-    
-    
-    ## NOTE IDEALLY ADD OTHER 1D MEASURES OF SPECIFICITY AS SEPERATE COLUMNS TO SEE HOW THEY CHANGE FROM FLAT TO WEIGHTED
-    
+    spec_mats[[paste("delta", measure,sep = "_")]] <- spec_mat_weighted - spec_mat_flat
+    spec_mats[[paste("weighted", measure,sep = "_")]] <- spec_mat_weighted
+    spec_mats[[paste("flat", measure,sep = "_")]] <- spec_mat_flat
   }
-  for(measure in 1){}
+  
+  ## set up color functions for heatmaps
+  col_funs <- list()
+  col_funs[["Zscore"]] <-colorRamp2(c(-4, -2 ,0, 2, 4), c("black", "blue", "white", "yellow", "red"))
+  col_funs[["zero_to_one"]] <-colorRamp2(c(0, 0.2, 0.5, 0.8, 1), c("black", "blue", "white", "yellow", "red"))
+
+  ## look at top n and bottom n genes with greatest change in specificity score between weighted and flat
+  gene_list <- list(up=list(),down=list()) 
+  for(spec_mat_name in names(spec_mats)[grep("delta", names(spec_mats))] ){
+    spec_mat <- spec_mats[[spec_mat_name]]
+    measure <- str_split_fixed(spec_mat_name, "_", 2)[,2]
+    ## for each tissue for matrix measures
+    if(specificity_measures$out_type[measure]=="matrix"){
+      n=5 ## top n for each tissue (column) of matrix
+    } else if (specificity_measures$out_type[measure]=="vector"){
+      n=20 ## top n for each vector measure (single column) 
+    } else { stop("WARNING: no out type associated with measure") }
+    temp_name <- measure
+    gene_list$up[[temp_name]] <- data.frame("gene"=numeric())
+    for(i in 1:ncol(spec_mat)){
+      gene_list$up[[temp_name]] <- rbind(gene_list$up[[temp_name]],
+                                         data.frame("gene"=rownames(spec_mat_flat)[order((spec_mat[,i]), decreasing = TRUE)[1:n]]))
+    }
+    for(i in 1:ncol(spec_mat_weighted)){
+      gene_list$down[[temp_name]] <- rbind(gene_list$up[[temp_name]],
+                                         data.frame("gene" = rownames(spec_mat_flat)[order(spec_mat[,i]*(-1), decreasing = TRUE)[1:n]])) 
+      }
+  }
+ 
+  ### gene lists generated now to organize into heatmaps 
+  
+  
+  gene_list$up <- unique(unlist(gene_list$up))
+  gene_list$down <- unique(unlist(gene_list$down))
+  gene_list$full <- unique(c(gene_list$up,gene_list$down))
+  
+  for(ud in c("up","down")){
+    h1 <- Heatmap(spec_mat_flat[gene_list[[ud]],], show_row_names = F, col=col_fun, row_order = gene_list[[ud]], column_order = colnames(spec_mat_flat) )
+      h1_list <- draw(h1)
+      col_order <- column_order(h1_list)
+      h1 <- h1+
+        Heatmap(spec_mat_weighted[gene_list[[ud]],], column_order = col_order,  row_order = gene_list[[ud]], show_row_names = F , col=col_fun) +
+        Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
+      draw(h1)
+      h2 <-Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
+      draw(h2, padding = unit(c(1, 0.1, 0.1, 0.1), "in"))
+  }
+
 }
 ```
