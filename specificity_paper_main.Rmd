@@ -19,6 +19,7 @@ registerDoParallel(detectCores())
 library(ComplexHeatmap)
 library(circlize)
 library(scales)
+library(reldist)
 ```
 
 ## load gtex here
@@ -151,7 +152,7 @@ calc_weighted_zscore_matrix <- function(mat, weights){
   }
   weighted_var <- numeric(length=nrow(mat))
   for (i in 1:nrow(mat)){
-    weighted_var[i] <- wtd.var(mat[i,],weights=weights)
+    weighted_var[i] <- Hmisc::wtd.var(mat[i,],weights=weights)
   }
   weighted_sd <- sqrt(weighted_var)
   for(i in 1:ncol(mat)){
@@ -187,6 +188,33 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
   return(tau)
 }
 
+calc_weighted_tsi <- function(te_matrix,weights_vector){
+  tsi <- c()
+  weights_vector <- as.matrix(weights_vector)
+  weighted_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (m in 1:nrow(weights_vector)){
+    weighted_matrix[,m] <- weights_vector[m,1]*te_matrix[,m]
+  }
+  for (i in 1:nrow(te_matrix)){
+    num <- max(weighted_matrix[i,])
+    den <- sum(weighted_matrix[i,])
+    temp <- num/den
+    tsi <- append(tsi,temp)
+  }
+  return(tsi)
+}
+
+calc_weighted_gini <- function(te_matrix, weights_vector){
+   gini_values <-  c()
+  for (i in 1:nrow(te_matrix)){
+    temp <- as.numeric(te_matrix[i,])
+    temp <- gini(temp, weights_vector)
+    gini_values <- append(gini_values,temp)
+  }
+  return(gini_values)
+}
+
+
 ```
 
 ```{r organizing functions into lists}
@@ -195,8 +223,8 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
 specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              funcs=list(Zscore=calc_weighted_zscore_matrix,
                                         Tau=calc_weighted_tau,
-                                        Tsi=NA,
-                                        Gini=NA),
+                                        Tsi=calc_weighted_tsi,
+                                        Gini=calc_weighted_gini),
                              out_type=list(Zscore="matrix",
                                            Tau="vector",
                                            Tsi="vector",
@@ -230,12 +258,26 @@ ggplot( data.frame(names=names(weights), weights=weights),aes(x=names, y=weights
 
 
 
-spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights)
+spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights = weights)
 flat <- weights; flat[1:length(flat)] <- 1
 spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
 ## plot to look at global dif between flat and weighted
 tau_flat <- calc_weighted_tau(exp_mat, flat)
 tau_weighted <- calc_weighted_tau(exp_mat, weights)
+tsi_flat <- calc_weighted_tsi(exp_mat,flat)
+tsi_weighted <- calc_weighted_tsi(exp_mat,weights)
+gini_flat <- calc_weighted_gini(exp_mat, flat)
+gini_weighted <- calc_weighted_gini(exp_mat, weights)
+
+hist(spec_mat_weighted ,breaks=100)
+hist(tau_weighted ,breaks=100)
+hist(tsi_weighted ,breaks=100)
+hist(gini_weighted ,breaks=100)
+hist(spec_mat_weighted - spec_mat_flat ,breaks=100)
+hist(tau_weighted - tau_flat ,breaks=100)
+hist(tsi_weighted - tsi_flat ,breaks=100)
+hist(gini_weighted - gini_flat ,breaks=100)
+
 ```
 
 
@@ -699,25 +741,7 @@ if(TRUE){
     
   }
 
-  draw(heatmaps)
-
-  for(i in 1:length(heatmaps)){
-    ht_list
-  }
-  
-
-  for(ud in c("up","down")){
-    h1 <- Heatmap(spec_mat_flat[gene_list[[ud]],], show_row_names = F, col=col_fun, row_order = gene_list[[ud]], column_order = colnames(spec_mat_flat) )
-      h1_list <- draw(h1)
-      col_order <- column_order(h1_list)
-      h1 <- h1+
-        Heatmap(spec_mat_weighted[gene_list[[ud]],], column_order = col_order,  row_order = gene_list[[ud]], show_row_names = F , col=col_fun) +
-        Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
-      draw(h1)
-      h2 <-Heatmap(spec_mat_weighted[gene_list[[ud]],]-spec_mat_flat[gene_list[[ud]],], column_order=col_order, row_order = gene_list[[ud]], show_row_names= F,col=col_fun_2)
-      draw(h2, padding = unit(c(1, 0.1, 0.1, 0.1), "in"))
-  }
-  ## add heatmaps for vector measures
+  draw(heatmaps, padding = unit(c(1, 0.1, 0.1, 0.1), "in"))
 
 }
 ```
