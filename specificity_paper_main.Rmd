@@ -640,8 +640,11 @@ if(TRUE){
   ## set up color functions for heatmaps
   col_funs <- list()
   col_funs[["Zscore"]] <-colorRamp2(c(-4, -2 ,0, 2, 4), c("black", "blue", "white", "yellow", "red"))
-  col_funs[["zero_to_one"]] <-colorRamp2(c(0, 0.2, 0.5, 0.8, 1), c("black", "blue", "white", "yellow", "red"))
-
+  col_funs[["Zscore"]] <-colorRamp2(c(-2, -1 ,0, 1, 2), c("black", "blue", "white", "yellow", "red"))
+  for(measure in specificity_measures$func_names[which(specificity_measures$out_type=="vector")]){
+    col_funs[[measure]] <-colorRamp2(c(0, 0.2, 0.5, 0.8, 1), c("black", "blue", "white", "yellow", "red"))
+  }
+  
   ## look at top n and bottom n genes with greatest change in specificity score between weighted and flat
   gene_list <- list(up=list(),down=list()) 
   for(spec_mat_name in names(spec_mats)[grep("delta", names(spec_mats))] ){
@@ -655,23 +658,43 @@ if(TRUE){
     } else { stop("WARNING: no out type associated with measure") }
     temp_name <- measure
     gene_list$up[[temp_name]] <- data.frame("gene"=numeric())
+    gene_list$down[[temp_name]] <- data.frame("gene"=numeric())
     for(i in 1:ncol(spec_mat)){
       gene_list$up[[temp_name]] <- rbind(gene_list$up[[temp_name]],
                                          data.frame("gene"=rownames(spec_mat_flat)[order((spec_mat[,i]), decreasing = TRUE)[1:n]]))
     }
-    for(i in 1:ncol(spec_mat_weighted)){
-      gene_list$down[[temp_name]] <- rbind(gene_list$up[[temp_name]],
-                                         data.frame("gene" = rownames(spec_mat_flat)[order(spec_mat[,i]*(-1), decreasing = TRUE)[1:n]])) 
+    for(i in 1:ncol(spec_mat)){
+      gene_list$down[[temp_name]] <- rbind(gene_list$down[[temp_name]],
+                                         data.frame("gene" = rownames(spec_mat_flat)[order((spec_mat[,i]*(-1)), decreasing = TRUE)[1:n]])) 
       }
   }
  
   ### gene lists generated now to organize into heatmaps 
   
+  heatmaps <- list()
+  heatmaps <- HeatmapList()
+  for( ud in c("up", "down")){
+    measure <- "Zscore"
+    gene_vec <- gene_list[[ud]][[measure]]
+    spec_mat_name <- names(spec_mats)[intersect(grep(measure, names(spec_mats)), grep("delta", names(spec_mats)))]
+    spec_mat <-  spec_mats[[spec_mat_name ]]
+    temp_name <- paste(ud, spec_mat_name, sep="_")
+    #heatmaps[[temp_name]] <- Heatmap(spec_mat[which,], name=temp_name, col = col_funs[[measure]])
+    h1 <- Heatmap(spec_mat[gene_vec[,1],], name=temp_name, row_order = gene_vec[,1], column_order = colnames(spec_mat), col = col_funs[[measure]])
+    if(length(heatmaps)==0){
+      heatmaps <- h1
+    } else {
+      heatmaps <- heatmaps %v% h1
+    }
+    
+  }
+  draw(heatmaps)
+
+  for(i in 1:length(heatmaps)){
+    ht_list
+  }
   
-  gene_list$up <- unique(unlist(gene_list$up))
-  gene_list$down <- unique(unlist(gene_list$down))
-  gene_list$full <- unique(c(gene_list$up,gene_list$down))
-  
+
   for(ud in c("up","down")){
     h1 <- Heatmap(spec_mat_flat[gene_list[[ud]],], show_row_names = F, col=col_fun, row_order = gene_list[[ud]], column_order = colnames(spec_mat_flat) )
       h1_list <- draw(h1)
