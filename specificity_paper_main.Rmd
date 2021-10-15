@@ -784,14 +784,31 @@ heatmaps$delta + heatmaps$flat + heatmaps$weighted
 
 head(gtex_rowinfo)
 ## create list of marker genes (common name and ENS map in genes object and gtex_rowinfo object)
-specific_genes <- c("SOX1","SOX2", "PRSS1", "MYH6", "MYH7")
+specific_genes <- c("SOX1","SOX2", "NEUROD1","NEUROD2" ,"NEUROD4", "NEUROD6", "PRSS1", "MYH6", "MYH7")
 spec_genes_w_ids <- gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
 spec_genes_w_ids <- spec_genes_w_ids[match(specific_genes, spec_genes_w_ids$Description),]
 spec_genes_w_ids <- merge( data.frame(f_or_w = c("flat","weighted")),spec_genes_w_ids)
 
 
-heatmaps <- HeatmapList()
 
+col_funs <- list()
+for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
+  if(measure=="Zscore"){
+    col_funs[[measure]] <-colorRamp2(c(min(c(min(spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
+                                             min(spec_mats$flat_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE),-4)),
+                                       -2, -1.99, 0, 1.99, 2,
+                                       #-3, -2, 0, 2, 3,
+                                       max(c(max( spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
+                                             max( spec_mats$flat_Zscore[spec_genes_w_ids$Name,]), na.rm = TRUE),4)),
+                                     c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))  
+  } else {
+    col_funs[[measure]] <-colorRamp2(c( 0, .25, 0.5, 1),
+                                     c("white", "#FFB8B8",  "red","red4"))
+  }
+}
+
+
+heatmaps <- HeatmapList()
 for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
   temp_mat <- matrix(nrow=nrow(spec_genes_w_ids),ncol=ncol(spec_mats[[paste("delta",measure, sep = "_")]]))
   colnames(temp_mat) <- colnames(spec_mats[[paste("delta",measure, sep = "_")]])
@@ -803,20 +820,22 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
     h1 <- Heatmap(temp_mat,
                   cluster_rows = FALSE, show_row_names = TRUE,
                   cluster_columns = sim_tree,
-                  column_order = colnames(spec_mat))
+                  column_order = colnames(spec_mat),
+                  col = col_funs[[measure]])
     } else {
       h1 <- Heatmap(temp_mat, name=temp_name,
-                    cluster_rows = FALSE, show_row_names = TRUE)
+                    cluster_rows = FALSE, show_row_names = TRUE,
+                    col = col_funs[[measure]])
       }
   if(length(heatmaps)==0){
       heatmaps <- h1
       } else {
       heatmaps <- heatmaps + h1
     }
-  draw(heatmaps)
-  draw(h1)
+  #draw(heatmaps)
+  #draw(h1)
 }
-
+draw(heatmaps)
 
 ## NOTE: dendextend and complex heatmap can interface fairly easily
 plot(sim_tree)
