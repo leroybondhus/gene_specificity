@@ -706,13 +706,21 @@ if(TRUE){
   ### gene lists generated now to organize into heatmaps 
     ## set up color functions for heatmaps
   col_funs <- list()
-  col_funs[["Zscore"]] <-colorRamp2(c(min(c(-2, min(spec_mats$delta_Zscore, na.rm = T)) ),
-                                      -1.99, -1, 0, 1, 1.99,
-                                      max(c(2, max( spec_mats$delta_Zscore, na.rm = T) ) )),
-                                    c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
-  for(measure in specificity_measures$func_names[which(specificity_measures$out_type=="vector")]){
-    col_funs[[measure]] <-colorRamp2(c(-1,-0.25, 0 , 0.25, 1),
-                                     c("darkblue", "blue", "white", "red", "red4") )
+  for(type in c("delta","flat","weighted")){
+    col_funs[[paste( type, "Zscore" ,sep="_")]] <-colorRamp2(c(min(c(-2, min(spec_mats[[paste( type, "Zscore" ,sep="_")]], na.rm = T)) ),
+                                        -1.99, -1, 0, 1, 1.99,
+                                        max(c(2, max( spec_mats$delta_Zscore, na.rm = T) ) )),
+                                      c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
+    for(measure in specificity_measures$func_names[which(specificity_measures$out_type=="vector")]){
+      if(type=="delta"){
+          col_funs[[paste(type, measure, sep="_")]] <- colorRamp2(c(-1,-0.25, 0 , 0.25, 1),
+                                         c("darkblue", "blue", "white", "red", "red4") )
+      } else {
+        col_funs[[paste(type,measure, sep="_")]] <- colorRamp2(c(0, 0.5, 1),
+                                         c("white", "red", "red4") )
+      }
+      
+    }
   }
   
   ## get genes in top and bottom (note: genes may be repeated since want to see top n for each group )
@@ -723,25 +731,49 @@ if(TRUE){
     }
   }
   
-  heatmaps <- HeatmapList()
-
-  for(measure in names(gene_list[["up"]])){
-    spec_mat_name <- names(spec_mats)[intersect(grep(measure, names(spec_mats)), grep("delta", names(spec_mats)))]
-    spec_mat <-  spec_mats[[spec_mat_name ]]
-    temp_name <- paste(spec_mat_name, sep="_")
-    h1 <- Heatmap(spec_mat[gene_vec$gene,], name=temp_name,
-                  row_order = gene_vec$gene, show_row_names = FALSE,
-                  column_order = colnames(spec_mat),
-                  col = col_funs[[measure]])
-    if(length(heatmaps)==0){
-      heatmaps <- h1
-    } else {
-      heatmaps <- heatmaps + h1
+  heatmaps <- list()
+  for(type in c("delta", "flat", "weighted")){
+    heatmaps[[type]] <- HeatmapList()
+    for(measure in names(gene_list[["up"]])){
+      spec_mat_name <- names(spec_mats)[intersect(grep(measure, names(spec_mats)), grep(type, names(spec_mats)))]
+      spec_mat <-  spec_mats[[spec_mat_name ]]
+      temp_name <- paste(spec_mat_name, sep="_")
+      h1 <- Heatmap(spec_mat[gene_vec$gene,], name=temp_name,
+                    row_order = gene_vec$gene, show_row_names = FALSE,
+                    column_order = colnames(spec_mat),
+                    col = col_funs[[paste(type,measure, sep="_")]])
+      if(length(heatmaps[[type]])==0){
+        heatmaps[[type]] <- h1
+      } else {
+        heatmaps[[type]] <- heatmaps[[type]] + h1
+      }
     }
-    
+    draw(heatmaps[[type]], padding = unit(c(1, 0.1, 0.1, 0.1), "in"))
   }
-
-  draw(heatmaps, padding = unit(c(1, 0.1, 0.1, 0.1), "in"))
-
+  
 }
+
+heatmaps$delta + heatmaps$flat + heatmaps$weighted
 ```
+
+
+
+```{r Figure 3C known marker genes}
+## neural/brain marker
+## pancreatic marker
+## cardiac marker
+
+
+```
+
+
+```{r Figure 3D}
+## gene ontology summaries
+
+
+```
+
+
+
+
+
