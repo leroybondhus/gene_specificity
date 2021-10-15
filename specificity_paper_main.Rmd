@@ -797,7 +797,7 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
     col_funs[[measure]] <-colorRamp2(c(min(c(min(spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
                                              min(spec_mats$flat_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE),-4)),
                                        -2, -1.99, 0, 1.99, 2,
-                                       #-3, -2, 0, 2, 3,
+                                      #-3, -2, 0, 2, 3,
                                        max(c(max( spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
                                              max( spec_mats$flat_Zscore[spec_genes_w_ids$Name,]), na.rm = TRUE),4)),
                                      c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))  
@@ -817,13 +817,14 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
     temp_mat[i,] <- spec_mats[[paste(spec_genes_w_ids$f_or_w[i], measure, sep = "_")]][spec_genes_w_ids$Name[i],]
   }
   if(measure=="Zscore"){
-    h1 <- Heatmap(temp_mat,
+    h1 <- Heatmap(temp_mat, name=measure,
                   cluster_rows = FALSE, show_row_names = TRUE,
                   cluster_columns = sim_tree,
                   column_order = colnames(spec_mat),
-                  col = col_funs[[measure]])
+                  col = col_funs[[measure]] 
+                  )
     } else {
-      h1 <- Heatmap(temp_mat, name=temp_name,
+      h1 <- Heatmap(temp_mat, name=measure,
                     cluster_rows = FALSE, show_row_names = TRUE,
                     col = col_funs[[measure]])
       }
