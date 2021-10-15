@@ -687,20 +687,30 @@ if(TRUE){
     ## for each tissue for matrix measures
     if(specificity_measures$out_type[measure]=="matrix"){
       n=5 ## top n for each tissue (column) of matrix
+      temp_name <- measure
+      gene_list$up[[temp_name]] <- data.frame("gene"=numeric())
+      gene_list$down[[temp_name]] <- data.frame("gene"=numeric())
+      ## go in same order as similarity tree
+      for(i in get_leaves_attr(sim_tree, "label")){
+        gene_list$up[[temp_name]] <- rbind(gene_list$up[[temp_name]],
+                                           data.frame("gene"=rownames(spec_mat_flat)[order((spec_mat[,i]), decreasing = TRUE)[1:n]]))
+      }
+      for(i in get_leaves_attr(sim_tree, "label")){
+        gene_list$down[[temp_name]] <- rbind(gene_list$down[[temp_name]],
+                                           data.frame("gene" = rownames(spec_mat_flat)[order((spec_mat[,i]*(-1)), decreasing = TRUE)[1:n]])) 
+        }
     } else if (specificity_measures$out_type[measure]=="vector"){
       n=20 ## top n for each vector measure (single column) 
-    } else { stop("WARNING: no out type associated with measure") }
-    temp_name <- measure
-    gene_list$up[[temp_name]] <- data.frame("gene"=numeric())
-    gene_list$down[[temp_name]] <- data.frame("gene"=numeric())
-    for(i in 1:ncol(spec_mat)){
+      temp_name <- measure
+      gene_list$up[[temp_name]] <- data.frame("gene"=numeric())
+      gene_list$down[[temp_name]] <- data.frame("gene"=numeric())
+      ## go in same order as similarity tree
       gene_list$up[[temp_name]] <- rbind(gene_list$up[[temp_name]],
-                                         data.frame("gene"=rownames(spec_mat_flat)[order((spec_mat[,i]), decreasing = TRUE)[1:n]]))
-    }
-    for(i in 1:ncol(spec_mat)){
+                                         data.frame("gene"=rownames(spec_mat_flat)[order((spec_mat[,1]), decreasing = TRUE)[1:n]]))
       gene_list$down[[temp_name]] <- rbind(gene_list$down[[temp_name]],
-                                         data.frame("gene" = rownames(spec_mat_flat)[order((spec_mat[,i]*(-1)), decreasing = TRUE)[1:n]])) 
-      }
+                                           data.frame("gene" = rownames(spec_mat_flat)[order((spec_mat[,1]*(-1)), decreasing = TRUE)[1:n]]))
+    } else { stop("WARNING: no out type associated with measure") }
+    
   }
  
   ### gene lists generated now to organize into heatmaps 
@@ -738,17 +748,24 @@ if(TRUE){
       spec_mat_name <- names(spec_mats)[intersect(grep(measure, names(spec_mats)), grep(type, names(spec_mats)))]
       spec_mat <-  spec_mats[[spec_mat_name ]]
       temp_name <- paste(spec_mat_name, sep="_")
-      h1 <- Heatmap(spec_mat[gene_vec$gene,], name=temp_name,
-                    row_order = gene_vec$gene, show_row_names = FALSE,
-                    column_order = colnames(spec_mat),
-                    col = col_funs[[paste(type,measure, sep="_")]])
+      if(measure=="Zscore"){
+        h1 <- Heatmap(spec_mat[gene_vec$gene,], name=temp_name,
+                      row_order = gene_vec$gene, show_row_names = FALSE,
+                      cluster_columns = sim_tree,
+                      column_order = colnames(spec_mat),
+                      col = col_funs[[paste(type,measure, sep="_")]])  
+      } else { 
+        h1 <- Heatmap(spec_mat[gene_vec$gene,], name=temp_name,
+                      row_order = gene_vec$gene, show_row_names = FALSE,
+                      col = col_funs[[paste(type,measure, sep="_")]])
+      }
       if(length(heatmaps[[type]])==0){
         heatmaps[[type]] <- h1
       } else {
         heatmaps[[type]] <- heatmaps[[type]] + h1
       }
     }
-    draw(heatmaps[[type]], padding = unit(c(1, 0.1, 0.1, 0.1), "in"))
+    draw(heatmaps[[type]], padding = unit(c(0.9, 0.1, 0.3, 0.1), "in"))
   }
   
 }
@@ -759,10 +776,37 @@ heatmaps$delta + heatmaps$flat + heatmaps$weighted
 
 
 ```{r Figure 3C known marker genes}
-## neural/brain marker
-## pancreatic marker
-## cardiac marker
+## neural/brain marker: SOX1, SOX2, :: refs
+## pancreatic marker: PRSS1, :: refs
+## cardiac marker: , :: refs
+## muscle marker: , :: refs
+## arterial marker: , :: refs
 
+head(gtex_rowinfo)
+## create list of marker genes (common name and ENS map in genes object and gtex_rowinfo object)
+specific_genes <- c("SOX1","SOX2", "PRSS1", "MYH6", "MYH7")
+gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
+
+specific_gene_vec <- data.frame(gene = character())
+for(marker_type in names(specific_gene_list)){
+  for(measure in names(gene_list[[marker_type]])){
+    specific_gene_vec <- rbind(specific_gene_vec, specific_gene_list[[marker_type]][[measure]]) 
+  }
+}
+
+
+## NOTE: dendextend and complex heatmap can interface fairly easily
+plot(sim_tree)
+
+for(type in c("delta", "flat", "weighted")){
+  for(measure in  unique(str_split_fixed(names(spec_mats), "_", 2)[,2] ) ){
+    ## grab specificity matrix 
+    spec_mat_name <- names(spec_mats)[intersect(grep(measure, names(spec_mats)), grep(type, names(spec_mats)))]
+    spec_mat <-  spec_mats[[spec_mat_name ]]
+    temp_name <- paste(spec_mat_name, sep="_")
+    ## do stuff
+  }
+}
 
 ```
 
