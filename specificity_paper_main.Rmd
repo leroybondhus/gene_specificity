@@ -301,7 +301,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
   
   num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-  num_reps <- 5
+  num_reps <- 3
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
   cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
@@ -785,13 +785,36 @@ heatmaps$delta + heatmaps$flat + heatmaps$weighted
 head(gtex_rowinfo)
 ## create list of marker genes (common name and ENS map in genes object and gtex_rowinfo object)
 specific_genes <- c("SOX1","SOX2", "PRSS1", "MYH6", "MYH7")
-gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
+spec_genes_w_ids <- gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
+spec_genes_w_ids <- spec_genes_w_ids[match(specific_genes, spec_genes_w_ids$Description),]
+spec_genes_w_ids <- merge( data.frame(f_or_w = c("flat","weighted")),spec_genes_w_ids)
 
-specific_gene_vec <- data.frame(gene = character())
-for(marker_type in names(specific_gene_list)){
-  for(measure in names(gene_list[[marker_type]])){
-    specific_gene_vec <- rbind(specific_gene_vec, specific_gene_list[[marker_type]][[measure]]) 
+
+heatmaps <- HeatmapList()
+
+for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
+  temp_mat <- matrix(nrow=nrow(spec_genes_w_ids),ncol=ncol(spec_mats[[paste("delta",measure, sep = "_")]]))
+  colnames(temp_mat) <- colnames(spec_mats[[paste("delta",measure, sep = "_")]])
+  rownames(temp_mat) <- spec_genes_w_ids$Name
+  for(i in 1:nrow(spec_genes_w_ids)){
+    temp_mat[i,] <- spec_mats[[paste(spec_genes_w_ids$f_or_w[i], measure, sep = "_")]][spec_genes_w_ids$Name[i],]
   }
+  if(measure=="Zscore"){
+    h1 <- Heatmap(temp_mat,
+                  cluster_rows = FALSE, show_row_names = TRUE,
+                  cluster_columns = sim_tree,
+                  column_order = colnames(spec_mat))
+    } else {
+      h1 <- Heatmap(temp_mat, name=temp_name,
+                    cluster_rows = FALSE, show_row_names = TRUE)
+      }
+  if(length(heatmaps)==0){
+      heatmaps <- h1
+      } else {
+      heatmaps <- heatmaps + h1
+    }
+  draw(heatmaps)
+  draw(h1)
 }
 
 
