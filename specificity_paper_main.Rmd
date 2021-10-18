@@ -784,11 +784,12 @@ heatmaps$delta + heatmaps$flat + heatmaps$weighted
 
 head(gtex_rowinfo)
 ## create list of marker genes (common name and ENS map in genes object and gtex_rowinfo object)
-specific_genes <- c("SOX1","SOX2", "NEUROD1","NEUROD2" ,"NEUROD4", "NEUROD6", "PRSS1", "MYH6", "MYH7")
+#"NEUROD1","NEUROD2" ,"NEUROD4", "NEUROD6",
+specific_genes <- c("SOX2", "MAP2", "MBP", "OLIG1","GFAP" , "PRSS1", "MYH6", "MYH7")
 spec_genes_w_ids <- gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
 spec_genes_w_ids <- spec_genes_w_ids[match(specific_genes, spec_genes_w_ids$Description),]
 spec_genes_w_ids <- merge( data.frame(f_or_w = c("flat","weighted")),spec_genes_w_ids)
-
+spec_genes_w_ids
 
 
 col_funs <- list()
@@ -796,14 +797,14 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
   if(measure=="Zscore"){
     col_funs[[measure]] <-colorRamp2(c(min(c(min(spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
                                              min(spec_mats$flat_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE),-4)),
-                                       -2, -1.99, 0, 1.99, 2,
-                                      #-3, -2, 0, 2, 3,
+                                      # -2, -1.99, 0, 1.99, 2,
+                                      -3, -2, 0, 2, 3,
                                        max(c(max( spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
                                              max( spec_mats$flat_Zscore[spec_genes_w_ids$Name,]), na.rm = TRUE),4)),
-                                     c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))  
+                                     c("darkblue", "blue", "#7777ff" ,"white", "#ff7777",  "red","red4"))  
   } else {
-    col_funs[[measure]] <-colorRamp2(c( 0, .25, 0.5, 1),
-                                     c("white", "#FFB8B8",  "red","red4"))
+    col_funs[[measure]] <-colorRamp2(c( 0, 0.4, 0.6, 0.8, 1),
+                                     c("white", "lightgoldenrod1","yellow" ,"red","red4"))
   }
 }
 
@@ -817,10 +818,14 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
     temp_mat[i,] <- spec_mats[[paste(spec_genes_w_ids$f_or_w[i], measure, sep = "_")]][spec_genes_w_ids$Name[i],]
   }
   if(measure=="Zscore"){
+    split <- rep(1:length(specific_genes), each=2)
+    ra <- rowAnnotation(foo = anno_block(labels = specific_genes))
     h1 <- Heatmap(temp_mat, name=measure,
                   cluster_rows = FALSE, show_row_names = TRUE,
                   cluster_columns = sim_tree,
                   column_order = colnames(spec_mat),
+                  row_split = split,
+                  left_annotation = ra,
                   col = col_funs[[measure]] 
                   )
     } else {
@@ -834,22 +839,12 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
       heatmaps <- heatmaps + h1
     }
   #draw(heatmaps)
-  #draw(h1)
+  draw(h1)
 }
 draw(heatmaps)
 
-## NOTE: dendextend and complex heatmap can interface fairly easily
-plot(sim_tree)
 
-for(type in c("delta", "flat", "weighted")){
-  for(measure in  unique(str_split_fixed(names(spec_mats), "_", 2)[,2] ) ){
-    ## grab specificity matrix 
-    spec_mat_name <- names(spec_mats)[intersect(grep(measure, names(spec_mats)), grep(type, names(spec_mats)))]
-    spec_mat <-  spec_mats[[spec_mat_name ]]
-    temp_name <- paste(spec_mat_name, sep="_")
-    ## do stuff
-  }
-}
+
 
 ```
 
