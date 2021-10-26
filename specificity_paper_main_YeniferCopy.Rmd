@@ -657,6 +657,10 @@ png("weight>flat.png",width=1000,height=900)
 dotplot(ego, showCategory=50)#top 20 
 dev.off()
 
+ego <- enrichplot::pairwise_termsim(ego)
+png("weight>flat_dotplot.png",width=1000,height=900)
+ emapplot(ego, showCategory = 20)
+dev.off()
 
 #reference package - methods 
 #fraction that looks like brain 
