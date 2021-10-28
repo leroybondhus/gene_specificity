@@ -20,6 +20,7 @@ library(ComplexHeatmap)
 library(circlize)
 library(scales)
 library(reldist)
+library(gridExtra)
 ```
 
 ## load gtex here
@@ -208,7 +209,7 @@ calc_weighted_gini <- function(te_matrix, weights_vector){
    gini_values <-  c()
   for (i in 1:nrow(te_matrix)){
     temp <- as.numeric(te_matrix[i,])
-    temp <- gini(temp, weights_vector)
+    temp <- reldist::gini(temp, weights_vector)
     gini_values <- append(gini_values,temp)
   }
   return(gini_values)
@@ -285,7 +286,7 @@ hist(gini_weighted - gini_flat ,breaks=100)
 
 ```{r Figure_2C validation with variable sample set }
 
-if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if running sequential. If you want to look at robustness test results it is recommended you have enabled parallel computing (e.g. check getDoParWorkers > 3 or 4 (preferably more))
+if(FALSE){  ## NOTE! This chunk can require a lot of memory and time depending if running sequential. If you want to look at robustness test results it is recommended you have enabled parallel computing (e.g. check getDoParWorkers > 3 or 4 (preferably more))
   
   ## Use this variable to control whether performing random or true brain-non-brain partition
   random_partition = FALSE
@@ -301,7 +302,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
   
   num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-  num_reps <- 3
+  num_reps <- 5
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
   cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
@@ -332,6 +333,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
       results <- foreach(perm=1:length(permutation_matrix), .errorhandling = "pass", .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
       library(Hmisc)
       library(dendextend)
+      library(reldist)
       sample_indices <- 1:(arrayInd(perm, dim(permutation_matrix))[,1]) ## row is sample name, all names in a row up to top are choices for n=1,2..i
       rep_index <- arrayInd(perm, dim(permutation_matrix))[,2] ## column is replicate number
       sample_set <- permutation_matrix[sample_indices, rep_index]
@@ -390,6 +392,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
 } ## end of chunk control
 ## output to look at is robustness_test_results
+save.image()
 ```
 
 ```{r Figure_2C}
@@ -461,9 +464,47 @@ temp <- df_summary_by_partition
 df_summary_by_partition$y_min <-  temp$mean_var-temp$sd_of_var/sqrt(num_reps)
 df_summary_by_partition$y_max <-  temp$mean_var+temp$sd_of_var/sqrt(num_reps)
 ggl <- list()
-for(measure in unique(df_summary_by_partition$measure)){
+for(measure in unique(df$measure)){
   which <- which(df_summary_by_partition$measure == measure)
   which2 <- which(df_robustness_test_results$measure == measure)
+  gg <- ggplot(df_summary_by_partition[which,], aes(x=n, y=mean_var)) +
+    ggtitle(paste(measure,sep = ""))+
+    scale_color_manual(values=c("grey20","steelblue3"))+
+    scale_fill_manual(values=c("grey20","steelblue3"))+
+    geom_ribbon(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, fill=weight_or_flat),alpha=0.5)+
+    geom_line(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, color=weight_or_flat, fill=weight_or_flat))+
+    geom_point(data = df_robustness_test_results[which2,], aes(x=n, y=variance,group=weight_or_flat, color=weight_or_flat, fill=weight_or_flat))+
+    theme_bw()+
+    theme(panel.grid.minor.x = element_blank())+
+    scale_x_continuous(limits = c(0,13), breaks=seq(0,12,by=1), expand = c(0,0))
+  if(measure=="Zscore"){
+    gg <- gg+facet_grid(P1orP2 ~ . , scales = "free")
+  }
+    
+  
+  plot(gg)
+  ggl[[measure]] <- gg
+}
+grobl <- list()
+for(n in names(ggl)){
+  grobl[[n]] <- ggplotGrob(ggl[[n]])
+}
+
+grid.arrange(grobs=grobl, widths = c(1,1), layout_matrix = rbind(c(1,2),c(1,3),c(1,4))  )
+
+
+## alt arrange on measure
+ggl <- list()
+## Zscore first 
+for(measure in c("Zscore", "notZscore")){
+  if(measure == "Zscore"){
+    which <- which(df_summary_by_partition$measure == measure)
+    which2 <- which(df_robustness_test_results$measure == measure)  
+  } else {
+    which <- which(df_summary_by_partition$measure != "Zscore")
+    which2 <- which(df_robustness_test_results$measure != "Zscore")
+  }
+  
   gg <- ggplot(df_summary_by_partition[which,], aes(x=n, y=mean_var)) +
     scale_color_manual(values=c("grey20","steelblue3"))+
     scale_fill_manual(values=c("grey20","steelblue3"))+
@@ -472,14 +513,35 @@ for(measure in unique(df_summary_by_partition$measure)){
     geom_point(data = df_robustness_test_results[which2,], aes(x=n, y=variance,group=weight_or_flat, color=weight_or_flat, fill=weight_or_flat))+
     theme_bw()+
     theme(panel.grid.minor.x = element_blank())+
-    scale_x_continuous(limits = c(0,13), breaks=seq(0,12,by=1), expand = c(0,0))+
-    facet_grid(P1orP2 ~ . , scales = "free")
+    scale_x_continuous(limits = c(0,13), breaks=seq(0,12,by=1), expand = c(0,0))
   
+  if(measure == "Zscore"){
+     gg <- gg+facet_grid(P1orP2 ~ measure , scales = "free")
+     gg <- gg+theme(legend.position = "none")
+  } else {
+     gg <- gg+facet_wrap( ~ measure, nrow=3); plot(gg)
+  }
   plot(gg)
   ggl[[measure]] <- gg
 }
+
+grobl <- list()
+for(n in names(ggl)){
+  grobl[[n]] <- ggplotGrob(ggl[[n]])
+}
+
+grid.arrange(grobs=grobl, ncol=2  )
+
+
+#grid.arrange(grobs=grobl, widths = c(1,1), layout_matrix = rbind(c(1,2),c(1,3),c(1,4))  )
+
+
+
+#grid.arrange(ggl$Zscore, ggl$Tau, ggl$Tsi, ggl$Gini, nrow=2)
+
 filename <- paste(figures_dir,"/",date,"_variance_non-random.png",sep = "")
 ggsave(filename, gg, device = "png", width = 6, height = 6)
+
 ```
 
 
@@ -512,7 +574,7 @@ for(el in names(robustness_test_results)){
  # for(i in 1:length(robustness_test_results[[el]]) ){   ### foreach at this level if implementing foreach
   df_temp <- foreach(i=1:length(robustness_test_results[[el]]), .errorhandling = "pass", .combine = rbind) %dopar% {
     #foreach(perm=1:length(permutation_matrix), .errorhandling = "pass", .final = function(x) setNames(x,paste("rep=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix))[,2], ",n=", arrayInd(1:length(permutation_matrix), dim(permutation_matrix ))[,1], sep = ""))) %dopar% {
-    
+    library(stringr)
     df_internal <- data.frame(measure=character(), n=numeric(),
                               rep=numeric(), cut_point=numeric(), 
                               jaccard=numeric(), P1orP2=character(),
@@ -770,7 +832,14 @@ if(TRUE){
   
 }
 
-heatmaps$delta + heatmaps$flat + heatmaps$weighted
+png(filename = "heatmap.png", width=8, height=16, units="in", res=300)
+heatmaps$delta
+dev.off()
+
+png(filename = "heatmap_f_w.png", width=16, height=16, units="in", res=300)
+heatmaps$flat + heatmaps$weighted
+dev.off()
+
 ```
 
 
@@ -784,22 +853,22 @@ heatmaps$delta + heatmaps$flat + heatmaps$weighted
 
 head(gtex_rowinfo)
 ## create list of marker genes (common name and ENS map in genes object and gtex_rowinfo object)
-#"NEUROD1","NEUROD2" ,"NEUROD4", "NEUROD6",
-specific_genes <- c("SOX2", "MAP2", "OLIG1","GFAP" , "PRSS1", "MYH6", "MYH7")
+#"NEUROD1","NEUROD2" ,"NEUROD4", "NEUROD6","MBP", "MAP2","GFAP" ,
+specific_genes <- c("SOX2",  "TPPP", "OLIG1", "PRSS1", "CTRB2", "MYH6", "MYL4")
 spec_genes_w_ids <- gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
 spec_genes_w_ids <- spec_genes_w_ids[which(is.element(spec_genes_w_ids$Name, rownames(spec_mats$delta_Zscore))),]
 spec_genes_w_ids <- spec_genes_w_ids[match(specific_genes, spec_genes_w_ids$Description),]
 spec_genes_w_ids <- merge( data.frame(f_or_w = c("flat","weighted")),spec_genes_w_ids)
-spec_genes_w_ids
-
+spec_genes_w_ids <- spec_genes_w_ids[complete.cases(spec_genes_w_ids),]
+ 
 
 col_funs <- list()
 for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
   if(measure=="Zscore"){
     col_funs[[measure]] <-colorRamp2(c(min(c(min(spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
                                              min(spec_mats$flat_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE),-4)),
-                                       -2, -1.99, 0, 1.99, 2,
-                                      #-3, -2, 0, 2, 3,
+                                      # -2, -1.99, 0, 1.99, 2,
+                                      -3, -2, 0, 2, 3,
                                        max(c(max( spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
                                              max( spec_mats$flat_Zscore[spec_genes_w_ids$Name,]), na.rm = TRUE),4)),
                                      c("darkblue", "blue", "#aaaaff" ,"white", "#ffaaaa",  "red","red4"))  
@@ -844,8 +913,10 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
   #draw(heatmaps)
   draw(h1)
 }
-draw(heatmaps)
 
+png("marker_genes_grad.png", width = 10, height = 8, units = "in", res=300 )
+draw(heatmaps)
+dev.off()
 
 
 
@@ -854,6 +925,140 @@ draw(heatmaps)
 
 ```{r Figure 3D}
 ## gene ontology summaries
+library(DOSE)
+library(pathview)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+
+library(tidyverse)
+
+
+
+
+spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights = weights)
+flat <- weights; flat[1:length(flat)] <- 1
+spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
+
+tem <- tempfile()
+download.file("https://raw.githubusercontent.com/hbctraining/DGE_workshop_salmon_online/master/data/annotations_ahb.csv",tem)
+annotations_ahb<- read.table( tem, skip=0, header = TRUE, sep = ",")
+
+y<-rownames(spec_mat_flat)
+gene_names<-str_split_fixed(y,"[.]",2)
+gene_names<-gene_names[,1]
+gene_names[1]
+tissue_names<-colnames(spec_mat_flat)
+
+genes_spec <- data.frame(NULL,NULL,NULL,NULL)
+
+########
+for(j in 1:ncol(spec_mat_weighted)){
+ for(i in 1:nrow(spec_mat_weighted)){ #get rid of loop
+      if(is.na(spec_mat_flat[i,j]>=2.0 && spec_mat_weighted[i,j]<=2.0)){
+     # print("NA")
+    }else if(spec_mat_flat[i,j]>=2.0 && spec_mat_weighted[i,j]<=2.0){ #get rid of this if statement 
+      #which <- which((spec_mat_flat[,j]>=2.0 & spec_mat_weighted[,j]<=2.0))
+      genes_spec[i,1]<- colnames(spec_mat_flat)[j]
+      genes_spec[i,2]<- gene_names[i]
+      genes_spec[i,3]<-spec_mat_flat[i,j] 
+      genes_spec[i,4]<-spec_mat_weighted[i,j]
+      genes_spec[i,5]<-(spec_mat_flat[i,j] - spec_mat_weighted[i,j])
+      genes_spec[i,6]<-(spec_mat_weighted[i,j] - spec_mat_flat[i,j])
+    }else{
+      #print("not specific")
+    }
+  }
+}
+########## 
+vec1 <- character()
+#diff_1<-character()
+for(j in 1:ncol(spec_mat_weighted)){
+ which<-which((spec_mat_flat[,j]>=2.0 & spec_mat_weighted[,j]<=2.0))
+which<-as.matrix(which)
+  which<- rownames(which)
+  which<-str_split_fixed(which, "[.]", 2)
+  which<- which[,1]
+   vec1 <- c(vec1, which)
+  # difference1<-as.character(which(spec_mat_flat[,j]>=2.0 & spec_mat_weighted[,j]<=2.0))
+  # diff_1<-c(diff_1,difference1)
+}
+
+
+vec1<-unique(vec1) #unique vector for gene ids of flat >2 and weighted < 2 
+#diff_1<-as.numeric(diff_1)
+#hist(diff_1)
+
+
+
+vec2 <- character()
+#diff_2<-character()
+for(j in 1:ncol(spec_mat_weighted)){
+ which<-which((spec_mat_flat[,j]<=2.0 & spec_mat_weighted[,j]>=2.0))
+which<-as.matrix(which)
+  which<- rownames(which)
+  which<-str_split_fixed(which, "[.]", 2)
+  which<- which[,1]
+   vec2 <- c(vec2, which)
+ #   difference<-as.character(which(spec_mat_flat[,j]<=2.0 & spec_mat_weighted[,j]>=2.0))
+  # diff_2<-c(diff_2,difference)
+}
+
+vec2<-unique(vec2)
+#diff_2<-as.numeric(diff_2)
+#hist(diff_2)
+
+data_spec<-as.data.frame(gene_names)
+library(data.table)
+colnames(data_spec)<- c("gene")
+res_ids <- data_spec
+res_ids
+
+
+
+
+allOE_genes <- as.character(res_ids$gene)
+## Extract significant results
+sigOE <- vec2 #specific genes 
+names(sigOE)<- c("gene_id")
+sigOE_genes <- as.character(vec2) #specific genes 
+names(sigOE_genes)<- c("gene_id")
+View(allOE_genes)
+View(sigOE_genes)
+View(res_ids)
+
+ego <- enrichGO(gene = sigOE_genes, 
+                universe = allOE_genes,
+                keyType = "ENSEMBL",
+                OrgDb = org.Hs.eg.db, 
+                ont = "BP", 
+                pAdjustMethod = "BH",
+                qvalueCutoff = 0.05,
+                readable = TRUE)
+
+
+
+cluster_summary <- data.frame(ego)
+cluster_summary
+write.csv(cluster_summary, "results/clusterProfiler_Mov10oe.csv")
+
+
+dotplot(ego, showCategory=50)
+
+
+png("weight>flat.png",width=1000,height=900)
+dotplot(ego, showCategory=100)#top 20 
+dev.off()
+
+ego <- enrichplot::pairwise_termsim(ego)
+png("weight>flat_dotplot.png",width=1000,height=900)
+options(ggrepel.max.overlaps = 30)
+emapplot(ego, showCategory = 20)
+dev.off()
+
+#reference package - methods 
+#fraction that looks like brain 
+
+
 
 
 ```
