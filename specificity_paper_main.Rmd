@@ -463,37 +463,8 @@ df_summary_by_partition$sd_of_var <- aggregate(df$variance,
 temp <- df_summary_by_partition
 df_summary_by_partition$y_min <-  temp$mean_var-temp$sd_of_var/sqrt(num_reps)
 df_summary_by_partition$y_max <-  temp$mean_var+temp$sd_of_var/sqrt(num_reps)
-ggl <- list()
-for(measure in unique(df$measure)){
-  which <- which(df_summary_by_partition$measure == measure)
-  which2 <- which(df_robustness_test_results$measure == measure)
-  gg <- ggplot(df_summary_by_partition[which,], aes(x=n, y=mean_var)) +
-    ggtitle(paste(measure,sep = ""))+
-    scale_color_manual(values=c("grey20","steelblue3"))+
-    scale_fill_manual(values=c("grey20","steelblue3"))+
-    geom_ribbon(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, fill=weight_or_flat),alpha=0.5)+
-    geom_line(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, color=weight_or_flat, fill=weight_or_flat))+
-    geom_point(data = df_robustness_test_results[which2,], aes(x=n, y=variance,group=weight_or_flat, color=weight_or_flat, fill=weight_or_flat))+
-    theme_bw()+
-    theme(panel.grid.minor.x = element_blank())+
-    scale_x_continuous(limits = c(0,13), breaks=seq(0,12,by=1), expand = c(0,0))
-  if(measure=="Zscore"){
-    gg <- gg+facet_grid(P1orP2 ~ . , scales = "free")
-  }
-    
-  
-  plot(gg)
-  ggl[[measure]] <- gg
-}
-grobl <- list()
-for(n in names(ggl)){
-  grobl[[n]] <- ggplotGrob(ggl[[n]])
-}
-
-grid.arrange(grobs=grobl, widths = c(1,1), layout_matrix = rbind(c(1,2),c(1,3),c(1,4))  )
 
 
-## alt arrange on measure
 ggl <- list()
 ## Zscore first 
 for(measure in c("Zscore", "notZscore")){
@@ -516,7 +487,8 @@ for(measure in c("Zscore", "notZscore")){
     scale_x_continuous(limits = c(0,13), breaks=seq(0,12,by=1), expand = c(0,0))
   
   if(measure == "Zscore"){
-     gg <- gg+facet_grid(P1orP2 ~ measure , scales = "free")
+     gg <- gg+facet_grid(P1orP2 ~ measure , scales = "free",
+                         labeller=labeller(P1orP2=c("P1"="P1 (non-brain)", "P2"="P2 (brain)")))
      gg <- gg+theme(legend.position = "none")
   } else {
      gg <- gg+facet_wrap( ~ measure, nrow=3); plot(gg)
@@ -529,9 +501,8 @@ grobl <- list()
 for(n in names(ggl)){
   grobl[[n]] <- ggplotGrob(ggl[[n]])
 }
-
 grid.arrange(grobs=grobl, ncol=2  )
-
+g <- arrangeGrob(grobs=grobl,ncol=2)
 
 #grid.arrange(grobs=grobl, widths = c(1,1), layout_matrix = rbind(c(1,2),c(1,3),c(1,4))  )
 
@@ -540,7 +511,8 @@ grid.arrange(grobs=grobl, ncol=2  )
 #grid.arrange(ggl$Zscore, ggl$Tau, ggl$Tsi, ggl$Gini, nrow=2)
 
 filename <- paste(figures_dir,"/",date,"_variance_non-random.png",sep = "")
-ggsave(filename, gg, device = "png", width = 6, height = 6)
+ggsave(filename, g, device = "png", width = 9, height = 8)
+
 
 ```
 
@@ -659,9 +631,16 @@ df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersec
                                                         cut_point=df$cut_point, P1orP2=df$P1orP2,
                                                         weighted=df$weighted),
                                                         FUN=function(x) mean(x,na.rm = TRUE) )$x 
+
+
+  
 ggl_jacc <- list()
-for(measure in unique(df_summary_by_partition$measure)){
-  which <- which(df_summary_by_partition$measure == measure)
+for(measure in c("Zscore", "notZscore")){
+  if(measure == "Zscore"){
+    which <- which(df_summary_by_partition$measure == measure)
+  } else {
+    which <- which(df_summary_by_partition$measure != "Zscore")
+  }
   gg <- ggplot(df_summary_by_partition[which,],
                aes(x=cut_point, y=jaccard_mean,
                    ymin=jaccard_mean-jaccard_sd/num_reps, 
@@ -675,16 +654,36 @@ for(measure in unique(df_summary_by_partition$measure)){
     scale_color_continuous(low="steelblue2", high="steelblue4")+
     scale_y_continuous(limits = c(0,1), breaks=seq(0,1,by=0.2))+
     facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-  if(measure=="Zscore"){gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
-  }else{ gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))}
-  gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  if(measure == "Zscore"){
+    gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
+    gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    gg <- gg+theme(legend.position = "none")
+  } else {
+    gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))
+    gg <- gg + facet_grid(measure ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  }
+  
   plot(gg)
   ggl_jacc[[measure]] <- gg
 }
 
+grobl <- list()
+for(n in names(ggl_jacc)){
+  grobl[[n]] <- ggplotGrob(ggl_jacc[[n]])
+}
+grid.arrange(grobs=grobl, ncol=2  )
+g <- arrangeGrob(grobs=grobl,ncol=2)
+filename <- paste(figures_dir,"/",date,"_jaccard_non-random.png",sep = "")
+ggsave(filename, g, device = "png", width = 12, height = 8)
+
+
 ggl_count <- list()
-for(measure in unique(df_summary_by_partition$measure)){
-  which <- which(df_summary_by_partition$measure == measure)
+for(measure in c("Zscore", "notZscore")){
+  if(measure == "Zscore"){
+    which <- which(df_summary_by_partition$measure == measure)
+  } else {
+    which <- which(df_summary_by_partition$measure != "Zscore")
+  }
   gg <- ggplot(df_summary_by_partition[which,],
                aes(x=cut_point, y=gene_count / nrow(genes),
                    group=n, fill=n))+
@@ -699,12 +698,26 @@ for(measure in unique(df_summary_by_partition$measure)){
                        breaks = trans_breaks("log10", function(x) 10^x), # ) #,
                        labels = percent,  )
     
-  if(measure=="Zscore"){gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
-  }else{ gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))}
-  gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  if(measure == "Zscore"){
+    gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
+    gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    gg <- gg+theme(legend.position = "none")
+  } else {
+    gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))
+    gg <- gg + facet_grid(measure ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  }
   plot(gg)
   ggl_count[[measure]] <- gg
 }
+grobl <- list()
+for(n in names(ggl_count)){
+  grobl[[n]] <- ggplotGrob(ggl_count[[n]])
+}
+grid.arrange(grobs=grobl, ncol=2  )
+g <- arrangeGrob(grobs=grobl,ncol=2)
+filename <- paste(figures_dir,"/",date,"_jaccard_gene_count_non-random.png",sep = "")
+ggsave(filename, g, device = "png", width = 12, height = 8)
+
 
 
 
