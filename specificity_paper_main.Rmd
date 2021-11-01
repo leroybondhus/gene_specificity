@@ -285,8 +285,8 @@ hist(gini_weighted - gini_flat ,breaks=100)
 
 
 ```{r Figure_2C validation with variable sample set }
-
-if(FALSE){  ## NOTE! This chunk can require a lot of memory and time depending if running sequential. If you want to look at robustness test results it is recommended you have enabled parallel computing (e.g. check getDoParWorkers > 3 or 4 (preferably more))
+## load data instead
+if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if running sequential. If you want to look at robustness test results it is recommended you have enabled parallel computing (e.g. check getDoParWorkers > 3 or 4 (preferably more))
   
   ## Use this variable to control whether performing random or true brain-non-brain partition
   random_partition = FALSE
@@ -302,7 +302,7 @@ if(FALSE){  ## NOTE! This chunk can require a lot of memory and time depending i
   
   
   num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-  num_reps <- 5
+  num_reps <- 8
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
   cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
@@ -845,11 +845,14 @@ if(TRUE){
   
 }
 
-png(filename = "heatmap.png", width=8, height=16, units="in", res=300)
+filename <- paste(figures_dir,"/",date,"_heatmap.png",sep = "")
+png(filename = filename, width=8, height=16, units="in", res=300)
 heatmaps$delta
 dev.off()
 
-png(filename = "heatmap_f_w.png", width=16, height=16, units="in", res=300)
+
+filename <- paste(figures_dir,"/",date,"_heatmap_f_w.png",sep = "")
+png(filename = filename, width=16, height=16, units="in", res=300)
 heatmaps$flat + heatmaps$weighted
 dev.off()
 
@@ -923,11 +926,10 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
       } else {
       heatmaps <- heatmaps + h1
     }
-  #draw(heatmaps)
-  draw(h1)
 }
 
-png("marker_genes_grad.png", width = 10, height = 8, units = "in", res=300 )
+filename <- paste(figures_dir,"/",date,"marker_genes_grad.png",sep = "")
+png(filename, width = 10, height = 8, units = "in", res=300 )
 draw(heatmaps)
 dev.off()
 
@@ -944,63 +946,25 @@ library(clusterProfiler)
 library(org.Hs.eg.db)
 
 library(tidyverse)
-
-
+library(topGO) 
 
 
 spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights = weights)
 flat <- weights; flat[1:length(flat)] <- 1
 spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
 
-tem <- tempfile()
-download.file("https://raw.githubusercontent.com/hbctraining/DGE_workshop_salmon_online/master/data/annotations_ahb.csv",tem)
-annotations_ahb<- read.table( tem, skip=0, header = TRUE, sep = ",")
+
+
+## which <- 
+cutoff <- 2
+which <- which((spec_mat_weighted >= cutoff & spec_mat_flat < cutoff))
+temp <- spec_mat_weighted[which]
 
 y<-rownames(spec_mat_flat)
 gene_names<-str_split_fixed(y,"[.]",2)
 gene_names<-gene_names[,1]
 gene_names[1]
 tissue_names<-colnames(spec_mat_flat)
-
-genes_spec <- data.frame(NULL,NULL,NULL,NULL)
-
-########
-for(j in 1:ncol(spec_mat_weighted)){
- for(i in 1:nrow(spec_mat_weighted)){ #get rid of loop
-      if(is.na(spec_mat_flat[i,j]>=2.0 && spec_mat_weighted[i,j]<=2.0)){
-     # print("NA")
-    }else if(spec_mat_flat[i,j]>=2.0 && spec_mat_weighted[i,j]<=2.0){ #get rid of this if statement 
-      #which <- which((spec_mat_flat[,j]>=2.0 & spec_mat_weighted[,j]<=2.0))
-      genes_spec[i,1]<- colnames(spec_mat_flat)[j]
-      genes_spec[i,2]<- gene_names[i]
-      genes_spec[i,3]<-spec_mat_flat[i,j] 
-      genes_spec[i,4]<-spec_mat_weighted[i,j]
-      genes_spec[i,5]<-(spec_mat_flat[i,j] - spec_mat_weighted[i,j])
-      genes_spec[i,6]<-(spec_mat_weighted[i,j] - spec_mat_flat[i,j])
-    }else{
-      #print("not specific")
-    }
-  }
-}
-########## 
-vec1 <- character()
-#diff_1<-character()
-for(j in 1:ncol(spec_mat_weighted)){
- which<-which((spec_mat_flat[,j]>=2.0 & spec_mat_weighted[,j]<=2.0))
-which<-as.matrix(which)
-  which<- rownames(which)
-  which<-str_split_fixed(which, "[.]", 2)
-  which<- which[,1]
-   vec1 <- c(vec1, which)
-  # difference1<-as.character(which(spec_mat_flat[,j]>=2.0 & spec_mat_weighted[,j]<=2.0))
-  # diff_1<-c(diff_1,difference1)
-}
-
-
-vec1<-unique(vec1) #unique vector for gene ids of flat >2 and weighted < 2 
-#diff_1<-as.numeric(diff_1)
-#hist(diff_1)
-
 
 
 vec2 <- character()
@@ -1049,24 +1013,22 @@ ego <- enrichGO(gene = sigOE_genes,
                 readable = TRUE)
 
 
-
 cluster_summary <- data.frame(ego)
 cluster_summary
-write.csv(cluster_summary, "results/clusterProfiler_Mov10oe.csv")
+#write.csv(cluster_summary, "results/clusterProfiler_Mov10oe.csv")
 
 
-dotplot(ego, showCategory=50)
+dotplot(ego, showCategory=20)
 
 
-png("weight>flat.png",width=1000,height=900)
-dotplot(ego, showCategory=100)#top 20 
-dev.off()
+#png("weight>flat.png",width=1000,height=900)
+dotplot(ego, showCategory=20)#top 20 
+#dev.off()
 
 ego <- enrichplot::pairwise_termsim(ego)
-png("weight>flat_dotplot.png",width=1000,height=900)
-options(ggrepel.max.overlaps = 30)
+#png("weight>flat_dotplot.png",width=1000,height=900)
 emapplot(ego, showCategory = 20)
-dev.off()
+#dev.off()
 
 #reference package - methods 
 #fraction that looks like brain 
