@@ -444,19 +444,19 @@ for(el in 1:length(robustness_test_results)){
   
 }
 
-df <- df_robustness_test_results
-df_summary_by_partition <- aggregate(df$variance,
-                                     by=list(measure=df$measure,
-                                             P1orP2=df$P1orP2,
-                                             weight_or_flat= df$weight_or_flat,
-                                             n=df$n),
+df_vp <- df_robustness_test_results
+df_summary_by_partition <- aggregate(df_vp$variance,
+                                     by=list(measure=df_vp$measure,
+                                             P1orP2=df_vp$P1orP2,
+                                             weight_or_flat= df_vp$weight_or_flat,
+                                             n=df_vp$n),
                                      FUN=function(x) mean(x,na.rm=TRUE))
 names(df_summary_by_partition)[ncol(df_summary_by_partition)] <- "mean_var"
-df_summary_by_partition$sd_of_var <- aggregate(df$variance,
-                                     by=list(measure=df$measure,
-                                             P1orP2=df$P1orP2,
-                                             weight_or_flat= df$weight_or_flat,
-                                             n=df$n),
+df_summary_by_partition$sd_of_var <- aggregate(df_vp$variance,
+                                     by=list(measure=df_vp$measure,
+                                             P1orP2=df_vp$P1orP2,
+                                             weight_or_flat= df_vp$weight_or_flat,
+                                             n=df_vp$n),
                                      FUN=function(x) sd(x,na.rm=TRUE))$x
 
 
@@ -481,17 +481,19 @@ for(measure in c("Zscore", "notZscore")){
     scale_fill_manual(values=c("grey20","steelblue3"))+
     geom_ribbon(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, fill=weight_or_flat),alpha=0.5)+
     geom_line(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, color=weight_or_flat, fill=weight_or_flat))+
-    geom_point(data = df_robustness_test_results[which2,], aes(x=n, y=variance,group=weight_or_flat, color=weight_or_flat, fill=weight_or_flat))+
+    geom_point(data = df_robustness_test_results[which2,], size=0.2,
+               aes(x=n, y=variance,group=weight_or_flat,color=weight_or_flat, fill=weight_or_flat))+
     theme_bw()+
     theme(panel.grid.minor.x = element_blank())+
     scale_x_continuous(limits = c(0,13), breaks=seq(0,12,by=1), expand = c(0,0))
   
   if(measure == "Zscore"){
-     gg <- gg+facet_grid(P1orP2 ~ measure , scales = "free",
+     gg <- gg+facet_wrap(measure ~ P1orP2 , scales = "free",
                          labeller=labeller(P1orP2=c("P1"="P1 (non-brain)", "P2"="P2 (brain)")))
      gg <- gg+theme(legend.position = "none")
   } else {
-     gg <- gg+facet_wrap( ~ measure, nrow=3); plot(gg)
+     gg <- gg+facet_wrap( ~ measure, ncol = 3); plot(gg)
+     gg <- gg+theme(legend.position="bottom")
   }
   plot(gg)
   ggl[[measure]] <- gg
@@ -501,8 +503,8 @@ grobl <- list()
 for(n in names(ggl)){
   grobl[[n]] <- ggplotGrob(ggl[[n]])
 }
-grid.arrange(grobs=grobl, ncol=2  )
-g <- arrangeGrob(grobs=grobl,ncol=2)
+grid.arrange(grobs=grobl, ncol=2, widths=c(5,4))
+g <-arrangeGrob(grobs=grobl, ncol=2, widths=c(5,4))
 
 #grid.arrange(grobs=grobl, widths = c(1,1), layout_matrix = rbind(c(1,2),c(1,3),c(1,4))  )
 
@@ -510,9 +512,8 @@ g <- arrangeGrob(grobs=grobl,ncol=2)
 
 #grid.arrange(ggl$Zscore, ggl$Tau, ggl$Tsi, ggl$Gini, nrow=2)
 
-filename <- paste(figures_dir,"/",date,"_variance_non-random.png",sep = "")
-ggsave(filename, g, device = "png", width = 9, height = 8)
-
+filename <- paste(figures_dir,"/",date,"_variance_non-random_v02.png",sep = "")
+ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
 
 ```
 
@@ -649,18 +650,19 @@ for(measure in c("Zscore", "notZscore")){
     theme_bw()+
     theme(
           panel.grid.minor.x = element_blank())+
-    ggtitle(paste("jaccard index for ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
+    #ggtitle(paste("jaccard index for ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
     geom_line(aes(color=n))+
-    scale_color_continuous(low="steelblue2", high="steelblue4")+
+    scale_color_continuous(low="powderblue", high="steelblue4")+
     scale_y_continuous(limits = c(0,1), breaks=seq(0,1,by=0.2))+
     facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
   if(measure == "Zscore"){
     gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
-    gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    gg <- gg + facet_grid(weighted ~ P1orP2, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
     gg <- gg+theme(legend.position = "none")
   } else {
     gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))
-    gg <- gg + facet_grid(measure ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    gg <- gg + facet_grid(weighted ~ measure, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    gg <- gg+theme(legend.position="bottom")
   }
   
   plot(gg)
@@ -671,10 +673,11 @@ grobl <- list()
 for(n in names(ggl_jacc)){
   grobl[[n]] <- ggplotGrob(ggl_jacc[[n]])
 }
-grid.arrange(grobs=grobl, ncol=2  )
-g <- arrangeGrob(grobs=grobl,ncol=2)
-filename <- paste(figures_dir,"/",date,"_jaccard_non-random.png",sep = "")
-ggsave(filename, g, device = "png", width = 12, height = 8)
+#grid.arrange(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(6,1)  ) ), nrow=2, heights=c(5,4) )
+grid.arrange(grobs =list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), nrow=2, heights=c(6,1)  ) ), ncol=2, widths=c(5,4) )
+g <- arrangeGrob(grobs =grobl, ncol=2, widths=c(5,4) )
+filename <- paste(figures_dir,"/",date,"_jaccard_non-random_v03.png",sep = "")
+ggsave(filename, g, device = "png", width = 8, height = 3, dpi=300)
 
 
 ggl_count <- list()
@@ -690,7 +693,7 @@ for(measure in c("Zscore", "notZscore")){
     theme_bw()+
     theme(
           panel.grid.minor.x = element_blank())+
-    ggtitle(paste("Number of genes above threshold for\n ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
+    #ggtitle(paste("Number of genes above threshold for\n ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
     geom_line(aes(color=n))+
     scale_color_continuous(low="steelblue2", high="steelblue4")+
     #scale_y_log10( #limits = c(1,3e4),
@@ -713,10 +716,10 @@ grobl <- list()
 for(n in names(ggl_count)){
   grobl[[n]] <- ggplotGrob(ggl_count[[n]])
 }
-grid.arrange(grobs=grobl, ncol=2  )
-g <- arrangeGrob(grobs=grobl,ncol=2)
+grid.arrange(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(6,1)  ) ), nrow=2, heights=c(5,4) )
+g <- arrangeGrob(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(5,1)  ) ), nrow=2, heights=c(5,4) )
 filename <- paste(figures_dir,"/",date,"_jaccard_gene_count_non-random.png",sep = "")
-ggsave(filename, g, device = "png", width = 12, height = 8)
+ggsave(filename, g, device = "png", width = 6, height = 4)
 
 
 
@@ -775,15 +778,15 @@ if(TRUE){
                                            data.frame("gene" = rownames(spec_mat_flat)[order((spec_mat[,i]*(-1)), decreasing = TRUE)[1:n]])) 
         }
     } else if (specificity_measures$out_type[measure]=="vector"){
-      n=20 ## top n for each vector measure (single column) 
-      temp_name <- measure
-      gene_list$up[[temp_name]] <- data.frame("gene"=numeric())
-      gene_list$down[[temp_name]] <- data.frame("gene"=numeric())
-      ## go in same order as similarity tree
-      gene_list$up[[temp_name]] <- rbind(gene_list$up[[temp_name]],
-                                         data.frame("gene"=rownames(spec_mat_flat)[order((spec_mat[,1]), decreasing = TRUE)[1:n]]))
-      gene_list$down[[temp_name]] <- rbind(gene_list$down[[temp_name]],
-                                           data.frame("gene" = rownames(spec_mat_flat)[order((spec_mat[,1]*(-1)), decreasing = TRUE)[1:n]]))
+      # n=20 ## top n for each vector measure (single column) 
+      # temp_name <- measure
+      # gene_list$up[[temp_name]] <- data.frame("gene"=numeric())
+      # gene_list$down[[temp_name]] <- data.frame("gene"=numeric())
+      # ## go in same order as similarity tree
+      # gene_list$up[[temp_name]] <- rbind(gene_list$up[[temp_name]],
+      #                                    data.frame("gene"=rownames(spec_mat_flat)[order((spec_mat[,1]), decreasing = TRUE)[1:n]]))
+      # gene_list$down[[temp_name]] <- rbind(gene_list$down[[temp_name]],
+      #                                      data.frame("gene" = rownames(spec_mat_flat)[order((spec_mat[,1]*(-1)), decreasing = TRUE)[1:n]]))
     } else { stop("WARNING: no out type associated with measure") }
     
   }
@@ -797,14 +800,14 @@ if(TRUE){
                                         max(c(2, max( spec_mats$delta_Zscore, na.rm = T) ) )),
                                       c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
     for(measure in specificity_measures$func_names[which(specificity_measures$out_type=="vector")]){
-      if(type=="delta"){
-          col_funs[[paste(type, measure, sep="_")]] <- colorRamp2(c(-1,-0.25, 0 , 0.25, 1),
-                                         c("darkblue", "blue", "white", "red", "red4") )
-      } else {
-        col_funs[[paste(type,measure, sep="_")]] <- colorRamp2(c(0, 0.5, 1),
-                                         c("white", "red", "red4") )
-      }
-      
+      # if(type=="delta"){
+      #     col_funs[[paste(type, measure, sep="_")]] <- colorRamp2(c(-1,-0.25, 0 , 0.25, 1),
+      #                                    c("darkblue", "blue", "white", "red", "red4") )
+      # } else {
+      #   col_funs[[paste(type,measure, sep="_")]] <- colorRamp2(c(0, 0.5, 1),
+      #                                    c("white", "red", "red4") )
+      # }
+      # 
     }
   }
   
@@ -845,14 +848,14 @@ if(TRUE){
   
 }
 
-filename <- paste(figures_dir,"/",date,"_heatmap.png",sep = "")
-png(filename = filename, width=8, height=16, units="in", res=300)
+filename <- paste(figures_dir,"/",date,"_heatmap_v01.png",sep = "")
+png(filename = filename, width=8, height=14, units="in", res=300)
 heatmaps$delta
 dev.off()
 
 
-filename <- paste(figures_dir,"/",date,"_heatmap_f_w.png",sep = "")
-png(filename = filename, width=16, height=16, units="in", res=300)
+filename <- paste(figures_dir,"/",date,"_heatmap_fw_v01.png",sep = "")
+png(filename = filename, width=16, height=14, units="in", res=300)
 heatmaps$flat + heatmaps$weighted
 dev.off()
 
@@ -869,8 +872,10 @@ dev.off()
 
 head(gtex_rowinfo)
 ## create list of marker genes (common name and ENS map in genes object and gtex_rowinfo object)
-#"NEUROD1","NEUROD2" ,"NEUROD4", "NEUROD6","MBP", "MAP2","GFAP" ,
-specific_genes <- c("SOX2",  "TPPP", "OLIG1", "PRSS1", "CTRB2", "MYH6", "MYL4")
+#"NEUROD1","NEUROD2" ,"SOX2",  "TPPP","NEUROD4", "NEUROD6","MBP", "MAP2","GFAP" ,"NSG2","ADCY8","HEPACAM","VSTM2B","SLITRK3","MBP","MAP2","SOX2",  "TPPP","BCAN", "NCAN","OPALIN","STMN4", "GFAP" ,"NSG2","ADCY8",
+specific_genes <- c( "OLIG1","OLIG2",
+                     "PRSS1", "CTRB2",
+                     "MYH6", "MYL4")
 spec_genes_w_ids <- gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
 spec_genes_w_ids <- spec_genes_w_ids[which(is.element(spec_genes_w_ids$Name, rownames(spec_mats$delta_Zscore))),]
 spec_genes_w_ids <- spec_genes_w_ids[match(specific_genes, spec_genes_w_ids$Description),]
@@ -881,13 +886,14 @@ spec_genes_w_ids <- spec_genes_w_ids[complete.cases(spec_genes_w_ids),]
 col_funs <- list()
 for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
   if(measure=="Zscore"){
-    col_funs[[measure]] <-colorRamp2(c(min(c(min(spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
+    col_funs[[measure]] <-colorRamp2( c( min(c(min(spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
                                              min(spec_mats$flat_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE),-4)),
-                                      # -2, -1.99, 0, 1.99, 2,
-                                      -3, -2, 0, 2, 3,
-                                       max(c(max( spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ),
+                                    #   -2, -1.99, 0, 1.99, 2, 3.99 ,
+                                      -3, -2, 0, 2, 3, 3.99,
+                                       max(c(max( spec_mats$weighted_Zscore[spec_genes_w_ids$Name,], na.rm = TRUE ), 
                                              max( spec_mats$flat_Zscore[spec_genes_w_ids$Name,]), na.rm = TRUE),4)),
-                                     c("darkblue", "blue", "#aaaaff" ,"white", "#ffaaaa",  "red","red4"))  
+                                     c("darkblue", "blue", "#aaaaff" ,"white", "#ffaaaa",  "red","red4", "grey20"))
+                                    #c("darkblue", "blue", "#aaaaff" ,"white", "#ffaaaa",  "red","red4"))
   } else {
     col_funs[[measure]] <-colorRamp2(c( 0, 0.4, 0.6, 0.8, 1),
                                      c("white", "lightgoldenrod1","yellow" ,"red","red4"))
@@ -917,18 +923,19 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
                   col = col_funs[[measure]] 
                   )
     } else {
-      h1 <- Heatmap(temp_mat, name=measure,
-                    cluster_rows = FALSE, show_row_names = TRUE,
-                    col = col_funs[[measure]])
+      # h1 <- Heatmap(temp_mat, name=measure,
+      #               cluster_rows = FALSE, show_row_names = TRUE,
+      #               col = col_funs[[measure]])
       }
   if(length(heatmaps)==0){
       heatmaps <- h1
-      } else {
-      heatmaps <- heatmaps + h1
+      # } else {
+      # heatmaps <- heatmaps + h1
     }
 }
+draw(heatmaps)
 
-filename <- paste(figures_dir,"/",date,"marker_genes_grad.png",sep = "")
+filename <- paste(figures_dir,"/",date,"marker_genes_grad_v01.png",sep = "")
 png(filename, width = 10, height = 8, units = "in", res=300 )
 draw(heatmaps)
 dev.off()
@@ -947,94 +954,65 @@ library(org.Hs.eg.db)
 
 library(tidyverse)
 library(topGO) 
-
+library(enrichplot)
 
 spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights = weights)
 flat <- weights; flat[1:length(flat)] <- 1
 spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
 
-
-
-## which <- 
 cutoff <- 2
 which <- which((spec_mat_weighted >= cutoff & spec_mat_flat < cutoff))
-temp <- spec_mat_weighted[which]
 
-y<-rownames(spec_mat_flat)
-gene_names<-str_split_fixed(y,"[.]",2)
-gene_names<-gene_names[,1]
-gene_names[1]
-tissue_names<-colnames(spec_mat_flat)
+allOE_genes<-str_split_fixed(rownames(spec_mat_flat),"[.]",2)[,1]
 
-
-vec2 <- character()
-#diff_2<-character()
+sigOE_genes <- character()
 for(j in 1:ncol(spec_mat_weighted)){
  which<-which((spec_mat_flat[,j]<=2.0 & spec_mat_weighted[,j]>=2.0))
 which<-as.matrix(which)
   which<- rownames(which)
   which<-str_split_fixed(which, "[.]", 2)
   which<- which[,1]
-   vec2 <- c(vec2, which)
- #   difference<-as.character(which(spec_mat_flat[,j]<=2.0 & spec_mat_weighted[,j]>=2.0))
-  # diff_2<-c(diff_2,difference)
+   sigOE_genes <- c(sigOE_genes, which)
+}
+sigOE_genes<-unique(sigOE_genes)
+
+
+for(onto in c("BP","MF","CC")){
+  print(onto)
+  ego <- enrichGO(gene = sigOE_genes, 
+                  universe = allOE_genes,
+                  keyType = "ENSEMBL",
+                  OrgDb = org.Hs.eg.db, 
+                  ont = onto, 
+                  pAdjustMethod = "BH",
+                  qvalueCutoff = 0.05,
+                  readable = TRUE,
+                  pool=TRUE)
+
+  
+  n=10
+  filename <- paste(figures_dir,"/",date,"_go_dot_",onto,"_",n,".png",sep = "")
+  print(filename)
+  png(filename, width = 6, height = 5, units = "in", res=300 ) 
+  print(dotplot(ego, showCategory = n))
+  dev.off()
+  
+  filename <- paste(figures_dir,"/",date,"_go_clus_",onto,"_",n,".png",sep = "")
+  print(filename)
+  png(filename, width = 8, height = 6, units = "in", res=300 )
+  ego <- enrichplot::pairwise_termsim(ego)
+  print(emapplot(ego, showCategory = n))
+  dev.off()
+  
+  filename <- paste(figures_dir,"/",date,"_go_graph_",onto,"_",n,".png",sep = "")
+  print(filename)
+  png(filename, width = 6, height = 7, units = "in", res=300 ) 
+  print(goplot(ego, showCategory = n)) ## note needed to nest goplot in print function for this to write to file.. not sure why
+  dev.off()
 }
 
-vec2<-unique(vec2)
-#diff_2<-as.numeric(diff_2)
-#hist(diff_2)
-
-data_spec<-as.data.frame(gene_names)
-library(data.table)
-colnames(data_spec)<- c("gene")
-res_ids <- data_spec
-res_ids
-
-
-
-
-allOE_genes <- as.character(res_ids$gene)
-## Extract significant results
-sigOE <- vec2 #specific genes 
-names(sigOE)<- c("gene_id")
-sigOE_genes <- as.character(vec2) #specific genes 
-names(sigOE_genes)<- c("gene_id")
-View(allOE_genes)
-View(sigOE_genes)
-View(res_ids)
-
-ego <- enrichGO(gene = sigOE_genes, 
-                universe = allOE_genes,
-                keyType = "ENSEMBL",
-                OrgDb = org.Hs.eg.db, 
-                ont = "BP", 
-                pAdjustMethod = "BH",
-                qvalueCutoff = 0.05,
-                readable = TRUE)
-
-
 cluster_summary <- data.frame(ego)
-cluster_summary
-#write.csv(cluster_summary, "results/clusterProfiler_Mov10oe.csv")
-
-
-dotplot(ego, showCategory=20)
-
-
-#png("weight>flat.png",width=1000,height=900)
-dotplot(ego, showCategory=20)#top 20 
-#dev.off()
-
-ego <- enrichplot::pairwise_termsim(ego)
-#png("weight>flat_dotplot.png",width=1000,height=900)
-emapplot(ego, showCategory = 20)
-#dev.off()
-
-#reference package - methods 
-#fraction that looks like brain 
-
-
-
+cluster_summary$frac_terms <- as.numeric(str_split_fixed(cluster_summary$GeneRatio,"/",2)[,1] ) / as.numeric( str_split_fixed(cluster_summary$BgRatio,"/",2)[,1] )
 
 ```
 
