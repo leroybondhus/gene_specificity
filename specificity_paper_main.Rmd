@@ -248,7 +248,10 @@ heatmap(dot_sim)
 
 sim_tree <- cluster_func(dot_sim)
 ## plot similarity tree with weights
-sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2.2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
+filename = paste(figures_dir, "/weighted_tree.png", sep="")
+png(filename = filename, width=9, height=4, units="in", res=300)
+sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
+dev.off()
 
 
 ## take a look at the weights
@@ -324,7 +327,8 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   for(rep in 1:num_reps){
     permutation_matrix[,rep] <- sample(colnames(notP1),num_brain_samples, replace = FALSE)
   }
-  
+  load("final_permutation_matrix") ## reproduce same used in paper figures
+
   
   for(measure in specificity_measures$func_names){
     specificity_func <- specificity_measures$funcs[[measure]]
@@ -915,9 +919,9 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
     split <- rep(1:(nrow(spec_genes_w_ids)/2), each=2)
     ra <- rowAnnotation(foo = anno_block(labels = unique(spec_genes_w_ids$Description)))
     h1 <- Heatmap(temp_mat, name=measure,
-                  cluster_rows = FALSE, show_row_names = TRUE,
+                  cluster_rows = FALSE, show_row_names = FALSE,
                   cluster_columns = sim_tree,
-                  column_order = colnames(spec_mat),
+                  column_order = colnames(spec_mats$delta_Zscore),
                   row_split = split,
                   left_annotation = ra,
                   col = col_funs[[measure]] 
@@ -936,7 +940,7 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
 draw(heatmaps)
 
 filename <- paste(figures_dir,"/",date,"marker_genes_grad_v01.png",sep = "")
-png(filename, width = 10, height = 8, units = "in", res=300 )
+png(filename, width = 8, height = 7, units = "in", res=300 )
 draw(heatmaps)
 dev.off()
 
@@ -977,7 +981,7 @@ which<-as.matrix(which)
 sigOE_genes<-unique(sigOE_genes)
 
 
-for(onto in c("BP","MF","CC")){
+for(onto in c("BP")){ #},"MF","CC")){
   print(onto)
   ego <- enrichGO(gene = sigOE_genes, 
                   universe = allOE_genes,
@@ -993,15 +997,15 @@ for(onto in c("BP","MF","CC")){
   n=10
   filename <- paste(figures_dir,"/",date,"_go_dot_",onto,"_",n,".png",sep = "")
   print(filename)
-  png(filename, width = 6, height = 5, units = "in", res=300 ) 
+  png(filename, width = 6, height = 10, units = "in", res=300 ) 
   print(dotplot(ego, showCategory = n))
   dev.off()
   
-  filename <- paste(figures_dir,"/",date,"_go_clus_",onto,"_",n,".png",sep = "")
+  filename <- paste(figures_dir,"/",date,"_go_clus_wo_labels",onto,"_",n,".png",sep = "")
   print(filename)
   png(filename, width = 8, height = 6, units = "in", res=300 )
   ego <- enrichplot::pairwise_termsim(ego)
-  print(emapplot(ego, showCategory = n))
+  print(emapplot(ego, showCategory = n, node_label="none"))
   dev.off()
   
   filename <- paste(figures_dir,"/",date,"_go_graph_",onto,"_",n,".png",sep = "")
