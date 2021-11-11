@@ -774,35 +774,45 @@ ggsave(filename, g, device = "png", width = 6, height = 4)
 ## paired t-test for difference in means
 ### t = delta / sd / sqrt(n)
 which_list <- list()
-which_list[["Z_P1_flat"]] <- which(df_2c$measure=="Zscore" 
-                    & df_2c$P1orP2=="P1"
-                    & df_2c$n == max(df_2c$n)
-                    & df_2c$weight_or_flat=="flat")
-which_list[["Z_P1_weighted"]] <- which(df_2c$measure=="Zscore" 
-                    & df_2c$P1orP2=="P1"
-                    & df_2c$n == max(df_2c$n)
-                    & df_2c$weight_or_flat=="weighted")
-which_list[["Z_P2_flat"]] <- which(df_2c$measure=="Zscore" 
-                    & df_2c$P1orP2=="P2"
-                    & df_2c$n == max(df_2c$n)
-                    & df_2c$weight_or_flat=="flat")
-which_list[["Z_P2_weighted"]] <- which(df_2c$measure=="Zscore" 
-                    & df_2c$P1orP2=="P2"
-                    & df_2c$n == max(df_2c$n)
-                    & df_2c$weight_or_flat=="weighted")
+which_list[["Z_P1_flat"]] <- which(df_2d$measure=="Zscore" 
+                                   & df_2d$n==max(df_2d$n)
+                                   & df_2d$cut_point==2
+                                   & df_2d$P1orP2=="P1"
+                                   & df_2d$weighted==FALSE)
+which_list[["Z_P1_weighted"]] <- which(df_2d$measure=="Zscore" 
+                                   & df_2d$n==max(df_2d$n)
+                                   & df_2d$cut_point==2
+                                   & df_2d$P1orP2=="P1"
+                                   & df_2d$weighted==TRUE)
 
-## t.test on logs gives ratio estimates
-temp <- t.test(x=log10(df_2c[which_list$Z_P1_weighted,]$variance),y=log10(df_2c[which_list$Z_P1_flat,]$variance) ,paired=TRUE, conf.level = 0.95)
-##  antilog to recover ratio of weighted / flat
-1-10^temp$estimate
-1-10^temp$conf.int
-### 79.3% lower variance in weighted than flat (CI)
+which_list[["Z_P2_flat"]] <- which(df_2d$measure=="Zscore" 
+                                   & df_2d$n==max(df_2d$n)
+                                   & df_2d$cut_point==2
+                                   & df_2d$P1orP2=="P2"
+                                   & df_2d$weighted==FALSE)
+which_list[["Z_P2_weighted"]] <- which(df_2d$measure=="Zscore" 
+                                   & df_2d$n==max(df_2d$n)
+                                   & df_2d$cut_point==2
+                                   & df_2d$P1orP2=="P2"
+                                   & df_2d$weighted==TRUE)
 
-temp <- t.test(x=log10(df_2c[which_list$Z_P2_weighted,]$variance),y=log10(df_2c[which_list$Z_P2_flat,]$variance) ,paired=TRUE, conf.level = 0.95)
-1-10^temp$estimate
-1-10^temp$conf.int
-### 
-#ggsave( paste(getwd(), "/figures/Figure_2D_v03_jaccard.png",sep=""), gg, dev="png", height = 3.4, width = 6)
+
+temp <- t.test(x=df_2d[which_list$Z_P2_flat,]$jaccard, conf.level = 0.95)
+temp$estimate
+temp$conf.int
+
+temp <- t.test(x=df_2d[which_list$Z_P2_weighted,]$jaccard, conf.level = 0.95)
+temp$estimate
+temp$conf.int
+
+temp <- t.test(x=df_2d[which_list$Z_P1_flat,]$jaccard, conf.level = 0.95)
+temp$estimate
+temp$conf.int
+
+temp <- t.test(x=df_2d[which_list$Z_P1_weighted,]$jaccard, conf.level = 0.95)
+temp$estimate
+temp$conf.int
+
 ```
 
 
