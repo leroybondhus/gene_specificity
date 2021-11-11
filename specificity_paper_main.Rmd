@@ -15,7 +15,7 @@ library(dplyr)
 library(Hmisc)
 library(doParallel)
 library(foreach)
-registerDoParallel(detectCores())
+registerDoParallel(detectCores()-1)
 library(ComplexHeatmap)
 library(circlize)
 library(scales)
@@ -240,6 +240,8 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 
 
 ```{r measure sample similarity}
+figures_dir <- paste(getwd(),"figures", sep = "/")
+date <- format(Sys.time(), format="%Y%m%d") 
 
 ## dot similarity from initial Z scores
 dot_sim <- similarity_func(exp_mat)
@@ -448,39 +450,39 @@ for(el in 1:length(robustness_test_results)){
   
 }
 
-df_vp <- df_robustness_test_results
-df_summary_by_partition <- aggregate(df_vp$variance,
-                                     by=list(measure=df_vp$measure,
-                                             P1orP2=df_vp$P1orP2,
-                                             weight_or_flat= df_vp$weight_or_flat,
-                                             n=df_vp$n),
+df_2c <- df_robustness_test_results
+df_2c_summary_by_partition <- aggregate(df_2c$variance,
+                                     by=list(measure=df_2c$measure,
+                                             P1orP2=df_2c$P1orP2,
+                                             weight_or_flat= df_2c$weight_or_flat,
+                                             n=df_2c$n),
                                      FUN=function(x) mean(x,na.rm=TRUE))
-names(df_summary_by_partition)[ncol(df_summary_by_partition)] <- "mean_var"
-df_summary_by_partition$sd_of_var <- aggregate(df_vp$variance,
-                                     by=list(measure=df_vp$measure,
-                                             P1orP2=df_vp$P1orP2,
-                                             weight_or_flat= df_vp$weight_or_flat,
-                                             n=df_vp$n),
+names(df_2c_summary_by_partition)[ncol(df_2c_summary_by_partition)] <- "mean_var"
+df_2c_summary_by_partition$sd_of_var <- aggregate(df_2c$variance,
+                                     by=list(measure=df_2c$measure,
+                                             P1orP2=df_2c$P1orP2,
+                                             weight_or_flat= df_2c$weight_or_flat,
+                                             n=df_2c$n),
                                      FUN=function(x) sd(x,na.rm=TRUE))$x
 
 
-temp <- df_summary_by_partition
-df_summary_by_partition$y_min <-  temp$mean_var-temp$sd_of_var/sqrt(num_reps)
-df_summary_by_partition$y_max <-  temp$mean_var+temp$sd_of_var/sqrt(num_reps)
+temp <- df_2c_summary_by_partition
+df_2c_summary_by_partition$y_min <-  temp$mean_var-temp$sd_of_var/sqrt(num_reps)
+df_2c_summary_by_partition$y_max <-  temp$mean_var+temp$sd_of_var/sqrt(num_reps)
 
 
 ggl <- list()
 ## Zscore first 
 for(measure in c("Zscore", "notZscore")){
   if(measure == "Zscore"){
-    which <- which(df_summary_by_partition$measure == measure)
+    which <- which(df_2c_summary_by_partition$measure == measure)
     which2 <- which(df_robustness_test_results$measure == measure)  
   } else {
-    which <- which(df_summary_by_partition$measure != "Zscore")
+    which <- which(df_2c_summary_by_partition$measure != "Zscore")
     which2 <- which(df_robustness_test_results$measure != "Zscore")
   }
   
-  gg <- ggplot(df_summary_by_partition[which,], aes(x=n, y=mean_var)) +
+  gg <- ggplot(df_2c_summary_by_partition[which,], aes(x=n, y=mean_var)) +
     scale_color_manual(values=c("grey20","steelblue3"))+
     scale_fill_manual(values=c("grey20","steelblue3"))+
     geom_ribbon(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, fill=weight_or_flat),alpha=0.5)+
@@ -521,6 +523,43 @@ ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
 
 ```
 
+```{r 2C stats reported}
+### stats reported in paper
+## paired t-test for difference in means
+### t = delta / sd / sqrt(n)
+which_list <- list()
+which_list[["Z_P1_flat"]] <- which(df_2c$measure=="Zscore" 
+                    & df_2c$P1orP2=="P1"
+                    & df_2c$n == max(df_2c$n)
+                    & df_2c$weight_or_flat=="flat")
+which_list[["Z_P1_weighted"]] <- which(df_2c$measure=="Zscore" 
+                    & df_2c$P1orP2=="P1"
+                    & df_2c$n == max(df_2c$n)
+                    & df_2c$weight_or_flat=="weighted")
+which_list[["Z_P2_flat"]] <- which(df_2c$measure=="Zscore" 
+                    & df_2c$P1orP2=="P2"
+                    & df_2c$n == max(df_2c$n)
+                    & df_2c$weight_or_flat=="flat")
+which_list[["Z_P2_weighted"]] <- which(df_2c$measure=="Zscore" 
+                    & df_2c$P1orP2=="P2"
+                    & df_2c$n == max(df_2c$n)
+                    & df_2c$weight_or_flat=="weighted")
+
+## t.test on logs gives ratio estimates
+temp <- t.test(x=log10(df_2c[which_list$Z_P1_weighted,]$variance),y=log10(df_2c[which_list$Z_P1_flat,]$variance) ,paired=TRUE, conf.level = 0.95)
+##  antilog to recover ratio of weighted / flat
+1-10^temp$estimate
+1-10^temp$conf.int
+### 79.3% lower variance in weighted than flat (CI)
+
+temp <- t.test(x=log10(df_2c[which_list$Z_P2_weighted,]$variance),y=log10(df_2c[which_list$Z_P2_flat,]$variance) ,paired=TRUE, conf.level = 0.95)
+1-10^temp$estimate
+1-10^temp$conf.int
+### 
+
+
+```
+
 
 
 
@@ -533,7 +572,7 @@ date <- format(Sys.time(), format="%Y%m%d")
 
 ## jaccard between n = 1 and n = num_brain_samples for brain v non-brain OR P1 v P2 
 
-df <- data.frame(measure=character(), n=numeric(),
+df_2d <- data.frame(measure=character(), n=numeric(),
                  rep=numeric(), cut_point=numeric(),
                  jaccard=numeric(), P1orP2=character(),
                  weighted=logical(), samp=character(),
@@ -610,31 +649,31 @@ for(el in names(robustness_test_results)){
     }
     df_internal
   }
-  df <- rbind(df, df_temp)
+  df_2d <- rbind(df_2d, df_temp)
 }
 Sys.time()
 
 
-df_summary_by_partition <-aggregate(df$jaccard, by=list(measure=df$measure, n=df$n,
-                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
-                                                        weighted=df$weighted),
+df_2d_summary_by_partition <-aggregate(df_2d$jaccard, by=list(measure=df_2d$measure, n=df_2d$n,
+                                                        cut_point=df_2d$cut_point, P1orP2=df_2d$P1orP2,
+                                                        weighted=df_2d$weighted),
                                     FUN=function(x) mean(x,na.rm=TRUE) )
-names(df_summary_by_partition)[length(names(df_summary_by_partition))] <- "jaccard_mean"
-df_summary_by_partition$jaccard_sd <- aggregate(df$jaccard, by=list(measure=df$measure, n=df$n,
-                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
-                                                        weighted=df$weighted) ,
+names(df_2d_summary_by_partition)[length(names(df_2d_summary_by_partition))] <- "jaccard_mean"
+df_2d_summary_by_partition$jaccard_sd <- aggregate(df_2d$jaccard, by=list(measure=df_2d$measure, n=df_2d$n,
+                                                        cut_point=df_2d$cut_point, P1orP2=df_2d$P1orP2,
+                                                        weighted=df_2d$weighted) ,
                                                 FUN=function(x) sd(x,na.rm = TRUE) )$x 
-df_summary_by_partition$gene_count <- aggregate(df$gene_count,  by=list(measure=df$measure, n=df$n,
-                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
-                                                        weighted=df$weighted)
+df_2d_summary_by_partition$gene_count <- aggregate(df_2d$gene_count,  by=list(measure=df_2d$measure, n=df_2d$n,
+                                                        cut_point=df_2d$cut_point, P1orP2=df_2d$P1orP2,
+                                                        weighted=df_2d$weighted)
                                                 , FUN=function(x) mean(x,na.rm = TRUE) )$x 
-df_summary_by_partition$gene_count_baseline <- aggregate(df$gene_count_baseline, by=list(measure=df$measure, n=df$n,
-                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
-                                                        weighted=df$weighted),
+df_2d_summary_by_partition$gene_count_baseline <- aggregate(df_2d$gene_count_baseline, by=list(measure=df_2d$measure, n=df_2d$n,
+                                                        cut_point=df_2d$cut_point, P1orP2=df_2d$P1orP2,
+                                                        weighted=df_2d$weighted),
                                                         FUN=function(x) mean(x,na.rm = TRUE) )$x 
-df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersect, by=list(measure=df$measure, n=df$n,
-                                                        cut_point=df$cut_point, P1orP2=df$P1orP2,
-                                                        weighted=df$weighted),
+df_2d_summary_by_partition$gene_count_intersect <- aggregate(df_2d$gene_count_intersect, by=list(measure=df_2d$measure, n=df_2d$n,
+                                                        cut_point=df_2d$cut_point, P1orP2=df_2d$P1orP2,
+                                                        weighted=df_2d$weighted),
                                                         FUN=function(x) mean(x,na.rm = TRUE) )$x 
 
 
@@ -642,11 +681,11 @@ df_summary_by_partition$gene_count_intersect <- aggregate(df$gene_count_intersec
 ggl_jacc <- list()
 for(measure in c("Zscore", "notZscore")){
   if(measure == "Zscore"){
-    which <- which(df_summary_by_partition$measure == measure)
+    which <- which(df_2d_summary_by_partition$measure == measure)
   } else {
-    which <- which(df_summary_by_partition$measure != "Zscore")
+    which <- which(df_2d_summary_by_partition$measure != "Zscore")
   }
-  gg <- ggplot(df_summary_by_partition[which,],
+  gg <- ggplot(df_2d_summary_by_partition[which,],
                aes(x=cut_point, y=jaccard_mean,
                    ymin=jaccard_mean-jaccard_sd/num_reps, 
                    ymax=jaccard_mean+jaccard_sd/num_reps,
@@ -687,11 +726,11 @@ ggsave(filename, g, device = "png", width = 8, height = 3, dpi=300)
 ggl_count <- list()
 for(measure in c("Zscore", "notZscore")){
   if(measure == "Zscore"){
-    which <- which(df_summary_by_partition$measure == measure)
+    which <- which(df_2d_summary_by_partition$measure == measure)
   } else {
-    which <- which(df_summary_by_partition$measure != "Zscore")
+    which <- which(df_2d_summary_by_partition$measure != "Zscore")
   }
-  gg <- ggplot(df_summary_by_partition[which,],
+  gg <- ggplot(df_2d_summary_by_partition[which,],
                aes(x=cut_point, y=gene_count / nrow(genes),
                    group=n, fill=n))+
     theme_bw()+
@@ -727,7 +766,42 @@ ggsave(filename, g, device = "png", width = 6, height = 4)
 
 
 
+```
 
+
+```{r 2d stats reported}
+### stats reported in paper
+## paired t-test for difference in means
+### t = delta / sd / sqrt(n)
+which_list <- list()
+which_list[["Z_P1_flat"]] <- which(df_2c$measure=="Zscore" 
+                    & df_2c$P1orP2=="P1"
+                    & df_2c$n == max(df_2c$n)
+                    & df_2c$weight_or_flat=="flat")
+which_list[["Z_P1_weighted"]] <- which(df_2c$measure=="Zscore" 
+                    & df_2c$P1orP2=="P1"
+                    & df_2c$n == max(df_2c$n)
+                    & df_2c$weight_or_flat=="weighted")
+which_list[["Z_P2_flat"]] <- which(df_2c$measure=="Zscore" 
+                    & df_2c$P1orP2=="P2"
+                    & df_2c$n == max(df_2c$n)
+                    & df_2c$weight_or_flat=="flat")
+which_list[["Z_P2_weighted"]] <- which(df_2c$measure=="Zscore" 
+                    & df_2c$P1orP2=="P2"
+                    & df_2c$n == max(df_2c$n)
+                    & df_2c$weight_or_flat=="weighted")
+
+## t.test on logs gives ratio estimates
+temp <- t.test(x=log10(df_2c[which_list$Z_P1_weighted,]$variance),y=log10(df_2c[which_list$Z_P1_flat,]$variance) ,paired=TRUE, conf.level = 0.95)
+##  antilog to recover ratio of weighted / flat
+1-10^temp$estimate
+1-10^temp$conf.int
+### 79.3% lower variance in weighted than flat (CI)
+
+temp <- t.test(x=log10(df_2c[which_list$Z_P2_weighted,]$variance),y=log10(df_2c[which_list$Z_P2_flat,]$variance) ,paired=TRUE, conf.level = 0.95)
+1-10^temp$estimate
+1-10^temp$conf.int
+### 
 #ggsave( paste(getwd(), "/figures/Figure_2D_v03_jaccard.png",sep=""), gg, dev="png", height = 3.4, width = 6)
 ```
 
