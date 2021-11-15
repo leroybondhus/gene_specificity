@@ -238,6 +238,37 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 
 ```
 
+```{r measure difference between 1 and all brain samples included}
+
+
+flat <- rep(1,length(colnames(exp_mat))); names(flat) <- colnames(exp_mat)
+## select which to be all non-brain and one brain
+which <- c(grep("Brain", colnames(exp_mat), invert = TRUE ),sample(grep("Brain", colnames(exp_mat)),1))
+spec_mat_flat_one <- calc_weighted_zscore_matrix(exp_mat[,which], flat[which])
+spec_mat_flat_all  <- calc_weighted_zscore_matrix(exp_mat, flat)
+
+df <- reshape2::melt(spec_mat_flat_all[,which], value.name = "spec_all")
+df2 <- reshape2::melt(spec_mat_flat_one, value.name = "spec_one")
+df <- merge(df,df2);rm(df2)
+ggplot(df, aes(x=spec_all, y=spec_one))+
+  geom_point()
+
+
+## plot to look at global dif between flat and weighted
+tau_flat_one <- calc_weighted_tau(exp_mat[,which], flat[which])
+tau_flat_all <- calc_weighted_tau(exp_mat, flat)
+tsi_flat_one <- calc_weighted_tsi(exp_mat[,which], flat[which])
+tsi_flat_all <- calc_weighted_tsi(exp_mat,flat)
+gini_flat_one <- calc_weighted_gini(exp_mat[,which], flat[which])
+gini_flat_all <- calc_weighted_gini(exp_mat, flat)
+
+plot(spec_mat_flat_all[,which],spec_mat_flat_one)
+plot(tau_flat_all,tau_flat_one)
+plot(tsi_flat_all, tsi_flat_one)
+plot(gini_flat_all, gini_flat_one)
+
+```
+
 
 ```{r measure sample similarity}
 figures_dir <- paste(getwd(),"figures", sep = "/")
@@ -247,7 +278,7 @@ date <- format(Sys.time(), format="%Y%m%d")
 dot_sim <- similarity_func(exp_mat)
 
 filename = paste(figures_dir, "/sample_similarity_heatmap.png", sep="")
-png(filename = filename, width=8, height=8, units="in", res=300)
+png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
 dev.off()
 
@@ -260,8 +291,8 @@ dev.off()
 
 
 ## take a look at the weights
-weights <- get_weights(sim_tree, get_leaves_attr(sim_tree, "label"))
-temp <- data.frame(weights=weights, names=factor(names(weights), levels=rev(names(weights)) ) )
+temp <- get_weights(sim_tree, get_leaves_attr(sim_tree, "label"))
+temp <- data.frame(weights=temp, names=factor(names(temp), levels=rev(names(temp)) ) )
 g <- ggplot( temp ,aes(y=names, x=weights))+
   geom_col() #+
   #theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust=1))
@@ -270,7 +301,7 @@ g
 filename = paste(figures_dir, "/sample_weights.png", sep="")
 ggsave(filename, g, device = "png", width = 8, height = 8, dpi = 300)
 
-
+weights <- get_weights(sim_tree, colnames(exp_mat))
 spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights = weights)
 flat <- weights; flat[1:length(flat)] <- 1
 spec_mat_flat  <- calc_weighted_zscore_matrix(exp_mat, flat)
