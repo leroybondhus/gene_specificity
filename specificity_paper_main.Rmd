@@ -245,8 +245,11 @@ date <- format(Sys.time(), format="%Y%m%d")
 
 ## dot similarity from initial Z scores
 dot_sim <- similarity_func(exp_mat)
-heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none")
 
+filename = paste(figures_dir, "/sample_similarity_heatmap.png", sep="")
+png(filename = filename, width=8, height=8, units="in", res=300)
+heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
+dev.off()
 
 sim_tree <- cluster_func(dot_sim)
 ## plot similarity tree with weights
@@ -257,11 +260,15 @@ dev.off()
 
 
 ## take a look at the weights
-weights <- get_weights(sim_tree, colnames(exp_mat))
-ggplot( data.frame(names=names(weights), weights=weights),aes(x=names, y=weights))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+weights <- get_weights(sim_tree, get_leaves_attr(sim_tree, "label"))
+temp <- data.frame(weights=weights, names=factor(names(weights), levels=rev(names(weights)) ) )
+g <- ggplot( temp ,aes(y=names, x=weights))+
+  geom_col() #+
+  #theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust=1))
+g
 
+filename = paste(figures_dir, "/sample_weights.png", sep="")
+ggsave(filename, g, device = "png", width = 8, height = 8, dpi = 300)
 
 
 spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights = weights)
