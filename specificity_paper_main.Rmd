@@ -247,12 +247,15 @@ which <- c(grep("Brain", colnames(exp_mat), invert = TRUE ),sample(grep("Brain",
 spec_mat_flat_one <- calc_weighted_zscore_matrix(exp_mat[,which], flat[which])
 spec_mat_flat_all  <- calc_weighted_zscore_matrix(exp_mat, flat)
 
-df <- reshape2::melt(spec_mat_flat_all[,which], value.name = "spec_all")
-df2 <- reshape2::melt(spec_mat_flat_one, value.name = "spec_one")
-df <- merge(df,df2);rm(df2)
-ggplot(df, aes(x=spec_all, y=spec_one))+
-  geom_point()
-
+df <- reshape2::melt(spec_mat_flat_all[,which], value.name = "flat_all")
+temp_df <- reshape2::melt(spec_mat_flat_one, value.name = "flat_one")
+df <- merge(df,temp_df)
+temp_df
+#[sample(1:nrow(df),1e4),]
+ggplot(df, aes(x=flat_all, y=flat_one))+
+  geom_point(size=0.1)
+cor(df$spec_all,df$spec_one, use="complete.obs")
+colnames(exp_mat[,which])[grep("Brain",colnames(exp_mat[,which]))]
 
 ## plot to look at global dif between flat and weighted
 tau_flat_one <- calc_weighted_tau(exp_mat[,which], flat[which])
