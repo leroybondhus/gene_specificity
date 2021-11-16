@@ -298,10 +298,9 @@ for(measure in specificity_measures$func_names){
     }
 }
 
-
 ## Main flat for all v 1
 ggl <- list()
-for(is_main in c(T)){ #,F)){
+for(is_main in c(T,F)){
   for(measure in specificity_measures$func_names){
     temp <- data.frame(cor_f = cor(df$all[which(df$f_or_w=="flat" & df$measure==measure)],
                                    df$one[which(df$f_or_w=="flat" & df$measure==measure)], use="complete.obs"),
@@ -324,10 +323,10 @@ for(is_main in c(T)){ #,F)){
       geom_point(size=0.1)+
       ggtitle(title)+
       scale_x_continuous(limits = c(temp$min,temp$max),
-                         breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",1,0.1)),
+                         breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",2,0.1)),
                          expand = c(0,0))+
       scale_y_continuous(limits = c(temp$min,temp$max),
-                         breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",1,0.1)),
+                         breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",2,0.1)),
                          expand = c(0,0))+
       geom_abline(slope=1,intercept=0, color="red", size=0.3)+
       theme_bw()+
@@ -349,7 +348,7 @@ for(is_main in c(T)){ #,F)){
     grid.arrange(grobs=grobl, ncol=4, widths=c(5,3,3,3))
     g <-arrangeGrob(grobs=grobl, ncol=4, widths=c(4,4,4,4))
     filename = paste(figures_dir, "/main_one_v_all.png", sep="")
-    ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
+    ggsave(filename, g, device = "png", width = 10, height = 2.8, dpi = 300)
   } else {
     grid.arrange(grobs=grobl, nrow=4, heights=c(5,3,3,3))
     g <-arrangeGrob(grobs=grobl, nrow=4, heights=c(4,4,4,4))
