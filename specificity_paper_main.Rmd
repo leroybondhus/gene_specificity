@@ -240,12 +240,6 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 
 ```{r measure difference between 1 and all brain samples included}
 
-dot_sim <- similarity_func(exp_mat)
-sim_tree <- cluster_func(dot_sim)
-weights_one <- get_weights(sim_tree, colnames(exp_mat))
-
-flat <- rep(1,length(colnames(exp_mat))); names(flat) <- colnames(exp_mat)
-
 ## select which to be all non-brain and one brain
 which <- c(grep("Brain", colnames(exp_mat), invert = TRUE ),sample(grep("Brain", colnames(exp_mat)),1))
 
@@ -305,48 +299,65 @@ for(measure in specificity_measures$func_names){
 }
 
 
-df_f <- reshape2::melt(spec_one_all_list[["Zscore_flat_all"]], value.name = "all")
-temp_df <- reshape2::melt(spec_one_all_list[["Zscore_flat_one"]], value.name = "one")
-df_f <- merge(df_f,temp_df); df_f$f_or_w <- "flat"
-df_w <- reshape2::melt(spec_one_all_list[["Zscore_weighted_all"]], value.name = "all")
-temp_df <- reshape2::melt(spec_one_all_list[["Zscore_weighted_one"]], value.name = "one")
-df_w <- merge(df_w,temp_df); df_w$f_or_w <- "weighted" 
-df <- rbind(df_f,df_w); rm(df_f,df_w)
-
-temp <- data.frame(cor_f = cor(df$all[which(df$f_or_w=="flat")],df$one[which(df$f_or_w=="flat")], use="complete.obs"),
-                   cor_w = cor(df$all[which(df$f_or_w=="weighted")],df$one[which(df$f_or_w=="weighted")], use="complete.obs"),
-                   min = min(c(df$all,df$one), na.rm = T),
-                   max = max(c(df$all,df$one), na.rm = T))
-
 ## Main flat for all v 1
 ggl <- list()
-ggl[["Zscore"]] <- ggplot(df[which(df$f_or_w=="flat"),], aes(x=all, y=one))+
-  geom_point(size=0.1)+
-  ggtitle(paste("Zscore: cor_f =",round(temp$cor_f,3), ": cor_w =", round(temp$cor_w,3)))+
-  scale_x_continuous(limits = c(temp$min,temp$max), breaks=seq(round(temp$min),round(temp$max),by=1), expand = c(0,0))+
-  scale_y_continuous(limits = c(temp$min,temp$max), breaks=seq(round(temp$min),round(temp$max),by=1), expand = c(0,0))+
-  geom_abline(slope=1,intercept=0, color="red", size=0.3)+
-  theme_bw()+
-    theme(panel.grid.minor.x = element_blank())
+for(is_main in c(T)){ #,F)){
+  for(measure in specificity_measures$func_names){
+    temp <- data.frame(cor_f = cor(df$all[which(df$f_or_w=="flat" & df$measure==measure)],
+                                   df$one[which(df$f_or_w=="flat" & df$measure==measure)], use="complete.obs"),
+                       cor_w = cor(df$all[which(df$f_or_w=="weighted" & df$measure==measure)],
+                                   df$one[which(df$f_or_w=="weighted" & df$measure==measure)], use="complete.obs"),
+                       min = min(c(df$all[which(df$measure==measure)],df$one[which(df$measure==measure)]), na.rm = T),
+                       max = max(c(df$all[which(df$measure==measure)],df$one[which(df$measure==measure)]), na.rm = T))
+    if(is_main){
+      which <- which(df$measure==measure & df$f_or_w=="flat")
+      title <- paste(measure, ": cor =",round(temp$cor_f,3))
+      temp$min <- min(c(df$all[which(df$f_or_w=="flat" & df$measure==measure)],
+                        df$one[which(df$f_or_w=="flat" & df$measure==measure)]), na.rm = T)
+      temp$max <- max(c(df$all[which(df$f_or_w=="flat" & df$measure==measure)],
+                        df$one[which(df$f_or_w=="flat" & df$measure==measure)]), na.rm = T)
+    } else { 
+      which <- which(df$measure==measure)
+      title <- paste(measure, ": cor_f =",round(temp$cor_f,3), ": cor_w =", round(temp$cor_w,3))
+    }
+    ggl[[measure]] <- ggplot(df[which,], aes(x=all, y=one))+
+      geom_point(size=0.1)+
+      ggtitle(title)+
+      scale_x_continuous(limits = c(temp$min,temp$max),
+                         breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",1,0.1)),
+                         expand = c(0,0))+
+      scale_y_continuous(limits = c(temp$min,temp$max),
+                         breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",1,0.1)),
+                         expand = c(0,0))+
+      geom_abline(slope=1,intercept=0, color="red", size=0.3)+
+      theme_bw()+
+        theme(panel.grid.minor.x = element_blank())
+    
+      if(is_main){
+      } else {
+        ggl[[measure]] <- ggl[[measure]] + facet_grid(. ~ f_or_w)
+      }
+  
+  }
+  
+  grobl <- list()
+  for(n in names(ggl)){
+    grobl[[n]] <- ggplotGrob(ggl[[n]])
+  }
+  
+  if(is_main){
+    grid.arrange(grobs=grobl, ncol=4, widths=c(5,3,3,3))
+    g <-arrangeGrob(grobs=grobl, ncol=4, widths=c(4,4,4,4))
+    filename = paste(figures_dir, "/main_one_v_all.png", sep="")
+    ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
+  } else {
+    grid.arrange(grobs=grobl, nrow=4, heights=c(5,3,3,3))
+    g <-arrangeGrob(grobs=grobl, nrow=4, heights=c(4,4,4,4))
+    filename = paste(figures_dir, "/supp_one_v_all.png", sep="")
+    ggsave(filename, g, device = "png", width = 4, height = 10, dpi = 300)
+  }
+}
 
-## Supplemental flat v weighted for all v 1
-ggplot(df, aes(x=all, y=one))+
-  geom_point(size=0.1)+
-  ggtitle(paste("Zscore: cor_f =",round(temp$cor_f,3), ": cor_w =", round(temp$cor_w,3)))+
-  scale_x_continuous(limits = c(temp$min,temp$max), breaks=seq(round(temp$min),round(temp$max),by=1), expand = c(0,0))+
-  scale_y_continuous(limits = c(temp$min,temp$max), breaks=seq(round(temp$min),round(temp$max),by=1), expand = c(0,0))+
-  geom_abline(slope=1,intercept=0, color="red", size=0.3)+
-  theme_bw()+
-    theme(panel.grid.minor.x = element_blank())+
-  facet_grid(. ~ f_or_w)
-
-
-tau_flat_one <- calc_weighted_tau(exp_mat[,which], flat[which])
-tau_flat_all <- calc_weighted_tau(exp_mat, flat)
-tsi_flat_one <- calc_weighted_tsi(exp_mat[,which], flat[which])
-tsi_flat_all <- calc_weighted_tsi(exp_mat,flat)
-gini_flat_one <- calc_weighted_gini(exp_mat[,which], flat[which])
-gini_flat_all <- calc_weighted_gini(exp_mat, flat)
 
 
 ```
