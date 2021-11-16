@@ -250,25 +250,28 @@ flat <- rep(1,length(colnames(exp_mat))); names(flat) <- colnames(exp_mat)
 which <- c(grep("Brain", colnames(exp_mat), invert = TRUE ),sample(grep("Brain", colnames(exp_mat)),1))
 
 spec_one_all_list <- list()
-spec_one_all_list[["spec_mat_flat_one"]] <- calc_weighted_zscore_matrix(exp_mat[,which], flat[which])
-spec_one_all_list[["spec_mat_flat_all"]]  <- calc_weighted_zscore_matrix(exp_mat, flat)
+for(measure in specificity_measures$func_names){
+    specificity_func <- specificity_measures$funcs[[measure]]
+    if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
+    spec_one_all_list[[paste(measure, "flat_one",sep="_")]] <- specificity_func(exp_mat[,which], flat[which])
+    spec_one_all_list[[paste(measure, "flat_all",sep="_")]] <- specificity_func(exp_mat, flat)
+    dot_sim <- similarity_func(exp_mat[,which])
+    sim_tree <- cluster_func(dot_sim)
+    weights <- get_weights(sim_tree, colnames(exp_mat)[which])
+    spec_one_all_list[[paste(measure, "weighted_one",sep="_")]] <- specificity_func(exp_mat[,which], weights)
+    dot_sim <- similarity_func(exp_mat)
+    sim_tree <- cluster_func(dot_sim)
+    weights <- get_weights(sim_tree, colnames(exp_mat))
+    spec_one_all_list[[paste(measure, "weighted_all",sep="_")]] <- calc_weighted_zscore_matrix(exp_mat, weights)
 
-dot_sim <- similarity_func(exp_mat[,which])
-sim_tree <- cluster_func(dot_sim)
-weights <- get_weights(sim_tree, colnames(exp_mat)[which])
-spec_one_all_list[["spec_mat_weighted_one"]] <- calc_weighted_zscore_matrix(exp_mat[,which], weights)
-
-dot_sim <- similarity_func(exp_mat)
-sim_tree <- cluster_func(dot_sim)
-weights <- get_weights(sim_tree, colnames(exp_mat))
-spec_one_all_list[["spec_mat_weighted_all"]] <- calc_weighted_zscore_matrix(exp_mat, weights)
+}
 
 
-df_f <- reshape2::melt(spec_one_all_list[["spec_mat_flat_all"]][,which], value.name = "all")
-temp_df <- reshape2::melt(spec_one_all_list[["spec_mat_flat_one"]], value.name = "one")
+df_f <- reshape2::melt(spec_one_all_list[["Zscore_flat_all"]][,which], value.name = "all")
+temp_df <- reshape2::melt(spec_one_all_list[["Zscore_flat_one"]], value.name = "one")
 df_f <- merge(df_f,temp_df); df_f$f_or_w <- "flat"
-df_w <- reshape2::melt(spec_one_all_list[["spec_mat_weighted_all"]][,which], value.name = "all")
-temp_df <- reshape2::melt(spec_one_all_list[["spec_mat_weighted_one"]], value.name = "one")
+df_w <- reshape2::melt(spec_one_all_list[["Zscore_weighted_all"]][,which], value.name = "all")
+temp_df <- reshape2::melt(spec_one_all_list[["Zscore_weighted_one"]], value.name = "one")
 df_w <- merge(df_w,temp_df); df_w$f_or_w <- "weighted" 
 df <- rbind(df_f,df_w); rm(df_f,df_w)
 
@@ -278,7 +281,8 @@ temp <- data.frame(cor_f = cor(df$all[which(df$f_or_w=="flat")],df$one[which(df$
                    max = max(c(df$all,df$one), na.rm = T))
 
 ## Main flat for all v 1
-ggplot(df[which(df$f_or_w=="flat"),], aes(x=all, y=one))+
+ggl <- list()
+ggl[["Zscore"]] <- ggplot(df[which(df$f_or_w=="flat"),], aes(x=all, y=one))+
   geom_point(size=0.1)+
   ggtitle(paste("Zscore: cor_f =",round(temp$cor_f,3), ": cor_w =", round(temp$cor_w,3)))+
   scale_x_continuous(limits = c(temp$min,temp$max), breaks=seq(round(temp$min),round(temp$max),by=1), expand = c(0,0))+
@@ -299,20 +303,13 @@ ggplot(df, aes(x=all, y=one))+
   facet_grid(. ~ f_or_w)
 
 
-## plot to look at global dif between flat and weighted
 tau_flat_one <- calc_weighted_tau(exp_mat[,which], flat[which])
 tau_flat_all <- calc_weighted_tau(exp_mat, flat)
-
-
 tsi_flat_one <- calc_weighted_tsi(exp_mat[,which], flat[which])
 tsi_flat_all <- calc_weighted_tsi(exp_mat,flat)
 gini_flat_one <- calc_weighted_gini(exp_mat[,which], flat[which])
 gini_flat_all <- calc_weighted_gini(exp_mat, flat)
 
-plot(spec_mat_flat_all[,which],spec_mat_flat_one)
-plot(tau_flat_all,tau_flat_one)
-plot(tsi_flat_all, tsi_flat_one)
-plot(gini_flat_all, gini_flat_one)
 
 ```
 
