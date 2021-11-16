@@ -240,26 +240,70 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 
 ```{r measure difference between 1 and all brain samples included}
 
+dot_sim <- similarity_func(exp_mat)
+sim_tree <- cluster_func(dot_sim)
+weights_one <- get_weights(sim_tree, colnames(exp_mat))
 
 flat <- rep(1,length(colnames(exp_mat))); names(flat) <- colnames(exp_mat)
+
 ## select which to be all non-brain and one brain
 which <- c(grep("Brain", colnames(exp_mat), invert = TRUE ),sample(grep("Brain", colnames(exp_mat)),1))
-spec_mat_flat_one <- calc_weighted_zscore_matrix(exp_mat[,which], flat[which])
-spec_mat_flat_all  <- calc_weighted_zscore_matrix(exp_mat, flat)
 
-df <- reshape2::melt(spec_mat_flat_all[,which], value.name = "flat_all")
-temp_df <- reshape2::melt(spec_mat_flat_one, value.name = "flat_one")
-df <- merge(df,temp_df)
-temp_df
-#[sample(1:nrow(df),1e4),]
-ggplot(df, aes(x=flat_all, y=flat_one))+
-  geom_point(size=0.1)
-cor(df$spec_all,df$spec_one, use="complete.obs")
-colnames(exp_mat[,which])[grep("Brain",colnames(exp_mat[,which]))]
+spec_one_all_list <- list()
+spec_one_all_list[["spec_mat_flat_one"]] <- calc_weighted_zscore_matrix(exp_mat[,which], flat[which])
+spec_one_all_list[["spec_mat_flat_all"]]  <- calc_weighted_zscore_matrix(exp_mat, flat)
+
+dot_sim <- similarity_func(exp_mat[,which])
+sim_tree <- cluster_func(dot_sim)
+weights <- get_weights(sim_tree, colnames(exp_mat)[which])
+spec_one_all_list[["spec_mat_weighted_one"]] <- calc_weighted_zscore_matrix(exp_mat[,which], weights)
+
+dot_sim <- similarity_func(exp_mat)
+sim_tree <- cluster_func(dot_sim)
+weights <- get_weights(sim_tree, colnames(exp_mat))
+spec_one_all_list[["spec_mat_weighted_all"]] <- calc_weighted_zscore_matrix(exp_mat, weights)
+
+
+df_f <- reshape2::melt(spec_one_all_list[["spec_mat_flat_all"]][,which], value.name = "all")
+temp_df <- reshape2::melt(spec_one_all_list[["spec_mat_flat_one"]], value.name = "one")
+df_f <- merge(df_f,temp_df); df_f$f_or_w <- "flat"
+df_w <- reshape2::melt(spec_one_all_list[["spec_mat_weighted_all"]][,which], value.name = "all")
+temp_df <- reshape2::melt(spec_one_all_list[["spec_mat_weighted_one"]], value.name = "one")
+df_w <- merge(df_w,temp_df); df_w$f_or_w <- "weighted" 
+df <- rbind(df_f,df_w); rm(df_f,df_w)
+
+temp <- data.frame(cor_f = cor(df$all[which(df$f_or_w=="flat")],df$one[which(df$f_or_w=="flat")], use="complete.obs"),
+                   cor_w = cor(df$all[which(df$f_or_w=="weighted")],df$one[which(df$f_or_w=="weighted")], use="complete.obs"),
+                   min = min(c(df$all,df$one), na.rm = T),
+                   max = max(c(df$all,df$one), na.rm = T))
+
+## Main flat for all v 1
+ggplot(df[which(df$f_or_w=="flat"),], aes(x=all, y=one))+
+  geom_point(size=0.1)+
+  ggtitle(paste("Zscore: cor_f =",round(temp$cor_f,3), ": cor_w =", round(temp$cor_w,3)))+
+  scale_x_continuous(limits = c(temp$min,temp$max), breaks=seq(round(temp$min),round(temp$max),by=1), expand = c(0,0))+
+  scale_y_continuous(limits = c(temp$min,temp$max), breaks=seq(round(temp$min),round(temp$max),by=1), expand = c(0,0))+
+  geom_abline(slope=1,intercept=0, color="red", size=0.3)+
+  theme_bw()+
+    theme(panel.grid.minor.x = element_blank())
+
+## Supplemental flat v weighted for all v 1
+ggplot(df, aes(x=all, y=one))+
+  geom_point(size=0.1)+
+  ggtitle(paste("Zscore: cor_f =",round(temp$cor_f,3), ": cor_w =", round(temp$cor_w,3)))+
+  scale_x_continuous(limits = c(temp$min,temp$max), breaks=seq(round(temp$min),round(temp$max),by=1), expand = c(0,0))+
+  scale_y_continuous(limits = c(temp$min,temp$max), breaks=seq(round(temp$min),round(temp$max),by=1), expand = c(0,0))+
+  geom_abline(slope=1,intercept=0, color="red", size=0.3)+
+  theme_bw()+
+    theme(panel.grid.minor.x = element_blank())+
+  facet_grid(. ~ f_or_w)
+
 
 ## plot to look at global dif between flat and weighted
 tau_flat_one <- calc_weighted_tau(exp_mat[,which], flat[which])
 tau_flat_all <- calc_weighted_tau(exp_mat, flat)
+
+
 tsi_flat_one <- calc_weighted_tsi(exp_mat[,which], flat[which])
 tsi_flat_all <- calc_weighted_tsi(exp_mat,flat)
 gini_flat_one <- calc_weighted_gini(exp_mat[,which], flat[which])
