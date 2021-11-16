@@ -255,6 +255,9 @@ for(measure in specificity_measures$func_names){
     if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
     spec_one_all_list[[paste(measure, "flat_one",sep="_")]] <- specificity_func(exp_mat[,which], flat[which])
     spec_one_all_list[[paste(measure, "flat_all",sep="_")]] <- specificity_func(exp_mat, flat)
+    if(measure=="Zscore"){
+       spec_one_all_list[[paste(measure, "flat_all",sep="_")]] <- spec_one_all_list[[paste(measure, "flat_all",sep="_")]][,which]
+    }
     dot_sim <- similarity_func(exp_mat[,which])
     sim_tree <- cluster_func(dot_sim)
     weights <- get_weights(sim_tree, colnames(exp_mat)[which])
@@ -262,15 +265,50 @@ for(measure in specificity_measures$func_names){
     dot_sim <- similarity_func(exp_mat)
     sim_tree <- cluster_func(dot_sim)
     weights <- get_weights(sim_tree, colnames(exp_mat))
-    spec_one_all_list[[paste(measure, "weighted_all",sep="_")]] <- calc_weighted_zscore_matrix(exp_mat, weights)
-
+    spec_one_all_list[[paste(measure, "weighted_all",sep="_")]] <- specificity_func(exp_mat, weights)
+    if(measure=="Zscore"){
+       spec_one_all_list[[paste(measure, "weighted_all",sep="_")]] <- spec_one_all_list[[paste(measure, "weighted_all",sep="_")]][,which]
+    }
+}
+for(measure in specificity_measures$func_names){
+    specificity_func <- specificity_measures$funcs[[measure]]
+    if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
+    if(measure=="Zscore"){
+      df_f <- reshape2::melt(spec_one_all_list[[paste(measure, "flat_all",sep="_")]], value.name = "all")
+      temp_df <- reshape2::melt(spec_one_all_list[[paste(measure, "flat_one",sep="_")]], value.name = "one")
+      df_f <- merge(df_f,temp_df) 
+    } else {
+      df_f <- data.frame(Var1=rownames(exp_mat),
+                         Var2=NA,
+                         all=spec_one_all_list[[paste(measure, "flat_all",sep="_")]],
+                         one=spec_one_all_list[[paste(measure, "flat_one",sep="_")]])
+    }
+    df_f$f_or_w <- "flat"; df_f$measure <- measure
+    
+    if(measure=="Zscore"){
+      df_w <- reshape2::melt(spec_one_all_list[[paste(measure, "weighted_all",sep="_")]], value.name = "all")
+      temp_df <- reshape2::melt(spec_one_all_list[[paste(measure, "weighted_one",sep="_")]], value.name = "one")
+      df_w <- merge(df_w,temp_df) 
+    } else{
+      df_w <- data.frame(Var1=rownames(exp_mat),
+                         Var2=NA,
+                         all=spec_one_all_list[[paste(measure, "weighted_all",sep="_")]],
+                         one=spec_one_all_list[[paste(measure, "weighted_one",sep="_")]])
+    }
+    df_w$f_or_w <- "weighted"; df_w$measure <- measure
+    
+    if(!is.data.frame(df)){
+      df <- rbind(df_f,df_w); rm(df_f,df_w)
+    } else {
+      df <- rbind(df,df_f,df_w)
+    }
 }
 
 
-df_f <- reshape2::melt(spec_one_all_list[["Zscore_flat_all"]][,which], value.name = "all")
+df_f <- reshape2::melt(spec_one_all_list[["Zscore_flat_all"]], value.name = "all")
 temp_df <- reshape2::melt(spec_one_all_list[["Zscore_flat_one"]], value.name = "one")
 df_f <- merge(df_f,temp_df); df_f$f_or_w <- "flat"
-df_w <- reshape2::melt(spec_one_all_list[["Zscore_weighted_all"]][,which], value.name = "all")
+df_w <- reshape2::melt(spec_one_all_list[["Zscore_weighted_all"]], value.name = "all")
 temp_df <- reshape2::melt(spec_one_all_list[["Zscore_weighted_one"]], value.name = "one")
 df_w <- merge(df_w,temp_df); df_w$f_or_w <- "weighted" 
 df <- rbind(df_f,df_w); rm(df_f,df_w)
