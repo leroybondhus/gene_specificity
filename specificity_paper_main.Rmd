@@ -383,6 +383,9 @@ for(is_main in c(T,F)){
 ## generate small set of brain related GO id/ GO labels
 ## plot on one v all plot
 
+genes <- getBM(attributes=c('hgnc_symbol', 'ensembl_gene_id','go_id','name_1006'),
+                 mart = ensembl, useCache = F)
+genes_go_sub <- genes[grep("neuro|axon|brain|glia|oligodend", genes$name_1006),]
 
 ## perform GO analysis on difference between one v all 
 ## make summary GO plots
@@ -390,6 +393,103 @@ for(is_main in c(T,F)){
 ## Note: don't want to go directly from GO analysis to small set of GO id as some terms
 ##       may include many genes if they are overly general (e.g. if enriched term is "chemical signalling")
 ## 
+
+
+ggl <- list()
+for(measure in specificity_measures$func_names){
+  temp <- data.frame(cor_f = cor(df_1b$all[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)],
+                                 df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)], use="complete.obs"),
+                     cor_w = cor(df_1b$all[which(df_1b$f_or_w=="weighted" & df_1b$measure==measure)],
+                                 df_1b$one[which(df_1b$f_or_w=="weighted" & df_1b$measure==measure)], use="complete.obs"),
+                     min = min(c(df_1b$all[which(df_1b$measure==measure)],df_1b$one[which(df_1b$measure==measure)]), na.rm = T),
+                     max = max(c(df_1b$all[which(df_1b$measure==measure)],df_1b$one[which(df_1b$measure==measure)]), na.rm = T))
+  
+  which <- which(df_1b$measure==measure & df_1b$f_or_w=="flat")
+
+  which_go_rev <- intersect(which, which(is.element(str_split_fixed(df_1b$Var1,"[.]",2)[,1], genes_go_sub$ensembl_gene_id )))
+  if(measure=="Zscore"){
+    which_go_rev <- intersect(which_go_rev, which(grepl("Brain", df_1b$Var2)))
+  }
+
+  title <- paste(measure, ": cor =",round(temp$cor_f,3))
+  temp$min <- min(c(df_1b$all[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)],
+                    df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)]), na.rm = T)
+  temp$max <- max(c(df_1b$all[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)],
+                    df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)]), na.rm = T)
+
+  ggl[[measure]] <- ggplot(df_1b[setdiff(which,which_go_rev),], aes(x=all, y=one))+
+    
+    geom_point(data=df_1b[which_go_rev,], aes( x=all, y=one), color="red")+
+    geom_point(size=0.1)+
+    ggtitle(title)+
+    scale_x_continuous(limits = c(temp$min,temp$max),
+                       breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",2,0.1)),
+                       expand = c(0,0))+
+    scale_y_continuous(limits = c(temp$min,temp$max),
+                       breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",2,0.1)),
+                       expand = c(0,0))+
+    geom_abline(slope=1,intercept=0, color="red", size=0.3)+
+    theme_bw()+
+      theme(panel.grid.minor.x = element_blank())
+  
+    ggl[[measure]] <- ggl[[measure]] + facet_grid(. ~ f_or_w)
+  
+    print(ggl[[measure]])
+    
+    
+    
+    
+    ggl[[paste(measure,"_delta_hist")]] <- ggplot(df_1b[setdiff(which,which_go_rev),], aes(x=all-one))+
+    geom_density(size=0.1)+
+    geom_density(data=df_1b[which_go_rev,], aes( x=all-one), color="red",alpha=0.5)+
+    ggtitle(title)+
+    theme_bw()+
+      theme(panel.grid.minor.x = element_blank())
+    print(ggl[[paste(measure,"_delta_hist")]])
+
+}
+
+grobl <- list()
+for(n in names(ggl)){
+  grobl[[n]] <- ggplotGrob(ggl[[n]])
+}
+
+if(is_main){
+  grid.arrange(grobs=grobl, ncol=4, widths=c(5,3,3,3))
+  g <-arrangeGrob(grobs=grobl, ncol=4, widths=c(4,4,4,4))
+  filename = paste(figures_dir, "/main_one_v_all_test.png", sep="")
+  ggsave(filename, g, device = "png", width = 10, height = 2.8, dpi = 300)
+} else {
+  grid.arrange(grobs=grobl, nrow=4, heights=c(5,3,3,3))
+  g <-arrangeGrob(grobs=grobl, nrow=4, heights=c(4,4,4,4))
+  filename = paste(figures_dir, "/supp_one_v_all_test.png", sep="")
+  ggsave(filename, g, device = "png", width = 4, height = 10, dpi = 300)
+}
+
+
+
+
+
+
+
+for(onto in c("BP")){ #},"MF","CC")){
+  print(onto)
+  
+  n=10
+  # filename <- paste(figures_dir,"/",date,"_go_dot_",onto,"_",n,".png",sep = "")
+  # print(filename)
+  # png(filename, width = 6, height = 10, units = "in", res=300 )
+  
+  
+  # filename <- paste(figures_dir,"/",date,"_go_clus_wo_labels",onto,"_",n,".png",sep = "")
+  # print(filename)
+  # png(filename, width = 8, height = 6, units = "in", res=300 )
+  ego <- enrichplot::pairwise_termsim(ego)
+  print(emapplot(ego, showCategory = n )) #, node_label="none"))
+  # dev.off()
+
+}
+
 
 
 ```
