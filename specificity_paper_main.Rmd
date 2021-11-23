@@ -21,6 +21,16 @@ library(circlize)
 library(scales)
 library(reldist)
 library(gridExtra)
+
+library(DOSE)
+library(pathview)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+
+library(tidyverse)
+library(topGO) 
+library(enrichplot)
+
 ```
 
 ## load gtex here
@@ -229,7 +239,15 @@ specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              out_type=list(Zscore="matrix",
                                            Tau="vector",
                                            Tsi="vector",
-                                           Gini="vector")
+                                           Gini="vector"),
+                             cutpoint=list(Zscore=2,
+                                           Tau=0.75,
+                                           Tsi=0.75,
+                                           Gini=0.75),
+                             delta_cutpoint=list(Zscore=1,
+                                                 Tau=0.05,
+                                                 Tsi=0.05,
+                                                 Gini=0.05)
                              )
 ## only 1 similarity function tested for now, can make as list later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
@@ -291,35 +309,36 @@ for(measure in specificity_measures$func_names){
     }
     df_w$f_or_w <- "weighted"; df_w$measure <- measure
     
-    if(!is.data.frame(df)){
-      df <- rbind(df_f,df_w); rm(df_f,df_w)
+    if(!is.data.frame(df_1b)){
+      df_1b <- rbind(df_f,df_w); rm(df_f,df_w)
     } else {
-      df <- rbind(df,df_f,df_w)
+      df_1b <- rbind(df_1b,df_f,df_w)
     }
 }
+df_1b$delta <- df_1b$one - df_1b$all
 
 ## Main flat for all v 1
 ggl <- list()
 for(is_main in c(T,F)){
   for(measure in specificity_measures$func_names){
-    temp <- data.frame(cor_f = cor(df$all[which(df$f_or_w=="flat" & df$measure==measure)],
-                                   df$one[which(df$f_or_w=="flat" & df$measure==measure)], use="complete.obs"),
-                       cor_w = cor(df$all[which(df$f_or_w=="weighted" & df$measure==measure)],
-                                   df$one[which(df$f_or_w=="weighted" & df$measure==measure)], use="complete.obs"),
-                       min = min(c(df$all[which(df$measure==measure)],df$one[which(df$measure==measure)]), na.rm = T),
-                       max = max(c(df$all[which(df$measure==measure)],df$one[which(df$measure==measure)]), na.rm = T))
+    temp <- data.frame(cor_f = cor(df_1b$all[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)],
+                                   df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)], use="complete.obs"),
+                       cor_w = cor(df_1b$all[which(df_1b$f_or_w=="weighted" & df_1b$measure==measure)],
+                                   df_1b$one[which(df_1b$f_or_w=="weighted" & df_1b$measure==measure)], use="complete.obs"),
+                       min = min(c(df_1b$all[which(df_1b$measure==measure)],df_1b$one[which(df_1b$measure==measure)]), na.rm = T),
+                       max = max(c(df_1b$all[which(df_1b$measure==measure)],df_1b$one[which(df_1b$measure==measure)]), na.rm = T))
     if(is_main){
-      which <- which(df$measure==measure & df$f_or_w=="flat")
+      which <- which(df_1b$measure==measure & df_1b$f_or_w=="flat")
       title <- paste(measure, ": cor =",round(temp$cor_f,3))
-      temp$min <- min(c(df$all[which(df$f_or_w=="flat" & df$measure==measure)],
-                        df$one[which(df$f_or_w=="flat" & df$measure==measure)]), na.rm = T)
-      temp$max <- max(c(df$all[which(df$f_or_w=="flat" & df$measure==measure)],
-                        df$one[which(df$f_or_w=="flat" & df$measure==measure)]), na.rm = T)
+      temp$min <- min(c(df_1b$all[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)],
+                        df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)]), na.rm = T)
+      temp$max <- max(c(df_1b$all[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)],
+                        df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)]), na.rm = T)
     } else { 
-      which <- which(df$measure==measure)
+      which <- which(df_1b$measure==measure)
       title <- paste(measure, ": cor_f =",round(temp$cor_f,3), ": cor_w =", round(temp$cor_w,3))
     }
-    ggl[[measure]] <- ggplot(df[which,], aes(x=all, y=one))+
+    ggl[[measure]] <- ggplot(df_1b[which,], aes(x=all, y=one))+
       geom_point(size=0.1)+
       ggtitle(title)+
       scale_x_continuous(limits = c(temp$min,temp$max),
@@ -357,9 +376,25 @@ for(is_main in c(T,F)){
   }
 }
 
+```
+
+```{r Figure 1DE or Supp}
+## get gene ids (rows from df_1b) that correspond to given GO id/ GO label
+## generate small set of brain related GO id/ GO labels
+## plot on one v all plot
+
+
+## perform GO analysis on difference between one v all 
+## make summary GO plots
+
+## Note: don't want to go directly from GO analysis to small set of GO id as some terms
+##       may include many genes if they are overly general (e.g. if enriched term is "chemical signalling")
+## 
 
 
 ```
+
+
 
 
 ```{r measure sample similarity}
