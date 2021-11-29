@@ -418,9 +418,8 @@ for(measure in specificity_measures$func_names){
                     df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)]), na.rm = T)
 
   ggl[[measure]] <- ggplot(df_1b[setdiff(which,which_go_rev),], aes(x=all, y=one))+
-    
-    geom_point(data=df_1b[which_go_rev,], aes( x=all, y=one), color="red")+
     geom_point(size=0.1)+
+    geom_point(data=df_1b[which_go_rev,], aes( x=all, y=one), color="red")+
     ggtitle(title)+
     scale_x_continuous(limits = c(temp$min,temp$max),
                        breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",2,0.1)),
@@ -433,12 +432,23 @@ for(measure in specificity_measures$func_names){
       theme(panel.grid.minor.x = element_blank())
   
     ggl[[measure]] <- ggl[[measure]] + facet_grid(. ~ f_or_w)
-  
     print(ggl[[measure]])
+
+  ggl[[paste(measure,"_delta")]] <- ggplot(df_1b[setdiff(which,which_go_rev),], aes(x=all, y=all-one))+
+    geom_point(size=0.1)+
+    geom_point(data=df_1b[which_go_rev,], aes( x=all, y=all-one), color="red")+
+    ggtitle(title)+
+    geom_abline(slope=0,intercept=0, color="red", size=0.3)+
+    theme_bw()+
+      theme(panel.grid.minor.x = element_blank())
+  
+    print(ggl[[paste(measure,"_delta")]])
     
+    print("brain var")
+    print(var(df_1b[which_go_rev,]$all-df_1b[which_go_rev,]$one, na.rm = T))
     
-    
-    
+    print("non-brain var")
+    print(var(df_1b[setdiff(which,which_go_rev),]$all-df_1b[setdiff(which,which_go_rev),]$one, na.rm = T ))
     ggl[[paste(measure,"_delta_hist")]] <- ggplot(df_1b[setdiff(which,which_go_rev),], aes(x=all-one))+
     geom_density(size=0.1)+
     geom_density(data=df_1b[which_go_rev,], aes( x=all-one), color="red",alpha=0.5)+
@@ -467,29 +477,40 @@ if(is_main){
 }
 
 
-
-
-
-
-
-for(onto in c("BP")){ #},"MF","CC")){
-  print(onto)
+for(measure in specificity_measures$func_names){
+  temp_df <- df_1b[which( df_1b$measure == measure),]
+  sigOE_genes <- slice_max(temp_df, order_by=delta, n=nrow(temp_df)/100 )
+  sigOE_genes <- str_split_fixed(sigOE_genes$Var1,"[.]",2)[,1]
+  ego <- enrichGO(gene = sigOE_genes, 
+                  universe = allOE_genes,
+                  keyType = "ENSEMBL",
+                  OrgDb = org.Hs.eg.db, 
+                  ont = onto, 
+                  pAdjustMethod = "BH",
+                  qvalueCutoff = 0.05,
+                  readable = TRUE,
+                  pool=TRUE)
   
-  n=10
-  # filename <- paste(figures_dir,"/",date,"_go_dot_",onto,"_",n,".png",sep = "")
-  # print(filename)
-  # png(filename, width = 6, height = 10, units = "in", res=300 )
   
+  for(onto in c("BP")){ #},"MF","CC")){
+    print(onto)
+    
+    n=10
+    # filename <- paste(figures_dir,"/",date,"_go_dot_",onto,"_",n,".png",sep = "")
+    # print(filename)
+    # png(filename, width = 6, height = 10, units = "in", res=300 )
+    
+    
+    # filename <- paste(figures_dir,"/",date,"_go_clus_wo_labels",onto,"_",n,".png",sep = "")
+    # print(filename)
+    # png(filename, width = 8, height = 6, units = "in", res=300 )
+    ego <- enrichplot::pairwise_termsim(ego)
+    print(dotplot(ego, showCategory = n))
+    print(emapplot(ego, showCategory = n )) #, node_label="none"))
+    # dev.off()
   
-  # filename <- paste(figures_dir,"/",date,"_go_clus_wo_labels",onto,"_",n,".png",sep = "")
-  # print(filename)
-  # png(filename, width = 8, height = 6, units = "in", res=300 )
-  ego <- enrichplot::pairwise_termsim(ego)
-  print(emapplot(ego, showCategory = n )) #, node_label="none"))
-  # dev.off()
-
+  }
 }
-
 
 
 ```
