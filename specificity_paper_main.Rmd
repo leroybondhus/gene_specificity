@@ -1354,4 +1354,26 @@ cluster_summary$frac_terms <- as.numeric(str_split_fixed(cluster_summary$GeneRat
 ```
 
 
+```{r supplemental comparison of clustering methods}
 
+## only 1 similarity function tested for now, can make as list later
+similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
+
+## only 1 clustering fucntion tested for now, can make as a list later
+cluster_func <- function(sim_mat, method="single"){
+  add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = method) ) ))
+}
+
+
+sim_mat <- similarity_func(exp_mat)
+cluster_methods <- c("single","complete","average")
+for(cm in cluster_methods){
+  filename = paste(figures_dir,"/cluster_method_supp_",cm,".png",sep = "")
+  png(filename = filename, width=9, height=4, units="in", res=300)
+  sim_tree <- cluster_func(sim_mat = sim_mat, method = cm)
+  sim_tree %>% plot(main=cm)
+  dev.off()
+}
+
+
+```
