@@ -31,6 +31,10 @@ library(tidyverse)
 library(topGO) 
 library(enrichplot)
 
+library(data.table)
+
+figures_dir <- paste(getwd(),"figures", sep = "/")
+date <- format(Sys.time(), format="%Y%m%d") 
 ```
 
 ## load gtex here
@@ -239,15 +243,7 @@ specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
                              out_type=list(Zscore="matrix",
                                            Tau="vector",
                                            Tsi="vector",
-                                           Gini="vector"),
-                             cutpoint=list(Zscore=2,
-                                           Tau=0.75,
-                                           Tsi=0.75,
-                                           Gini=0.75),
-                             delta_cutpoint=list(Zscore=1,
-                                                 Tau=0.05,
-                                                 Tsi=0.05,
-                                                 Gini=0.05)
+                                           Gini="vector")
                              )
 ## only 1 similarity function tested for now, can make as list later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
@@ -260,7 +256,7 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 
 ## select which to be all non-brain and one brain
 which <- c(grep("Brain", colnames(exp_mat), invert = TRUE ),sample(grep("Brain", colnames(exp_mat)),1))
-
+flat <- rep(1,ncol(exp_mat)); names(flat) <- colnames(exp_mat)
 spec_one_all_list <- list()
 for(measure in specificity_measures$func_names){
     specificity_func <- specificity_measures$funcs[[measure]]
@@ -309,7 +305,7 @@ for(measure in specificity_measures$func_names){
     }
     df_w$f_or_w <- "weighted"; df_w$measure <- measure
     
-    if(!is.data.frame(df_1b)){
+    if(!exists("df_1b")){
       df_1b <- rbind(df_f,df_w); rm(df_f,df_w)
     } else {
       df_1b <- rbind(df_1b,df_f,df_w)
@@ -367,25 +363,25 @@ for(is_main in c(T,F)){
     grid.arrange(grobs=grobl, ncol=4, widths=c(5,3,3,3))
     g <-arrangeGrob(grobs=grobl, ncol=4, widths=c(4,4,4,4))
     filename = paste(figures_dir, "/main_one_v_all.png", sep="")
-    ggsave(filename, g, device = "png", width = 10, height = 2.8, dpi = 300)
+    #ggsave(filename, g, device = "png", width = 10, height = 2.8, dpi = 300)
   } else {
     grid.arrange(grobs=grobl, nrow=4, heights=c(5,3,3,3))
     g <-arrangeGrob(grobs=grobl, nrow=4, heights=c(4,4,4,4))
     filename = paste(figures_dir, "/supp_one_v_all.png", sep="")
-    ggsave(filename, g, device = "png", width = 4, height = 10, dpi = 300)
+    #ggsave(filename, g, device = "png", width = 4, height = 10, dpi = 300)
   }
 }
 
 ```
 
-```{r Figure 1DE or Supp}
+```{r Supplemental figure go terms associated with difference in one v all brain samples}
 ## get gene ids (rows from df_1b) that correspond to given GO id/ GO label
 ## generate small set of brain related GO id/ GO labels
 ## plot on one v all plot
 
 genes <- getBM(attributes=c('hgnc_symbol', 'ensembl_gene_id','go_id','name_1006'),
                  mart = ensembl, useCache = F)
-
+allOE_genes<-str_split_fixed(rownames(exp_mat),"[.]",2)[,1]
 ggl <- list()
 for(measure in specificity_measures$func_names){
   temp_df <- df_1b[which( df_1b$measure == measure),]
@@ -415,9 +411,9 @@ for(measure in specificity_measures$func_names){
   p1 <- plot(ggl[[measure]])
   p2 <- dotplot(ego, showCategory = n)
   p3 <- emapplot(ego, showCategory = n ) #, node_label="none"))
-  png(filename, width = 16, height = 5, units = "in", res=200 )
+  #png(filename, width = 16, height = 5, units = "in", res=200 )
   grid.arrange(p1,p2,p3, ncol=3)
-  dev.off()
+  #dev.off()
 
 }
 
@@ -428,23 +424,21 @@ for(measure in specificity_measures$func_names){
 
 
 ```{r measure sample similarity}
-figures_dir <- paste(getwd(),"figures", sep = "/")
-date <- format(Sys.time(), format="%Y%m%d") 
-
 ## dot similarity from initial Z scores
 dot_sim <- similarity_func(exp_mat)
 
-filename = paste(figures_dir, "/sample_similarity_heatmap.png", sep="")
-png(filename = filename, width=10, height=10, units="in", res=300)
+# filename = paste(figures_dir, "/sample_similarity_heatmap.png", sep="")
+# png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
-dev.off()
+legend()
+# dev.off()
 
 sim_tree <- cluster_func(dot_sim)
 ## plot similarity tree with weights
-filename = paste(figures_dir, "/weighted_tree.png", sep="")
-png(filename = filename, width=9, height=4, units="in", res=300)
+# filename = paste(figures_dir, "/weighted_tree.png", sep="")
+# png(filename = filename, width=9, height=4, units="in", res=300)
 sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
-dev.off()
+# dev.off()
 
 
 ## take a look at the weights
@@ -455,8 +449,8 @@ g <- ggplot( temp ,aes(y=names, x=weights))+
   #theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust=1))
 g
 
-filename = paste(figures_dir, "/sample_weights.png", sep="")
-ggsave(filename, g, device = "png", width = 8, height = 8, dpi = 300)
+# filename = paste(figures_dir, "/sample_weights.png", sep="")
+# ggsave(filename, g, device = "png", width = 8, height = 8, dpi = 300)
 
 weights <- get_weights(sim_tree, colnames(exp_mat))
 spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights = weights)
@@ -489,7 +483,7 @@ hist(gini_weighted - gini_flat ,breaks=100)
 if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if running sequential. If you want to look at robustness test results it is recommended you have enabled parallel computing (e.g. check getDoParWorkers > 3 or 4 (preferably more))
   
   ## Use this variable to control whether performing random or true brain-non-brain partition
-  random_partition = TRUE
+  random_partition = FALSE
   
   
   robustness_test_results <- list( )
@@ -719,14 +713,14 @@ g <-arrangeGrob(grobs=grobl, ncol=2, widths=c(5,4))
 #grid.arrange(ggl$Zscore, ggl$Tau, ggl$Tsi, ggl$Gini, nrow=2)
 
 filename <- paste(figures_dir,"/",date,"_variance_random_v01.png",sep = "")
-ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
+#ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
 
 ## for random supplemental
 if(FALSE){
   grid.arrange(grobs=grobl, nrow=2, heights=c(5,5))
   g <-arrangeGrob(grobs=grobl, nrow=2, heights=c(5,5))
   filename <- paste(figures_dir,"/",date,"_variance_random_v01.png",sep = "")
-  ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
+ # ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
 }
 
 
@@ -932,7 +926,7 @@ for(n in names(ggl_jacc)){
 grid.arrange(grobs =list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), nrow=2, heights=c(6,1)  ) ), ncol=2, widths=c(5,4) )
 g <- arrangeGrob(grobs =grobl, ncol=2, widths=c(5,4) )
 filename <- paste(figures_dir,"/",date,"_jaccard_random_v01.png",sep = "")
-ggsave(filename, g, device = "png", width = 8, height = 3, dpi=300)
+#ggsave(filename, g, device = "png", width = 8, height = 3, dpi=300)
 
 ## for random supplemental
 if(FALSE){
@@ -983,14 +977,14 @@ for(n in names(ggl_count)){
 grid.arrange(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(6,1)  ) ), nrow=2, heights=c(5,4) )
 g <- arrangeGrob(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(5,1)  ) ), nrow=2, heights=c(5,4) )
 filename <- paste(figures_dir,"/",date,"_jaccard_gene_count_random_v01.png",sep = "")
-ggsave(filename, g, device = "png", width = 6, height = 4)
+#ggsave(filename, g, device = "png", width = 6, height = 4)
 
 ## for random supplemental
 if(FALSE){
   grid.arrange(grobs = grobl, nrow=2, heights=c(5,4) )
   g <- arrangeGrob(grobs = grobl, nrow=2, heights=c(5,4) )
   filename <- paste(figures_dir,"/",date,"_jaccard_gene_count_random_v01.png",sep = "")
-  ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
+ # ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
 }
 
 
@@ -1172,15 +1166,27 @@ if(TRUE){
 }
 
 filename <- paste(figures_dir,"/",date,"_heatmap_v01.png",sep = "")
-png(filename = filename, width=8, height=14, units="in", res=300)
+#png(filename = filename, width=8, height=14, units="in", res=300)
 heatmaps$delta
-dev.off()
+#dev.off()
 
 
 filename <- paste(figures_dir,"/",date,"_heatmap_fw_v01.png",sep = "")
-png(filename = filename, width=16, height=14, units="in", res=300)
+#png(filename = filename, width=16, height=14, units="in", res=300)
 heatmaps$flat + heatmaps$weighted
-dev.off()
+#dev.off()
+
+
+## write csvs of flat v weighted tables for supplement
+library("writexl")
+temp_list<-list()
+for(i in 1:length(spec_mats)){
+  if(grepl("delta",names(spec_mats)[i])){next;}
+  temp_list[[names(spec_mats)[i] ]] <- merge(gtex_rowinfo, cbind( Name=rownames(spec_mats[[1]]),    data.frame(signif(spec_mats[[i]],3) )) )
+}
+
+filename <- paste(figures_dir, "/specificity_scores_full_Gtex.xlsx",sep = "")
+write_xlsx(temp_list, filename)
 
 ```
 
@@ -1259,9 +1265,9 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
 draw(heatmaps)
 
 filename <- paste(figures_dir,"/",date,"marker_genes_grad_v01.png",sep = "")
-png(filename, width = 8, height = 7, units = "in", res=300 )
-draw(heatmaps)
-dev.off()
+#png(filename, width = 8, height = 7, units = "in", res=300 )
+#draw(heatmaps)
+#dev.off()
 
 
 ## get particular values reported in paper
@@ -1324,30 +1330,28 @@ for(onto in c("BP")){ #},"MF","CC")){
   n=10
   filename <- paste(figures_dir,"/",date,"_go_dot_",onto,"_",n,".png",sep = "")
   print(filename)
-  png(filename, width = 6, height = 10, units = "in", res=300 ) 
+  #png(filename, width = 6, height = 10, units = "in", res=300 ) 
   print(dotplot(ego, showCategory = n))
-  dev.off()
+  #dev.off()
   
   filename <- paste(figures_dir,"/",date,"_go_clus_wo_labels",onto,"_",n,".png",sep = "")
   print(filename)
-  png(filename, width = 8, height = 6, units = "in", res=300 )
+  #png(filename, width = 8, height = 6, units = "in", res=300 )
   ego <- enrichplot::pairwise_termsim(ego)
-  print(emapplot(ego, showCategory = n, node_label="none"))
-  dev.off()
+  print(emapplot(ego, showCategory = n))
+  #dev.off()
   
   filename <- paste(figures_dir,"/",date,"_go_graph_",onto,"_",n,".png",sep = "")
   print(filename)
-  png(filename, width = 6, height = 7, units = "in", res=300 ) 
+  #png(filename, width = 6, height = 7, units = "in", res=300 ) 
   print(goplot(ego, showCategory = n)) ## note needed to nest goplot in print function for this to write to file.. not sure why
-  dev.off()
+  #dev.off()
 }
 
 cluster_summary <- data.frame(ego)
 cluster_summary$frac_terms <- as.numeric(str_split_fixed(cluster_summary$GeneRatio,"/",2)[,1] ) / as.numeric( str_split_fixed(cluster_summary$BgRatio,"/",2)[,1] )
 
 ```
-
-
 
 
 
