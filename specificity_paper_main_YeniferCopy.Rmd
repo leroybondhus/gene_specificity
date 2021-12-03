@@ -81,6 +81,149 @@ exp_mat <- log10(exp_mat+1)
 
 ```{r measure sample similarity}
 ### to do: justify method for measuring sample similarity - may require comparison or refs
+
+####ADDED
+calc_manhattan_matrix<- function(dat) {
+   manhatt<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       x<-dat[,i]
+       y<-dat[,j]
+       manhatt[j,i]<-sum(x[i]-x[j] + y[i]-y[j])
+    }
+  }
+    
+  return(manhatt)
+}
+
+
+manhat_matrix<- (calc_manhattan_matrix(exp_mat))
+library(reshape2)
+library(ggplot2)
+
+manhat_matrix<-melt(manhat_matrix)
+  ggplot(manhat_matrix, aes(x = Var2, y = Var1)) + 
+  geom_raster(aes(fill=value)) + 
+  scale_fill_gradient(low="white", high="red") +
+  labs(x="Tissue", y="Tissue", title="Manhattan Distance") +
+  theme_bw() + theme(axis.text.x=element_text(size=7, angle=90, vjust=.1),
+                     axis.text.y=element_text(size=7),
+                     plot.title=element_text(size=11)) 
+
+
+
+
+
+
+
+
+calc_mean_char_dif_matrix<- function(dat) {
+   mcd<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       x<-dat[,i]
+       y<-dat[,j]
+       h<-sum(abs(x[i]-x[j] + y[i]-y[j]))
+       n<-(1/i) * h
+       mcd[j,i]<- n 
+    }
+  }
+    
+  return(mcd)
+}
+mcd_mat<-(calc_mean_char_dif_matrix(exp_mat))
+
+library(reshape2)
+library(ggplot2)
+
+mcd_mat<-melt(mcd_mat)
+  ggplot(mcd_mat, aes(x = Var2, y = Var1)) + 
+  geom_raster(aes(fill=value)) + 
+  scale_fill_gradient(low="white", high="red") +
+  labs(x="Tissue", y="Tissue", title="Mean Character Difference ") +
+  theme_bw() + theme(axis.text.x=element_text(size=7, angle=90, vjust=.1),
+                     axis.text.y=element_text(size=7),
+                     plot.title=element_text(size=11)) 
+
+
+
+calc_canberra_matrix<- function(dat) {
+   canberra<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       x<-dat[,i]
+       y<-dat[,j]
+       h<-sum(abs(x[i]-x[j] + y[i]-y[j]))
+       g<-sum(x[i]+x[j] + y[i]+y[j])
+       n<-h/g
+        if(is.na(n)){
+         n = 0
+       }
+       canberra[j,i]<- n 
+    }
+  }
+    
+  return(canberra)
+}
+
+canberra_mat<- (calc_canberra_matrix(exp_mat))
+  
+#canberra 
+
+library(reshape2)
+library(ggplot2)
+
+canberra_mat<-melt(canberra_mat)
+  ggplot(canberra_mat, aes(x = Var2, y = Var1)) + 
+  geom_raster(aes(fill=value)) + 
+  scale_fill_gradient(low="white", high="red") +
+  labs(x="Tissue", y="Tissue", title="Canberra ") +
+  theme_bw() + theme(axis.text.x=element_text(size=7, angle=90, vjust=.1),
+                     axis.text.y=element_text(size=7),
+                     plot.title=element_text(size=11)) 
+
+
+  
+calc_coefficient_divergence<- function(dat) {
+   cdiv<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       x<-dat[,i]
+       y<-dat[,j]
+       h<-sum(x[i]-x[j] + y[i]-y[j])
+       g<-sum(x[i]+x[j] + y[i]+y[j])
+       n<-h/g
+       n = n^2 
+       n = n * (1/54)
+       n = n^(1/2)
+       if(is.na(n)){ #unsure whether to leave NA values or convert them to 0
+         n = 0
+       }
+       cdiv[j,i]<- n 
+    }
+  }
+    
+  return(cdiv)
+}
+
+cod_matrix<-(calc_coefficient_divergence(exp_mat))
+
+#coefficient of divergence 
+
+library(reshape2)
+library(ggplot2)
+
+cod_matrix<-melt(cod_matrix)
+  ggplot(cod_matrix, aes(x = Var2, y = Var1)) + 
+  geom_raster(aes(fill=value)) + 
+  scale_fill_gradient(low="white", high="red") +
+  labs(x="Tissue", y="Tissue", title="Coefficient of divergence   ") +
+  theme_bw() + theme(axis.text.x=element_text(size=7, angle=90, vjust=.1),
+                     axis.text.y=element_text(size=7),
+                     plot.title=element_text(size=11)) 
+
+######
+
 calc_zscore_matrix<- function(dat) {
   zscores <- dat; zscores[] <- 0 
   means <- rowMeans(dat)
@@ -114,6 +257,28 @@ dot_sim <- calc_dot_product_similarity_matrix(zscores)
 plot(hclust(as.dist(1-dot_sim),method = "single"), hang = -1, main = "dot_sim,single_clust")
 sim_mat <- dot_sim
 ### create: sim_mat # sample similarity matrix
+
+#####ADDED
+library(reshape2)
+library(ggplot2)
+
+#sim_mat
+
+library(reshape2)
+library(ggplot2)
+
+simi_mat<-melt(sim_mat)
+  ggplot(simi_mat, aes(x = Var2, y = Var1)) + 
+  geom_raster(aes(fill=value)) + 
+  scale_fill_gradient(low="white", high="red") +
+  labs(x="Tissue", y="Tissue", title="Z-scores") +
+  theme_bw() + theme(axis.text.x=element_text(size=7, angle=90, vjust=.1),
+                     axis.text.y=element_text(size=7),
+                     plot.title=element_text(size=11)) 
+
+######
+
+
 ```
 
 
