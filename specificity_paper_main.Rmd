@@ -406,8 +406,10 @@ grid.arrange(grobs=grobl_supp, nrow=4, heights=c(5,3,3,3))
 ## generate small set of brain related GO id/ GO labels
 ## plot on one v all plot
 
-genes <- getBM(attributes=c('hgnc_symbol', 'ensembl_gene_id','go_id','name_1006'),
-                 mart = ensembl, useCache = F)
+# genes <- getBM(attributes=c('hgnc_symbol', 'ensembl_gene_id','go_id','name_1006'),
+#                mart = ensembl, useCache = F)
+genes <- load("genes_w_go.RData")
+
 allOE_genes<-str_split_fixed(rownames(exp_mat),"[.]",2)[,1]
 ggl <- list()
 for(measure in specificity_measures$func_names){
@@ -435,7 +437,7 @@ for(measure in specificity_measures$func_names){
   n=10
   filename <- paste(figures_dir,"/",measure,"_top1percent_deltas_go.png",sep = "")
   ego <- enrichplot::pairwise_termsim(ego)
-  p1 <- plot(ggl[[measure]])
+  p1 <- ggl[[measure]]
   p2 <- dotplot(ego, showCategory = n)
   p3 <- emapplot(ego, showCategory = n ) #, node_label="none"))
   #png(filename, width = 16, height = 5, units = "in", res=200 )
