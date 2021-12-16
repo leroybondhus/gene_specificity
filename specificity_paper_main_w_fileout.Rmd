@@ -5,14 +5,7 @@ date: "8/19/2021"
 output: html_document
 ---
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
-)
-```
-
-```{r libraries, include=FALSE}
+```{r libraries}
 library(ggplot2)
 library(ggpubr)
 library(biomaRt)
@@ -22,7 +15,7 @@ library(dplyr)
 library(Hmisc)
 library(doParallel)
 library(foreach)
-
+registerDoParallel(detectCores()-1)
 library(ComplexHeatmap)
 library(circlize)
 library(scales)
@@ -42,8 +35,6 @@ library(data.table)
 
 figures_dir <- paste(getwd(),"figures", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
-
-registerDoParallel(detectCores()-1)
 ```
 
 ## load gtex here
@@ -67,14 +58,10 @@ genes <- genes[which(is.element(genes$chromosome_name, c(1:22, "X", "Y", "MT")) 
 ```
 
 ## clean gtex dataset here
-```{r clean dataset, fig.width = 8, fig.height=4}
+```{r clean dataset}
 ## show mitochondrial genes drive a large part of sample similarity
 ## Note sum of medians in gtex not quite 1M - likely artifact of taking medians
-
-temp <- data.frame(names=colnames(gtex), total_transcripts=colSums(gtex))
-ggplot( temp ,aes(y=total_transcripts, x=names))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+barplot(colSums(gtex))
 
 ## match genes between gtex and ensembl
 gtex_names <- str_split_fixed(gtex_rowinfo$Name, "[.]", 2)[,1]
@@ -83,28 +70,14 @@ gtex_cleaned <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which]))
 which <- which(genes$chromosome_name == "MT" )
 gtex_cleanedMT <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
 
-##non-mitochondrial TPM sum
-temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
-ggplot( temp ,aes(y=total_transcripts, x=names))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-##mitochondrial TPM sum
-temp <- data.frame(names=colnames(gtex_cleanedMT), total_transcripts=colSums(gtex_cleanedMT))
-ggplot( temp ,aes(y=total_transcripts, x=names))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
+barplot(colSums(gtex_cleaned))     ##non-mitochondrial TPM sum
+barplot(colSums(gtex_cleanedMT))   ##mitochondrial TPM sum
 rm(gtex_cleanedMT)
 ##renormalize TPM without mitochondrial genes
 for(i in 1:ncol(gtex_cleaned)){
   gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
 }
-
-temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
-ggplot( temp ,aes(y=total_transcripts, x=names))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+barplot(colSums(gtex_cleaned))
 
 gtex <- gtex_cleaned; rm(gtex_cleaned)
 exp_mat <- gtex
@@ -113,7 +86,7 @@ exp_mat <- log10(exp_mat+1)
 
 ## remove mitochondrial contribution
 ```
-```{r collected functions used, include=FALSE}
+```{r collected functions used }
 
 calc_zscore_matrix<- function(dat) {
   zscores <- dat; zscores[] <- 0 
@@ -139,7 +112,8 @@ calc_dot_product_similarity_matrix <- function(dat) {
   return(dot_product_similarity_matrix)
 }
 
-### uses Equation 1. from paper 
+### uses Equation 1. 
+## modelled on Yenifer's code
 add_dist_to_parent <- function(dend, dist_to_parent=0){
   ## note: distance to parent is fed in at the start of the function
   attributes(dend) <- c(attributes(dend), dist_to_parent=dist_to_parent)
@@ -222,7 +196,6 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
     temp <- sum(temp_matrix[i,]) / den
     tau <- append(tau,temp)
   }
-  
   ## add normalization (believe this is a numeric instability issue from dividing small numbers)
   # tau <- tau / max(tau, na.rm=T)
   ## alternative, set all > 1 to 1 (when looking at plots for different cutoffs, normalizing true 1 values causes issue)
@@ -259,7 +232,7 @@ calc_weighted_gini <- function(te_matrix, weights_vector){
 
 ```
 
-```{r organizing functions into lists, include=FALSE}
+```{r organizing functions into lists}
 ### generalizing a list to store results in - this will make it easier to extend later if necessary.
 ## Note: only need the weighted version of each equation as each simplifies to flat version when all weights are 1
 specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
@@ -279,7 +252,7 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 
 ```
 
-```{r measure difference between 1 and all brain samples included, include=FALSE }
+```{r measure difference between 1 and all brain samples included}
 
 ## select which to be all non-brain and one brain
 which <- c(grep("Brain", colnames(exp_mat), invert = TRUE ),sample(grep("Brain", colnames(exp_mat)),1))
@@ -387,21 +360,21 @@ for(is_main in c(T,F)){
   }
   
   if(is_main){
-    grobl_main <- grobl
+    grid.arrange(grobs=grobl, ncol=4, widths=c(5,3,3,3))
+    g <-arrangeGrob(grobs=grobl, ncol=4, widths=c(4,4,4,4))
+    filename = paste(figures_dir, "/main_one_v_all.png", sep="")
+    #ggsave(filename, g, device = "png", width = 10, height = 2.8, dpi = 300)
   } else {
-    grobl_supp <- grobl
+    grid.arrange(grobs=grobl, nrow=4, heights=c(5,3,3,3))
+    g <-arrangeGrob(grobs=grobl, nrow=4, heights=c(4,4,4,4))
+    filename = paste(figures_dir, "/supp_one_v_all.png", sep="")
+    #ggsave(filename, g, device = "png", width = 4, height = 10, dpi = 300)
   }
 }
 
 ```
 
-
-```{r plot difference between 1 and all brain samples included for weighted and flat, fig.width = 8, fig.height=8}
-grid.arrange(grobs=grobl_supp, nrow=4, heights=c(5,3,3,3))
-```
-
-
-```{r Supplemental Figure Go terms associated with diff in 1 v all brain samples, fig.width = 8, fig.height=4}
+```{r Supplemental figure go terms associated with difference in one v all brain samples}
 ## get gene ids (rows from df_1b) that correspond to given GO id/ GO label
 ## generate small set of brain related GO id/ GO labels
 ## plot on one v all plot
@@ -450,7 +423,7 @@ for(measure in specificity_measures$func_names){
 
 
 
-```{r measure sample similarity, fig.width = 8, fig.height=4}
+```{r measure sample similarity}
 ## dot similarity from initial Z scores
 dot_sim <- similarity_func(exp_mat)
 sim_tree <- cluster_func(dot_sim)

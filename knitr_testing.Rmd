@@ -1,0 +1,452 @@
+---
+title: "knitr_testing"
+author: "Leroy Bondhus"
+date: "12/15/2021"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r libraries, include=FALSE}
+library(ggplot2)
+library(ggpubr)
+library(biomaRt)
+library(stringr)
+library(dendextend)
+library(dplyr)
+library(Hmisc)
+library(doParallel)
+library(foreach)
+
+library(ComplexHeatmap)
+library(circlize)
+library(scales)
+library(reldist)
+library(gridExtra)
+
+library(DOSE)
+library(pathview)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+
+library(tidyverse)
+library(topGO) 
+library(enrichplot)
+
+library(data.table)
+
+figures_dir <- paste(getwd(),"figures", sep = "/")
+date <- format(Sys.time(), format="%Y%m%d") 
+
+registerDoParallel(detectCores()-1)
+```
+
+## load gtex here
+```{r import dataset}
+## import gtex medians data
+temp <- tempfile()
+download.file("https://storage.googleapis.com/gtex_analysis_v8/rna_seq_data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz",temp)
+gtex <- read.table( temp, skip=2, header = TRUE, sep = "\t")
+gtex_rowinfo <- data.frame(Name=gtex$Name, Description=gtex$Description)
+rownames(gtex) <- gtex$Name
+gtex <- as.matrix(gtex[,3:ncol(gtex)])
+unlink(temp); rm(temp)
+
+
+## import ensembl gene data
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", GRCh=37)
+genes <- getBM(attributes=c('chromosome_name','start_position','end_position','hgnc_symbol', 'ensembl_gene_id','gene_biotype'),
+                 filters = list('biotype'='protein_coding'),
+                 mart = ensembl, useCache = F) 
+genes <- genes[which(is.element(genes$chromosome_name, c(1:22, "X", "Y", "MT")) & genes$hgnc_symbol != "" ) ,]
+```
+
+## clean gtex dataset here
+```{r clean dataset, fig.width = 8, fig.height=4}
+## show mitochondrial genes drive a large part of sample similarity
+## Note sum of medians in gtex not quite 1M - likely artifact of taking medians
+
+temp <- data.frame(names=colnames(gtex), total_transcripts=colSums(gtex))
+ggplot( temp ,aes(y=total_transcripts, x=names))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+## match genes between gtex and ensembl
+gtex_names <- str_split_fixed(gtex_rowinfo$Name, "[.]", 2)[,1]
+which <- which(genes$chromosome_name != "MT" )
+gtex_cleaned <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
+which <- which(genes$chromosome_name == "MT" )
+gtex_cleanedMT <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
+
+##non-mitochondrial TPM sum
+temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
+ggplot( temp ,aes(y=total_transcripts, x=names))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+##mitochondrial TPM sum
+temp <- data.frame(names=colnames(gtex_cleanedMT), total_transcripts=colSums(gtex_cleanedMT))
+ggplot( temp ,aes(y=total_transcripts, x=names))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+rm(gtex_cleanedMT)
+##renormalize TPM without mitochondrial genes
+for(i in 1:ncol(gtex_cleaned)){
+  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
+}
+
+temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
+ggplot( temp ,aes(y=total_transcripts, x=names))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+gtex <- gtex_cleaned; rm(gtex_cleaned)
+exp_mat <- gtex
+## log10(TPM+1) transform of data
+exp_mat <- log10(exp_mat+1)
+
+## remove mitochondrial contribution
+```
+```{r collected functions used, include=FALSE}
+
+calc_zscore_matrix<- function(dat) {
+  zscores <- dat; zscores[] <- 0 
+  means <- rowMeans(dat)
+  sds <- as.numeric(rep(NA,length(means)))
+  which <- which(means != 0)
+  sds[which] <- apply(dat[which,],1,sd)
+  for(j in 1:ncol(dat)){zscores[,j] <- (dat[,j] - means)/sds  }
+  return(zscores)
+}
+
+calc_dot_product_similarity_matrix <- function(dat) {
+  dot_product_similarity_matrix <- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  colnames(dot_product_similarity_matrix) <- colnames(dat)
+  rownames(dot_product_similarity_matrix) <- colnames(dat)
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)){
+      which_i <- which(!is.na(dat[,i])) ## ignore NAs
+      which_j <- which(!is.na(dat[,j])) ## ignore NAs
+      dot_product_similarity_matrix[i,j] <- sum(dat[which_i,i] * dat[which_j,j]) / (norm(dat[which_i,i],"2")*norm(dat[which_j,j],"2"))
+    }
+  }
+  return(dot_product_similarity_matrix)
+}
+
+### uses Equation 1. from paper 
+add_dist_to_parent <- function(dend, dist_to_parent=0){
+  ## note: distance to parent is fed in at the start of the function
+  attributes(dend) <- c(attributes(dend), dist_to_parent=dist_to_parent)
+  ## test if at leaf node
+  if(!is.null(attributes(dend)$leaf) && attributes(dend)$leaf){
+    return(dend)
+  }
+  for(i in 1:length(dend)){ ## length of dend should be number of child nodes
+    ## distance to parent is simply the difference in height between parent and child
+    dist_to_parent <- attributes(dend)$height - attributes(dend[[i]])$height 
+    dend[[i]] <- add_dist_to_parent(dend[[i]], 
+                                             dist_to_parent = dist_to_parent)
+  }
+  return(dend)
+}
+
+## this functions calculates and adds weights to dendrogram object using the 'dist_to_parent' attribute added previously
+## weight_of_parent parameter exists only for recursion and should not be manually adjusted without understanding it's function
+add_weights <- function(dend, weight_of_parent=0){
+  weight <- (attributes(dend)$dist_to_parent / attributes(dend)$members) + weight_of_parent 
+  attributes(dend) <- c(attributes(dend), weight=weight)
+  ## test if at leaf node
+  if(!is.null(attributes(dend)$leaf) && attributes(dend)$leaf){
+    return(dend)
+  }
+  for(i in 1:length(dend)){ ## length of dend should be number of child nodes
+    dend[[i]] <- add_weights(dend[[i]], weight_of_parent=weight)
+  }
+  return(dend)
+}
+
+## this function returns the weights from a dendrogram object that has a "weight" attribute at leaves. Also requires the order of the vector to return based on names of leaves
+get_weights <- function(dend, name_order){
+  weights <- setNames(get_leaves_attr(dend,"weight"),nm=get_leaves_attr(dend,"lab") )
+  weights <- weights[order(factor(names(weights),levels = name_order))]
+  return(weights)
+}
+
+
+# function to calculate weighted zscores given matrix and vector of weights. column names of the matrix and names of the weight vector must match
+calc_weighted_zscore_matrix <- function(mat, weights){
+  if(any( colnames(mat) != names(weights) )){stop("WARNING: mismatch in weights names and matrix colnames order")}
+  weighted_mat <- mat; weighted_mat[] <- 0
+  for (i in 1:length(weights)){
+    weighted_mat[,i] <- weights[i]*mat[,i]
+  }
+  weighted_means <- numeric(length = nrow(weighted_mat))
+  sum_of_weights <- sum(weights)
+  for (i in 1:nrow(weighted_mat)){
+    weighted_means[i] <- sum(weighted_mat[i,]) / sum_of_weights
+  }
+  weighted_var <- numeric(length=nrow(mat))
+  for (i in 1:nrow(mat)){
+    weighted_var[i] <- Hmisc::wtd.var(mat[i,],weights=weights)
+  }
+  weighted_sd <- sqrt(weighted_var)
+  for(i in 1:ncol(mat)){
+    mat[,i] <- (mat[,i]-weighted_means)/weighted_sd
+  }
+  weighted_zscores <- mat
+  return(weighted_zscores)
+}
+
+
+
+# weighted tau
+calc_weighted_tau <- function(te_matrix, weights_vector){
+  xhat_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  te_row_maxima <- apply(te_matrix, 1, max)
+  for(j in 1:ncol(te_matrix)){
+    xhat_matrix[,j] <- te_matrix[,j] / te_row_maxima
+  }
+  temp_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (i in 1:nrow(te_matrix)){
+    temp_matrix[i,] <- weights_vector - (xhat_matrix[i,] * weights_vector)
+  }
+  tau <- c()
+  den <- sum(weights_vector) - 1
+  for (i in 1:nrow(temp_matrix)){
+    temp <- sum(temp_matrix[i,]) / den
+    tau <- append(tau,temp)
+  }
+  
+  ## add normalization (believe this is a numeric instability issue from dividing small numbers)
+  # tau <- tau / max(tau, na.rm=T)
+  ## alternative, set all > 1 to 1 (when looking at plots for different cutoffs, normalizing true 1 values causes issue)
+  tau[which(tau > 1)] <- 1
+  return(tau)
+}
+
+calc_weighted_tsi <- function(te_matrix,weights_vector){
+  tsi <- c()
+  weights_vector <- as.matrix(weights_vector)
+  weighted_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (m in 1:nrow(weights_vector)){
+    weighted_matrix[,m] <- weights_vector[m,1]*te_matrix[,m]
+  }
+  for (i in 1:nrow(te_matrix)){
+    num <- max(weighted_matrix[i,])
+    den <- sum(weighted_matrix[i,])
+    temp <- num/den
+    tsi <- append(tsi,temp)
+  }
+  return(tsi)
+}
+
+calc_weighted_gini <- function(te_matrix, weights_vector){
+   gini_values <-  c()
+  for (i in 1:nrow(te_matrix)){
+    temp <- as.numeric(te_matrix[i,])
+    temp <- reldist::gini(temp, weights_vector)
+    gini_values <- append(gini_values,temp)
+  }
+  return(gini_values)
+}
+
+
+```
+
+```{r organizing functions into lists, include=FALSE}
+### generalizing a list to store results in - this will make it easier to extend later if necessary.
+## Note: only need the weighted version of each equation as each simplifies to flat version when all weights are 1
+specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
+                             funcs=list(Zscore=calc_weighted_zscore_matrix,
+                                        Tau=calc_weighted_tau,
+                                        Tsi=calc_weighted_tsi,
+                                        Gini=calc_weighted_gini),
+                             out_type=list(Zscore="matrix",
+                                           Tau="vector",
+                                           Tsi="vector",
+                                           Gini="vector")
+                             )
+## only 1 similarity function tested for now, can make as list later
+similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
+## only 1 clustering fucntion tested for now, can make as a list later
+cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+
+```
+
+```{r measure difference between 1 and all brain samples included, include=FALSE }
+
+## select which to be all non-brain and one brain
+which <- c(grep("Brain", colnames(exp_mat), invert = TRUE ),sample(grep("Brain", colnames(exp_mat)),1))
+flat <- rep(1,ncol(exp_mat)); names(flat) <- colnames(exp_mat)
+spec_one_all_list <- list()
+for(measure in specificity_measures$func_names){
+    specificity_func <- specificity_measures$funcs[[measure]]
+    if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
+    spec_one_all_list[[paste(measure, "flat_one",sep="_")]] <- specificity_func(exp_mat[,which], flat[which])
+    spec_one_all_list[[paste(measure, "flat_all",sep="_")]] <- specificity_func(exp_mat, flat)
+    if(measure=="Zscore"){
+       spec_one_all_list[[paste(measure, "flat_all",sep="_")]] <- spec_one_all_list[[paste(measure, "flat_all",sep="_")]][,which]
+    }
+    dot_sim <- similarity_func(exp_mat[,which])
+    sim_tree <- cluster_func(dot_sim)
+    weights <- get_weights(sim_tree, colnames(exp_mat)[which])
+    spec_one_all_list[[paste(measure, "weighted_one",sep="_")]] <- specificity_func(exp_mat[,which], weights)
+    dot_sim <- similarity_func(exp_mat)
+    sim_tree <- cluster_func(dot_sim)
+    weights <- get_weights(sim_tree, colnames(exp_mat))
+    spec_one_all_list[[paste(measure, "weighted_all",sep="_")]] <- specificity_func(exp_mat, weights)
+    if(measure=="Zscore"){
+       spec_one_all_list[[paste(measure, "weighted_all",sep="_")]] <- spec_one_all_list[[paste(measure, "weighted_all",sep="_")]][,which]
+    }
+}
+for(measure in specificity_measures$func_names){
+    specificity_func <- specificity_measures$funcs[[measure]]
+    if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
+    if(measure=="Zscore"){
+      df_f <- reshape2::melt(spec_one_all_list[[paste(measure, "flat_all",sep="_")]], value.name = "all")
+      temp_df <- reshape2::melt(spec_one_all_list[[paste(measure, "flat_one",sep="_")]], value.name = "one")
+      df_f <- merge(df_f,temp_df) 
+    } else {
+      df_f <- data.frame(Var1=rownames(exp_mat),
+                         Var2=NA,
+                         all=spec_one_all_list[[paste(measure, "flat_all",sep="_")]],
+                         one=spec_one_all_list[[paste(measure, "flat_one",sep="_")]])
+    }
+    df_f$f_or_w <- "flat"; df_f$measure <- measure
+    
+    if(measure=="Zscore"){
+      df_w <- reshape2::melt(spec_one_all_list[[paste(measure, "weighted_all",sep="_")]], value.name = "all")
+      temp_df <- reshape2::melt(spec_one_all_list[[paste(measure, "weighted_one",sep="_")]], value.name = "one")
+      df_w <- merge(df_w,temp_df) 
+    } else{
+      df_w <- data.frame(Var1=rownames(exp_mat),
+                         Var2=NA,
+                         all=spec_one_all_list[[paste(measure, "weighted_all",sep="_")]],
+                         one=spec_one_all_list[[paste(measure, "weighted_one",sep="_")]])
+    }
+    df_w$f_or_w <- "weighted"; df_w$measure <- measure
+    
+    if(!exists("df_1b")){
+      df_1b <- rbind(df_f,df_w); rm(df_f,df_w)
+    } else {
+      df_1b <- rbind(df_1b,df_f,df_w)
+    }
+}
+df_1b$delta <- df_1b$one - df_1b$all
+
+## Main flat for all v 1
+ggl <- list()
+for(is_main in c(T,F)){
+  for(measure in specificity_measures$func_names){
+    temp <- data.frame(cor_f = cor(df_1b$all[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)],
+                                   df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)], use="complete.obs"),
+                       cor_w = cor(df_1b$all[which(df_1b$f_or_w=="weighted" & df_1b$measure==measure)],
+                                   df_1b$one[which(df_1b$f_or_w=="weighted" & df_1b$measure==measure)], use="complete.obs"),
+                       min = min(c(df_1b$all[which(df_1b$measure==measure)],df_1b$one[which(df_1b$measure==measure)]), na.rm = T),
+                       max = max(c(df_1b$all[which(df_1b$measure==measure)],df_1b$one[which(df_1b$measure==measure)]), na.rm = T))
+    if(is_main){
+      which <- which(df_1b$measure==measure & df_1b$f_or_w=="flat")
+      title <- paste(measure, ": cor =",round(temp$cor_f,3))
+      temp$min <- min(c(df_1b$all[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)],
+                        df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)]), na.rm = T)
+      temp$max <- max(c(df_1b$all[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)],
+                        df_1b$one[which(df_1b$f_or_w=="flat" & df_1b$measure==measure)]), na.rm = T)
+    } else { 
+      which <- which(df_1b$measure==measure)
+      title <- paste(measure, ": cor_f =",round(temp$cor_f,3), ": cor_w =", round(temp$cor_w,3))
+    }
+    ggl[[measure]] <- ggplot(df_1b[which,], aes(x=all, y=one))+
+      geom_point(size=0.1)+
+      ggtitle(title)+
+      scale_x_continuous(limits = c(temp$min,temp$max),
+                         breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",2,0.1)),
+                         expand = c(0,0))+
+      scale_y_continuous(limits = c(temp$min,temp$max),
+                         breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",2,0.1)),
+                         expand = c(0,0))+
+      geom_abline(slope=1,intercept=0, color="red", size=0.3)+
+      theme_bw()+
+        theme(panel.grid.minor.x = element_blank())
+    
+      if(is_main){
+      } else {
+        ggl[[measure]] <- ggl[[measure]] + facet_grid(. ~ f_or_w)
+      }
+  
+  }
+  
+  grobl <- list()
+  for(n in names(ggl)){
+    grobl[[n]] <- ggplotGrob(ggl[[n]])
+  }
+  
+  if(is_main){
+    grobl_main <- grobl
+  } else {
+    grobl_supp <- grobl
+  }
+}
+
+```
+
+
+```{r plot difference between 1 and all brain samples included for weighted and flat, fig.width =8, fig.height=12}
+grid.arrange(grobs=grobl_supp, nrow=4)
+```
+
+
+
+```{r Supplemental Figure Go terms associated with diff in 1 v all brain samples, fig.width = 8, fig.height=12}
+## get gene ids (rows from df_1b) that correspond to given GO id/ GO label
+## generate small set of brain related GO id/ GO labels
+## plot on one v all plot
+
+genes <- getBM(attributes=c('hgnc_symbol', 'ensembl_gene_id','go_id','name_1006'),
+                 mart = ensembl, useCache = F)
+allOE_genes<-str_split_fixed(rownames(exp_mat),"[.]",2)[,1]
+ggl <- list()
+for(measure in specificity_measures$func_names){
+  temp_df <- df_1b[which( df_1b$measure == measure),]
+  temp_df_sub <- slice_max(temp_df, order_by=delta, n=nrow(temp_df)/100 )
+  sigOE_genes <- str_split_fixed(temp_df_sub$Var1,"[.]",2)[,1]
+  ego <- enrichGO(gene = sigOE_genes, 
+                  universe = allOE_genes,
+                  keyType = "ENSEMBL",
+                  OrgDb = org.Hs.eg.db, 
+                  ont = "BP", 
+                  pAdjustMethod = "BH",
+                  qvalueCutoff = 0.05,
+                  readable = TRUE,
+                  pool=TRUE)
+  
+  ggl[[measure]] <- ggplot(temp_df, aes(x=all, y=one))+
+    geom_point(size=0.1)+
+    geom_point(data=temp_df_sub, aes( x=all, y=one), color="red")+
+    ggtitle(measure)+
+    geom_abline(slope=1,intercept=0, color="red", size=0.3)+
+    theme_bw()+
+      theme(panel.grid.minor.x = element_blank())
+  
+  n=10
+  filename <- paste(figures_dir,"/",measure,"_top1percent_deltas_go.png",sep = "")
+  ego <- enrichplot::pairwise_termsim(ego)
+  p1 <- plot(ggl[[measure]])
+  p2 <- dotplot(ego, showCategory = n)
+  p3 <- emapplot(ego, showCategory = n ) #, node_label="none"))
+  #png(filename, width = 16, height = 5, units = "in", res=200 )
+  grid.arrange(p1,p2,p3, ncol=3)
+  #dev.off()
+
+}
+
+
+```
+
+
+
