@@ -401,14 +401,14 @@ grid.arrange(grobs=grobl_supp, nrow=4, heights=c(5,3,3,3))
 ```
 
 
-```{r Supplemental Figure Go terms associated with diff in 1 v all brain samples, fig.width = 8, fig.height=4}
+```{r Supplemental Figure Go terms associated with diff in 1 v all brain samples, fig.width = 10, fig.height=4}
 ## get gene ids (rows from df_1b) that correspond to given GO id/ GO label
 ## generate small set of brain related GO id/ GO labels
 ## plot on one v all plot
 
-# genes <- getBM(attributes=c('hgnc_symbol', 'ensembl_gene_id','go_id','name_1006'),
-#                mart = ensembl, useCache = F)
-genes <- load("genes_w_go.RData")
+genes <- getBM(attributes=c('hgnc_symbol', 'ensembl_gene_id','go_id','name_1006'),
+               mart = ensembl, useCache = F)
+#genes <- load("genes_w_go.RData")
 
 allOE_genes<-str_split_fixed(rownames(exp_mat),"[.]",2)[,1]
 ggl <- list()
@@ -438,10 +438,14 @@ for(measure in specificity_measures$func_names){
   filename <- paste(figures_dir,"/",measure,"_top1percent_deltas_go.png",sep = "")
   ego <- enrichplot::pairwise_termsim(ego)
   p1 <- ggl[[measure]]
-  p2 <- dotplot(ego, showCategory = n)
-  p3 <- emapplot(ego, showCategory = n ) #, node_label="none"))
-  #png(filename, width = 16, height = 5, units = "in", res=200 )
-  grid.arrange(p1,p2,p3, ncol=3)
+  p2 <- enrichplot::dotplot(ego, showCategory = n, font.size=8, label_format=15)+
+          theme(legend.position = "none")
+    
+  p3 <- emapplot(ego, showCategory = n, cex_label_category=0.5, cex_category=0.5, cex_line=0.5 )+
+    scale_y_discrete(labels=str_wrap(ego@result$Description[1:n], width=15 ))
+
+
+  grid.arrange(p1, p2,p3, ncol=3) #, widths = c(3,3,4))
   #dev.off()
 
 }
@@ -452,36 +456,36 @@ for(measure in specificity_measures$func_names){
 
 
 
-```{r measure sample similarity, fig.width = 8, fig.height=4}
+
+
+```{r measure sample similarity, fig.width = 6, fig.height=6}
 ## dot similarity from initial Z scores
 dot_sim <- similarity_func(exp_mat)
 sim_tree <- cluster_func(dot_sim)
+heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13), symm=T)
+```
 
-# filename = paste(figures_dir, "/sample_similarity_heatmap.png", sep="")
-# png(filename = filename, width=10, height=10, units="in", res=300)
-heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
-legend()
-# dev.off()
-
+```{r cluster and get weights, fig.show="hold", out.width="50%", fig.height= 8}
 sim_tree <- cluster_func(dot_sim)
 ## plot similarity tree with weights
-# filename = paste(figures_dir, "/weighted_tree.png", sep="")
-# png(filename = filename, width=9, height=4, units="in", res=300)
-sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
-# dev.off()
-
+par(mar=c(2,2,2,15))
+sim_tree %>%
+  dendextend::set("nodes_pch",19) %>% 
+  dendextend::set("nodes_cex",2* sqrt(get_nodes_attr(sim_tree,"weight"))) %>%
+  plot(horiz=T)
 
 ## take a look at the weights
 temp <- get_weights(sim_tree, get_leaves_attr(sim_tree, "label"))
 temp <- data.frame(weights=temp, names=factor(names(temp), levels=rev(names(temp)) ) )
-g <- ggplot( temp ,aes(y=names, x=weights))+
+g <- ggplot( temp ,aes(y=fct_rev(as.factor(names)), x=weights))+
   geom_col() #+
   #theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust=1))
 g
 
-# filename = paste(figures_dir, "/sample_weights.png", sep="")
-# ggsave(filename, g, device = "png", width = 8, height = 8, dpi = 300)
 
+```
+
+```{r look at flat and weighted distributions, fig.show="hold", out.width="50%",  fig.height=4}
 weights <- get_weights(sim_tree, colnames(exp_mat))
 spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights = weights)
 flat <- weights; flat[1:length(flat)] <- 1
@@ -494,9 +498,13 @@ tsi_weighted <- calc_weighted_tsi(exp_mat,weights)
 gini_flat <- calc_weighted_gini(exp_mat, flat)
 gini_weighted <- calc_weighted_gini(exp_mat, weights)
 
+hist(spec_mat_flat ,breaks=100)
 hist(spec_mat_weighted ,breaks=100)
-hist(tau_weighted ,breaks=100)
+hist(tau_flat ,breaks=100)
+hist(tau_weighted  ,breaks=100)
+hist(tsi_flat ,breaks=100)
 hist(tsi_weighted ,breaks=100)
+hist(gini_flat ,breaks=100)
 hist(gini_weighted ,breaks=100)
 hist(spec_mat_weighted - spec_mat_flat ,breaks=100)
 hist(tau_weighted - tau_flat ,breaks=100)
@@ -526,7 +534,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
   
   num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-  num_reps <- 8
+  num_reps <- 3
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
   cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
