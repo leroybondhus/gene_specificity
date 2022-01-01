@@ -634,9 +634,6 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
 ```
 
 ```{r Figure_2C}
-#system("mkdir figures")
-figures_dir <- paste(getwd(),"figures", sep = "/")
-date <- format(Sys.time(), format="%Y%m%d") 
 
 df_robustness_test_results <- data.frame(measure=character(),
                                          P1orP2=character(),
@@ -730,10 +727,9 @@ for(measure in c("Zscore", "notZscore")){
                          labeller=labeller(P1orP2=c("P1"="P1 (non-brain)", "P2"="P2 (brain)")))
      gg <- gg+theme(legend.position = "none")
   } else {
-     gg <- gg+facet_wrap( ~ measure, ncol = 3); plot(gg)
+     gg <- gg+facet_wrap( ~ measure, ncol = 3)
      gg <- gg+theme(legend.position="bottom")
   }
-  plot(gg)
   ggl[[measure]] <- gg
 }
 
@@ -741,24 +737,10 @@ grobl <- list()
 for(n in names(ggl)){
   grobl[[n]] <- ggplotGrob(ggl[[n]])
 }
-grid.arrange(grobs=grobl, ncol=2, widths=c(5,4))
-g <-arrangeGrob(grobs=grobl, ncol=2, widths=c(5,4))
-
-#grid.arrange(grobs=grobl, widths = c(1,1), layout_matrix = rbind(c(1,2),c(1,3),c(1,4))  )
-
-
-
-#grid.arrange(ggl$Zscore, ggl$Tau, ggl$Tsi, ggl$Gini, nrow=2)
-
-filename <- paste(figures_dir,"/",date,"_variance_random_v01.png",sep = "")
-#ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
-
+grid.arrange(grobs=grobl, nrow=2)
 ## for random supplemental
-if(FALSE){
-  grid.arrange(grobs=grobl, nrow=2, heights=c(5,5))
-  g <-arrangeGrob(grobs=grobl, nrow=2, heights=c(5,5))
-  filename <- paste(figures_dir,"/",date,"_variance_random_v01.png",sep = "")
- # ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
+if(!random_partition){
+  grid.arrange(grobs=grobl, nrow=2)
 }
 
 
