@@ -633,7 +633,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
 #save.image()
 ```
 
-```{r Figure_2C}
+```{r Figure_2C, fig.width = 8, fig.height= 8}
 
 df_robustness_test_results <- data.frame(measure=character(),
                                          P1orP2=character(),
@@ -738,11 +738,6 @@ for(n in names(ggl)){
   grobl[[n]] <- ggplotGrob(ggl[[n]])
 }
 grid.arrange(grobs=grobl, nrow=2)
-## for random supplemental
-if(!random_partition){
-  grid.arrange(grobs=grobl, nrow=2)
-}
-
 
 ```
 
@@ -768,8 +763,7 @@ which_list[["Z_P2_weighted"]] <- which(df_2c$measure=="Zscore"
                     & df_2c$n == max(df_2c$n)
                     & df_2c$weight_or_flat=="weighted")
 
-filename=paste(figures_dir,"/random_ttest_output.txt",sep="")
-sink(file=filename)
+
 print("t-test P1 weighted / P1 flat : %diff between weighted and flat")
 ## t.test on logs gives ratio estimates
 temp <- t.test(x=log10(df_2c[which_list$Z_P1_weighted,]$variance),y=log10(df_2c[which_list$Z_P1_flat,]$variance) ,paired=TRUE, conf.level = 0.95)
@@ -783,7 +777,7 @@ temp <- t.test(x=log10(df_2c[which_list$Z_P2_weighted,]$variance),y=log10(df_2c[
 1-10^temp$estimate
 1-10^temp$conf.int
 ### 
-sink()
+
 ```
 
 
@@ -791,10 +785,7 @@ sink()
 
 
 
-```{r Figure_2D flat v weighted jaccard plot}
-#system("mkdir figures")
-figures_dir <- paste(getwd(),"figures", sep = "/")
-date <- format(Sys.time(), format="%Y%m%d") 
+```{r Figure_2D flat v weighted jaccard plot, fig.width = 6, fig.height= 6}
 
 ## jaccard between n = 1 and n = num_brain_samples for brain v non-brain OR P1 v P2 
 
@@ -927,14 +918,11 @@ for(measure in c("Zscore", "notZscore")){
   if(measure == "Zscore"){
     gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
     gg <- gg + facet_grid(weighted ~ P1orP2, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-    gg <- gg+theme(legend.position = "none")
   } else {
     gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))
     gg <- gg + facet_grid(weighted ~ measure, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-    gg <- gg+theme(legend.position="bottom")
   }
   
-  plot(gg)
   ggl_jacc[[measure]] <- gg
 }
 
@@ -942,18 +930,11 @@ grobl <- list()
 for(n in names(ggl_jacc)){
   grobl[[n]] <- ggplotGrob(ggl_jacc[[n]])
 }
-#grid.arrange(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(6,1)  ) ), nrow=2, heights=c(5,4) )
-grid.arrange(grobs =list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), nrow=2, heights=c(6,1)  ) ), ncol=2, widths=c(5,4) )
-g <- arrangeGrob(grobs =grobl, ncol=2, widths=c(5,4) )
-filename <- paste(figures_dir,"/",date,"_jaccard_random_v01.png",sep = "")
-#ggsave(filename, g, device = "png", width = 8, height = 3, dpi=300)
+grid.arrange(grobs =list(grobl$Zscore,grobl$notZscore), nrow=2)
 
 ## for random supplemental
-if(FALSE){
+if(random_partition){
   grid.arrange(grobs = grobl, nrow=2, heights=c(5,4) )
-  g <- arrangeGrob(grobs = grobl, nrow=2, heights=c(5,4) )
-  filename <- paste(figures_dir,"/",date,"_jaccard_random_v01.png",sep = "")
-  ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
 }
 
 
@@ -971,7 +952,6 @@ for(measure in c("Zscore", "notZscore")){
     theme_bw()+
     theme(
           panel.grid.minor.x = element_blank())+
-    #ggtitle(paste("Number of genes above threshold for\n ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
     geom_line(aes(color=n))+
     scale_color_continuous(low="steelblue2", high="steelblue4")+
     #scale_y_log10( #limits = c(1,3e4),
@@ -981,31 +961,24 @@ for(measure in c("Zscore", "notZscore")){
     
   if(measure == "Zscore"){
     gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
-    gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
-    gg <- gg+theme(legend.position = "none")
+    gg <- gg + facet_grid(weighted ~ P1orP2, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
   } else {
     gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))
-    gg <- gg + facet_grid(measure ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    gg <- gg + facet_grid(weighted ~ measure, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
   }
-  plot(gg)
   ggl_count[[measure]] <- gg
 }
 grobl <- list()
 for(n in names(ggl_count)){
   grobl[[n]] <- ggplotGrob(ggl_count[[n]])
 }
-grid.arrange(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(6,1)  ) ), nrow=2, heights=c(5,4) )
-g <- arrangeGrob(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(5,1)  ) ), nrow=2, heights=c(5,4) )
-filename <- paste(figures_dir,"/",date,"_jaccard_gene_count_random_v01.png",sep = "")
-#ggsave(filename, g, device = "png", width = 6, height = 4)
+grid.arrange(grobs =  list(grobl$Zscore, grobl$notZscore), nrow=2)
 
 ## for random supplemental
-if(FALSE){
+if(random_partition){
   grid.arrange(grobs = grobl, nrow=2, heights=c(5,4) )
-  g <- arrangeGrob(grobs = grobl, nrow=2, heights=c(5,4) )
-  filename <- paste(figures_dir,"/",date,"_jaccard_gene_count_random_v01.png",sep = "")
- # ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
 }
+
 
 
 ```
@@ -1038,8 +1011,7 @@ which_list[["Z_P2_weighted"]] <- which(df_2d$measure=="Zscore"
                                    & df_2d$P1orP2=="P2"
                                    & df_2d$weighted==TRUE)
 
-filename=paste(figures_dir,"/random_ttest_jaccard_output.txt",sep="")
-sink(file=filename)
+
 
 print("t-test P2 flat jaccard")
 temp <- t.test(x=df_2d[which_list$Z_P2_flat,]$jaccard, conf.level = 0.95)
@@ -1061,12 +1033,12 @@ temp <- t.test(x=df_2d[which_list$Z_P1_weighted,]$jaccard, conf.level = 0.95)
 temp$estimate
 temp$conf.int
 
-sink()
 ```
 
 
-```{r  Figure 3AB flat v weighted comparisons}
+```{r  Figure 3AB flat v weighted comparisons, fig.width = 9,  fig.height=8}
 if(TRUE){
+
 
   ### Matrix built from Z score first then add columns of change in other scores
   ## NOT going to be general to arbitrary sets of matrix measures -> use only Z score and then concatenate other measures
@@ -1115,15 +1087,6 @@ if(TRUE){
                                            data.frame("gene" = rownames(spec_mat_flat)[order((spec_mat[,i]*(-1)), decreasing = TRUE)[1:n]])) 
         }
     } else if (specificity_measures$out_type[measure]=="vector"){
-      # n=20 ## top n for each vector measure (single column) 
-      # temp_name <- measure
-      # gene_list$up[[temp_name]] <- data.frame("gene"=numeric())
-      # gene_list$down[[temp_name]] <- data.frame("gene"=numeric())
-      # ## go in same order as similarity tree
-      # gene_list$up[[temp_name]] <- rbind(gene_list$up[[temp_name]],
-      #                                    data.frame("gene"=rownames(spec_mat_flat)[order((spec_mat[,1]), decreasing = TRUE)[1:n]]))
-      # gene_list$down[[temp_name]] <- rbind(gene_list$down[[temp_name]],
-      #                                      data.frame("gene" = rownames(spec_mat_flat)[order((spec_mat[,1]*(-1)), decreasing = TRUE)[1:n]]))
     } else { stop("WARNING: no out type associated with measure") }
     
   }
@@ -1136,16 +1099,6 @@ if(TRUE){
                                         -1.99, -1, 0, 1, 1.99,
                                         max(c(2, max( spec_mats$delta_Zscore, na.rm = T) ) )),
                                       c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
-    for(measure in specificity_measures$func_names[which(specificity_measures$out_type=="vector")]){
-      # if(type=="delta"){
-      #     col_funs[[paste(type, measure, sep="_")]] <- colorRamp2(c(-1,-0.25, 0 , 0.25, 1),
-      #                                    c("darkblue", "blue", "white", "red", "red4") )
-      # } else {
-      #   col_funs[[paste(type,measure, sep="_")]] <- colorRamp2(c(0, 0.5, 1),
-      #                                    c("white", "red", "red4") )
-      # }
-      # 
-    }
   }
   
   ## get genes in top and bottom (note: genes may be repeated since want to see top n for each group )
@@ -1180,50 +1133,21 @@ if(TRUE){
         heatmaps[[type]] <- heatmaps[[type]] + h1
       }
     }
-    draw(heatmaps[[type]], padding = unit(c(0.9, 0.1, 0.3, 0.1), "in"))
   }
-  
-}
 
-filename <- paste(figures_dir,"/",date,"_heatmap_v01.png",sep = "")
-#png(filename = filename, width=8, height=14, units="in", res=300)
 heatmaps$delta
-#dev.off()
-
-
-filename <- paste(figures_dir,"/",date,"_heatmap_fw_v01.png",sep = "")
-#png(filename = filename, width=16, height=14, units="in", res=300)
 heatmaps$flat + heatmaps$weighted
-#dev.off()
-
-
-## write csvs of flat v weighted tables for supplement
-library("writexl")
-temp_list<-list()
-for(i in 1:length(spec_mats)){
-  if(grepl("delta",names(spec_mats)[i])){next;}
-  temp_list[[names(spec_mats)[i] ]] <- merge(gtex_rowinfo, cbind( Name=rownames(spec_mats[[1]]),    data.frame(signif(spec_mats[[i]],3) )) )
 }
-
-filename <- paste(figures_dir, "/specificity_scores_full_Gtex.xlsx",sep = "")
-write_xlsx(temp_list, filename)
-
 ```
 
 
 
-```{r Figure 3C known marker genes}
-## neural/brain marker: SOX1, SOX2, :: refs
-## pancreatic marker: PRSS1, :: refs
-## cardiac marker: , :: refs
-## muscle marker: , :: refs
-## arterial marker: , :: refs
+```{r  Figure 3C marker, fig.width = 9,  fig.height=8}
 
 head(gtex_rowinfo)
-## create list of marker genes (common name and ENS map in genes object and gtex_rowinfo object)
-#"NEUROD1","NEUROD2" ,"SOX2",  "TPPP","NEUROD4", "NEUROD6","MBP", "MAP2","GFAP" ,"NSG2","ADCY8","HEPACAM","VSTM2B","SLITRK3","MBP","MAP2","SOX2",  "TPPP","BCAN", "NCAN","OPALIN","STMN4", "GFAP" ,"NSG2","ADCY8",
+
 specific_genes <- c( "OLIG1","OLIG2",
-                     "PRSS1", "PTF1A", # "CTRB2",
+                     "PRSS1", "PTF1A", 
                      "MYH6", "MYL4")
 spec_genes_w_ids <- gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
 spec_genes_w_ids <- spec_genes_w_ids[which(is.element(spec_genes_w_ids$Name, rownames(spec_mats$delta_Zscore))),]
@@ -1262,7 +1186,7 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
   }
   if(measure=="Zscore"){
     split <- rep(1:(nrow(spec_genes_w_ids)/2), each=2)
-    ra <- rowAnnotation(foo = anno_block(labels = unique(spec_genes_w_ids$Description)))
+    ra <- rowAnnotation(foo = anno_block(labels =  paste(unique(spec_genes_w_ids$Description), "\nW     F")))
     h1 <- Heatmap(temp_mat, name=measure,
                   cluster_rows = FALSE, show_row_names = FALSE,
                   cluster_columns = sim_tree,
@@ -1284,10 +1208,6 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
 }
 draw(heatmaps)
 
-filename <- paste(figures_dir,"/",date,"marker_genes_grad_v01.png",sep = "")
-#png(filename, width = 8, height = 7, units = "in", res=300 )
-#draw(heatmaps)
-#dev.off()
 
 
 ## get particular values reported in paper
@@ -1299,10 +1219,14 @@ for(i in 1:nrow(spec_genes_w_ids)){
   temp_mat[i,] <- spec_mats[[paste(spec_genes_w_ids$f_or_w[i], measure, sep = "_")]][spec_genes_w_ids$Name[i],]
 }
 rownames(temp_mat) <- paste(c("flat","weighted"), spec_genes_w_ids$Description)
+
+
+
+
 ```
 
 
-```{r Figure 3D}
+```{r Figure 3D, fig.show="hold", out.width="50%",  fig.height=4}
 ## gene ontology summaries
 library(DOSE)
 library(pathview)
@@ -1346,26 +1270,12 @@ for(onto in c("BP")){ #},"MF","CC")){
                   readable = TRUE,
                   pool=TRUE)
 
-  
   n=10
-  filename <- paste(figures_dir,"/",date,"_go_dot_",onto,"_",n,".png",sep = "")
-  print(filename)
-  #png(filename, width = 6, height = 10, units = "in", res=300 ) 
   print(dotplot(ego, showCategory = n))
-  #dev.off()
   
-  filename <- paste(figures_dir,"/",date,"_go_clus_wo_labels",onto,"_",n,".png",sep = "")
-  print(filename)
-  #png(filename, width = 8, height = 6, units = "in", res=300 )
   ego <- enrichplot::pairwise_termsim(ego)
   print(emapplot(ego, showCategory = n))
-  #dev.off()
   
-  filename <- paste(figures_dir,"/",date,"_go_graph_",onto,"_",n,".png",sep = "")
-  print(filename)
-  #png(filename, width = 6, height = 7, units = "in", res=300 ) 
-  print(goplot(ego, showCategory = n)) ## note needed to nest goplot in print function for this to write to file.. not sure why
-  #dev.off()
 }
 
 cluster_summary <- data.frame(ego)
@@ -1374,7 +1284,7 @@ cluster_summary$frac_terms <- as.numeric(str_split_fixed(cluster_summary$GeneRat
 ```
 
 
-```{r supplemental comparison of clustering methods}
+```{r supplemental comparison of clustering methods, fig.width = 9,  fig.height=6}
 
 ## only 1 similarity function tested for now, can make as list later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
@@ -1384,24 +1294,18 @@ cluster_func <- function(sim_mat, method="single"){
   add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = method) ) ))
 }
 
-
 sim_mat <- similarity_func(exp_mat)
 cluster_methods <- c("single","complete","average")
 for(cm in cluster_methods){
-  filename = paste(figures_dir,"/cluster_method_supp_",cm,".png",sep = "")
-  png(filename = filename, width=9, height=5, units="in", res=300)
   par(mar = c(16,2,2,2))
   sim_tree <- cluster_func(sim_mat = sim_mat, method = cm)
   sim_tree %>% plot(main=cm)
-  dev.off()
 }
 
 
 ```
 
-```{r supplemental comparison of similarity measures}
-
-
+```{r supplemental comparison of similarity measures, fig.width =8,  fig.height=8}
 ### to do: justify method for measuring sample similarity - may require comparison or refs
 calc_dot_product_similarity_matrix <- function(dat) {
   dot_product_similarity_matrix <- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
@@ -1418,13 +1322,8 @@ calc_dot_product_similarity_matrix <- function(dat) {
 }
 sim_mat<- (similarity_func(exp_mat))
 sim_mat <- (sim_mat-min(sim_mat,na.rm=T)); sim_mat <- sim_mat/max(sim_mat,na.rm = T) ## coerce domain to [0-1]
-
-hist(sim_mat)
 sim_tree <- cluster_func(sim_mat)
-filename = paste(figures_dir, "/sample_similarity_heatmap_cosine.png", sep="")
-png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(sim_mat, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
-dev.off()
 
 
 ####ADDED
@@ -1440,14 +1339,10 @@ calc_eucl_matrix<- function(dat) {
   return(eucl)
 }
 eucl_matrix<- 1-(calc_eucl_matrix(calc_zscore_matrix(exp_mat)))
-
 eucl_matrix <- (eucl_matrix-min(eucl_matrix,na.rm=T)); eucl_matrix <- eucl_matrix/max(eucl_matrix,na.rm = T) ## coerce domain to [0-1]
-hist(eucl_matrix)
 sim_tree <- cluster_func(eucl_matrix)
-filename = paste(figures_dir, "/sample_similarity_heatmap_eucl.png", sep="")
-png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(eucl_matrix, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
-dev.off()
+
 
 ####ADDED
 calc_manhattan_matrix<- function(dat) {
@@ -1465,14 +1360,10 @@ calc_manhattan_matrix<- function(dat) {
   return(manhatt)
 }
 manhat_matrix<- 1-(calc_manhattan_matrix(calc_zscore_matrix(exp_mat)))
-
 manhat_matrix <- (manhat_matrix-min(manhat_matrix,na.rm=T)); manhat_matrix <- manhat_matrix/max(manhat_matrix,na.rm = T) ## coerce domain to [0-1]
-hist(manhat_matrix)
 sim_tree <- cluster_func(manhat_matrix)
-filename = paste(figures_dir, "/sample_similarity_heatmap_manhattan.png", sep="")
-png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(manhat_matrix, Rowv = sim_tree, Colv = rev(sim_tree), scale = "none", margins=c(11,13))
-dev.off()
+
 
 calc_canberra_matrix<- function(dat) {
   canberra<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
@@ -1488,18 +1379,10 @@ calc_canberra_matrix<- function(dat) {
   }  
   return(canberra)
 }
-
 canberra_mat<- 1-(calc_canberra_matrix( calc_zscore_matrix(exp_mat)))
 canberra_mat <- (canberra_mat-min(canberra_mat,na.rm=T)); canberra_mat <- canberra_mat/max(canberra_mat,na.rm = T) ## coerce domain to [0-1]
-hist(canberra_mat)
 sim_tree <- cluster_func(canberra_mat)
-filename = paste(figures_dir, "/sample_similarity_heatmap_canberra.png", sep="")
-png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(canberra_mat, Rowv = sim_tree, Colv = rev(sim_tree), scale = "none", margins=c(11,13))
-dev.off()
-
-
-
 ```
 
 
