@@ -1,0 +1,136 @@
+---
+title: "knitr_testing"
+author: "Leroy Bondhus"
+date: "12/15/2021"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+library(biomaRt)
+library(stringr)
+library(dendextend)
+library(dplyr)
+library(Hmisc)
+library(doParallel)
+library(foreach)
+
+library(ComplexHeatmap)
+library(circlize)
+library(scales)
+library(reldist)
+library(gridExtra)
+
+library(DOSE)
+library(pathview)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+
+library(tidyverse)
+library(topGO) 
+library(enrichplot)
+
+library(data.table)
+
+figures_dir <- paste(getwd(),"figures", sep = "/")
+date <- format(Sys.time(), format="%Y%m%d") 
+
+registerDoParallel(detectCores()-1)
+```
+
+
+
+```{r supplemental comparison of clustering methods, fig.width =8,  fig.height=8}
+load(".Rdata")
+
+
+
+### to do: justify method for measuring sample similarity - may require comparison or refs
+calc_dot_product_similarity_matrix <- function(dat) {
+  dot_product_similarity_matrix <- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  colnames(dot_product_similarity_matrix) <- colnames(dat)
+  rownames(dot_product_similarity_matrix) <- colnames(dat)
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)){
+      which_i <- which(!is.na(dat[,i])) ## ignore NAs
+      which_j <- which(!is.na(dat[,j])) ## ignore NAs
+      dot_product_similarity_matrix[i,j] <- sum(dat[which_i,i] * dat[which_j,j]) / (norm(dat[which_i,i],"2")*norm(dat[which_j,j],"2"))
+    }
+  }
+  return(dot_product_similarity_matrix)
+}
+sim_mat<- (similarity_func(exp_mat))
+sim_mat <- (sim_mat-min(sim_mat,na.rm=T)); sim_mat <- sim_mat/max(sim_mat,na.rm = T) ## coerce domain to [0-1]
+sim_tree <- cluster_func(sim_mat)
+heatmap(sim_mat, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
+
+
+####ADDED
+calc_eucl_matrix<- function(dat) {
+  eucl<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  colnames(eucl) <- colnames(dat)
+  rownames(eucl) <- colnames(dat)
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       eucl[i,j]<-sqrt(sum((dat[,i]-dat[,j])^2,na.rm = T ) )
+    }
+  }
+  return(eucl)
+}
+eucl_matrix<- 1-(calc_eucl_matrix(calc_zscore_matrix(exp_mat)))
+eucl_matrix <- (eucl_matrix-min(eucl_matrix,na.rm=T)); eucl_matrix <- eucl_matrix/max(eucl_matrix,na.rm = T) ## coerce domain to [0-1]
+sim_tree <- cluster_func(eucl_matrix)
+heatmap(eucl_matrix, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
+
+
+####ADDED
+calc_manhattan_matrix<- function(dat) {
+  manhatt<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  colnames(manhatt) <- colnames(dat)
+  rownames(manhatt) <- colnames(dat)
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+       manhatt[i,j]<-sum(abs(dat[,i]-dat[,j]),na.rm = T)
+    }
+  }
+  for(i in 1:nrow(manhatt)){
+    manhatt[,i] <- manhatt[,i] / max(manhatt,na.rm=T )
+  }  
+  return(manhatt)
+}
+manhat_matrix<- 1-(calc_manhattan_matrix(calc_zscore_matrix(exp_mat)))
+manhat_matrix <- (manhat_matrix-min(manhat_matrix,na.rm=T)); manhat_matrix <- manhat_matrix/max(manhat_matrix,na.rm = T) ## coerce domain to [0-1]
+sim_tree <- cluster_func(manhat_matrix)
+heatmap(manhat_matrix, Rowv = sim_tree, Colv = rev(sim_tree), scale = "none", margins=c(11,13))
+
+
+calc_canberra_matrix<- function(dat) {
+  canberra<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  colnames(canberra) <- colnames(dat)
+  rownames(canberra) <- colnames(dat)
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)) {
+      canberra[i,j]<- sum(abs(dat[,i] - dat[,j])/ (abs(dat[,i])+abs(dat[,j])) , na.rm = T) 
+    }
+  }
+  for(i in 1:nrow(canberra)){
+    canberra[,i] <- canberra[,i] / max(canberra,na.rm=T )
+  }  
+  return(canberra)
+}
+canberra_mat<- 1-(calc_canberra_matrix( calc_zscore_matrix(exp_mat)))
+canberra_mat <- (canberra_mat-min(canberra_mat,na.rm=T)); canberra_mat <- canberra_mat/max(canberra_mat,na.rm = T) ## coerce domain to [0-1]
+sim_tree <- cluster_func(canberra_mat)
+heatmap(canberra_mat, Rowv = sim_tree, Colv = rev(sim_tree), scale = "none", margins=c(11,13))
+
+
+```
+
