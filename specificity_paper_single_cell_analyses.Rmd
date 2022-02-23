@@ -1,0 +1,324 @@
+---
+title: "specificity_paper_single_cell_analyses"
+author: "Leroy Bondhus"
+date: "2/23/2022"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r libraries, include=FALSE}
+library(ggplot2)
+library(ggpubr)
+library(biomaRt)
+library(stringr)
+library(dendextend)
+library(dplyr)
+library(Hmisc)
+library(doParallel)
+library(foreach)
+
+library(ComplexHeatmap)
+library(circlize)
+library(scales)
+library(reldist)
+library(gridExtra)
+
+library(DOSE)
+library(pathview)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+
+library(tidyverse)
+library(topGO) 
+library(enrichplot)
+
+library(data.table)
+
+figures_dir <- paste(getwd(),"figures", sep = "/")
+date <- format(Sys.time(), format="%Y%m%d") 
+
+registerDoParallel(detectCores()-1)
+```
+
+## load gtex here
+```{r import dataset}
+## import mouse single cell data
+
+## import zebrafish single cell data
+
+## import human gene data
+## import mouse gene data
+## import zerbrafish gene data
+
+## import human-mouse, human-zebrafish, mouse-zebrafish, human-mouse-zebrafish gene maps
+
+genes_list <- list()
+ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", version="105")
+
+genes_list[["hsapiens"]] <-  getBM(attributes=c('chromosome_name','start_position','end_position',
+                                                'ensembl_gene_id',
+                                                'mmusculus_homolog_ensembl_gene','drerio_homolog_ensembl_gene'),
+                                   filters = list('biotype'='protein_coding'),
+                                   mart = ensembl, useCache = F)
+genes_list[["hsapiens"]] <-  merge(genes_list[["hsapiens"]], getBM(attributes=c(
+                                                'ensembl_gene_id','gene_biotype', 'external_gene_name'),
+                                   filters = list('biotype'='protein_coding'),
+                                   mart = ensembl, useCache = F))
+ensembl <- useEnsembl(biomart="ensembl", dataset="mmusculus_gene_ensembl", version="105")
+genes_list[["mmusculus"]] <-  getBM(attributes=c('chromosome_name','start_position','end_position',
+                                                'ensembl_gene_id',
+                                                'hsapiens_homolog_ensembl_gene','drerio_homolog_ensembl_gene'),
+                                   filters = list('biotype'='protein_coding'),
+                                   mart = ensembl, useCache = F)
+genes_list[["mmusculus"]] <-  merge(genes_list[["mmusculus"]], getBM(attributes=c(
+                                                'ensembl_gene_id','gene_biotype', 'external_gene_name'),
+                                   filters = list('biotype'='protein_coding'),
+                                   mart = ensembl, useCache = F))
+
+ensembl <- useEnsembl(biomart="ensembl", dataset="drerio_gene_ensembl", version="105")
+genes_list[["drerio"]] <-  getBM(attributes=c('chromosome_name','start_position','end_position',
+                                                'ensembl_gene_id',
+                                                'hsapiens_homolog_ensembl_gene','mmusculus_homolog_ensembl_gene'),
+                                   filters = list('biotype'='protein_coding'),
+                                   mart = ensembl, useCache = F)
+genes_list[["drerio"]] <-  merge(genes_list[["drerio"]], getBM(attributes=c(
+                                                'ensembl_gene_id','gene_biotype', 'external_gene_name'),
+                                   filters = list('biotype'='protein_coding'),
+                                   mart = ensembl, useCache = F))
+
+genes_list[["all"]] <- rbind(data.frame(cbind("hsapiens_gene_id"=genes_list$hsapiens$ensembl_gene_id,
+                                              "mmusculus_gene_id"=genes_list$hsapiens$mmusculus_homolog_ensembl_gene,
+                                              "drerio_gene_id"=genes_list$hsapiens$drerio_homolog_ensembl_gene)),
+                             data.frame(cbind("hsapiens_gene_id"=genes_list$mmusculus$hsapiens_homolog_ensembl_gene,
+                                              "mmusculus_gene_id"=genes_list$mmusculus$ensembl_gene_id,
+                                              "drerio_gene_id"=genes_list$mmusculus$drerio_homolog_ensembl_gene)),
+                             data.frame(cbind("hsapiens_gene_id"=genes_list$drerio$hsapiens_homolog_ensembl_gene, 
+                                              "mmusculus_gene_id"=genes_list$drerio$mmusculus_homolog_ensembl_gene,
+                                              "drerio_gene_id"=genes_list$drerio$ensembl_gene_id)))
+
+## subset for all genes with 1:1:1 mapping only (i.e. avoid issue of multiple mapping when comparing similarity of expression profiles)
+genes_list$all <- unique(genes_list$all)
+genes_list$all <- genes_list$all[is.element(genes_list$all$hsapiens_gene_id, names(which(table(genes_list$all$hsapiens_gene_id)==1))),]
+genes_list$all <- genes_list$all[is.element(genes_list$all$mmusculus_gene_id, names(which(table(genes_list$all$mmusculus_gene_id)==1))),]
+genes_list$all <- genes_list$all[is.element(genes_list$all$drerio_gene_id, names(which(table(genes_list$all$drerio_gene_id)==1))),]
+```
+
+## clean gtex dataset here
+```{r clean dataset, fig.width = 8, fig.height=4}
+## show mitochondrial genes drive a large part of sample similarity
+## Note sum of medians in gtex not quite 1M - likely artifact of taking medians
+
+temp <- data.frame(names=colnames(gtex), total_transcripts=colSums(gtex))
+ggplot( temp ,aes(y=total_transcripts, x=names))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+## match genes between gtex and ensembl
+gtex_names <- str_split_fixed(gtex_rowinfo$Name, "[.]", 2)[,1]
+which <- which(genes$chromosome_name != "MT" )
+gtex_cleaned <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
+which <- which(genes$chromosome_name == "MT" )
+gtex_cleanedMT <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
+
+##non-mitochondrial TPM sum
+temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
+ggplot( temp ,aes(y=total_transcripts, x=names))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+##mitochondrial TPM sum
+temp <- data.frame(names=colnames(gtex_cleanedMT), total_transcripts=colSums(gtex_cleanedMT))
+ggplot( temp ,aes(y=total_transcripts, x=names))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+rm(gtex_cleanedMT)
+##renormalize TPM without mitochondrial genes
+for(i in 1:ncol(gtex_cleaned)){
+  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
+}
+
+temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
+ggplot( temp ,aes(y=total_transcripts, x=names))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+gtex <- gtex_cleaned; rm(gtex_cleaned)
+exp_mat <- gtex
+## log10(TPM+1) transform of data
+exp_mat <- log10(exp_mat+1)
+
+## remove mitochondrial contribution
+```
+```{r collected functions used, include=FALSE}
+
+calc_zscore_matrix<- function(dat) {
+  zscores <- dat; zscores[] <- 0 
+  means <- rowMeans(dat)
+  sds <- as.numeric(rep(NA,length(means)))
+  which <- which(means != 0)
+  sds[which] <- apply(dat[which,],1,sd)
+  for(j in 1:ncol(dat)){zscores[,j] <- (dat[,j] - means)/sds  }
+  return(zscores)
+}
+
+calc_dot_product_similarity_matrix <- function(dat) {
+  dot_product_similarity_matrix <- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
+  colnames(dot_product_similarity_matrix) <- colnames(dat)
+  rownames(dot_product_similarity_matrix) <- colnames(dat)
+  for(i in 1:ncol(dat)){
+    for(j in 1:ncol(dat)){
+      which_i <- which(!is.na(dat[,i])) ## ignore NAs
+      which_j <- which(!is.na(dat[,j])) ## ignore NAs
+      dot_product_similarity_matrix[i,j] <- sum(dat[which_i,i] * dat[which_j,j]) / (norm(dat[which_i,i],"2")*norm(dat[which_j,j],"2"))
+    }
+  }
+  return(dot_product_similarity_matrix)
+}
+
+### uses Equation 1. from paper 
+add_dist_to_parent <- function(dend, dist_to_parent=0){
+  ## note: distance to parent is fed in at the start of the function
+  attributes(dend) <- c(attributes(dend), dist_to_parent=dist_to_parent)
+  ## test if at leaf node
+  if(!is.null(attributes(dend)$leaf) && attributes(dend)$leaf){
+    return(dend)
+  }
+  for(i in 1:length(dend)){ ## length of dend should be number of child nodes
+    ## distance to parent is simply the difference in height between parent and child
+    dist_to_parent <- attributes(dend)$height - attributes(dend[[i]])$height 
+    dend[[i]] <- add_dist_to_parent(dend[[i]], 
+                                             dist_to_parent = dist_to_parent)
+  }
+  return(dend)
+}
+
+## this functions calculates and adds weights to dendrogram object using the 'dist_to_parent' attribute added previously
+## weight_of_parent parameter exists only for recursion and should not be manually adjusted without understanding it's function
+add_weights <- function(dend, weight_of_parent=0){
+  weight <- (attributes(dend)$dist_to_parent / attributes(dend)$members) + weight_of_parent 
+  attributes(dend) <- c(attributes(dend), weight=weight)
+  ## test if at leaf node
+  if(!is.null(attributes(dend)$leaf) && attributes(dend)$leaf){
+    return(dend)
+  }
+  for(i in 1:length(dend)){ ## length of dend should be number of child nodes
+    dend[[i]] <- add_weights(dend[[i]], weight_of_parent=weight)
+  }
+  return(dend)
+}
+
+## this function returns the weights from a dendrogram object that has a "weight" attribute at leaves. Also requires the order of the vector to return based on names of leaves
+get_weights <- function(dend, name_order){
+  weights <- setNames(get_leaves_attr(dend,"weight"),nm=get_leaves_attr(dend,"lab") )
+  weights <- weights[order(factor(names(weights),levels = name_order))]
+  return(weights)
+}
+
+
+# function to calculate weighted zscores given matrix and vector of weights. column names of the matrix and names of the weight vector must match
+calc_weighted_zscore_matrix <- function(mat, weights){
+  if(any( colnames(mat) != names(weights) )){stop("WARNING: mismatch in weights names and matrix colnames order")}
+  weighted_mat <- mat; weighted_mat[] <- 0
+  for (i in 1:length(weights)){
+    weighted_mat[,i] <- weights[i]*mat[,i]
+  }
+  weighted_means <- numeric(length = nrow(weighted_mat))
+  sum_of_weights <- sum(weights)
+  for (i in 1:nrow(weighted_mat)){
+    weighted_means[i] <- sum(weighted_mat[i,]) / sum_of_weights
+  }
+  weighted_var <- numeric(length=nrow(mat))
+  for (i in 1:nrow(mat)){
+    weighted_var[i] <- Hmisc::wtd.var(mat[i,],weights=weights)
+  }
+  weighted_sd <- sqrt(weighted_var)
+  for(i in 1:ncol(mat)){
+    mat[,i] <- (mat[,i]-weighted_means)/weighted_sd
+  }
+  weighted_zscores <- mat
+  return(weighted_zscores)
+}
+
+
+
+# weighted tau
+calc_weighted_tau <- function(te_matrix, weights_vector){
+  xhat_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  te_row_maxima <- apply(te_matrix, 1, max)
+  for(j in 1:ncol(te_matrix)){
+    xhat_matrix[,j] <- te_matrix[,j] / te_row_maxima
+  }
+  temp_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (i in 1:nrow(te_matrix)){
+    temp_matrix[i,] <- weights_vector - (xhat_matrix[i,] * weights_vector)
+  }
+  tau <- c()
+  den <- sum(weights_vector) - 1
+  for (i in 1:nrow(temp_matrix)){
+    temp <- sum(temp_matrix[i,]) / den
+    tau <- append(tau,temp)
+  }
+  
+  ## add normalization (believe this is a numeric instability issue from dividing small numbers)
+  # tau <- tau / max(tau, na.rm=T)
+  ## alternative, set all > 1 to 1 (when looking at plots for different cutoffs, normalizing true 1 values causes issue)
+  tau[which(tau > 1)] <- 1
+  return(tau)
+}
+
+calc_weighted_tsi <- function(te_matrix,weights_vector){
+  tsi <- c()
+  weights_vector <- as.matrix(weights_vector)
+  weighted_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
+  for (m in 1:nrow(weights_vector)){
+    weighted_matrix[,m] <- weights_vector[m,1]*te_matrix[,m]
+  }
+  for (i in 1:nrow(te_matrix)){
+    num <- max(weighted_matrix[i,])
+    den <- sum(weighted_matrix[i,])
+    temp <- num/den
+    tsi <- append(tsi,temp)
+  }
+  return(tsi)
+}
+
+calc_weighted_gini <- function(te_matrix, weights_vector){
+   gini_values <-  c()
+  for (i in 1:nrow(te_matrix)){
+    temp <- as.numeric(te_matrix[i,])
+    temp <- reldist::gini(temp, weights_vector)
+    gini_values <- append(gini_values,temp)
+  }
+  return(gini_values)
+}
+
+
+```
+
+```{r organizing functions into lists, include=FALSE}
+### generalizing a list to store results in - this will make it easier to extend later if necessary.
+## Note: only need the weighted version of each equation as each simplifies to flat version when all weights are 1
+specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
+                             funcs=list(Zscore=calc_weighted_zscore_matrix,
+                                        Tau=calc_weighted_tau,
+                                        Tsi=calc_weighted_tsi,
+                                        Gini=calc_weighted_gini),
+                             out_type=list(Zscore="matrix",
+                                           Tau="vector",
+                                           Tsi="vector",
+                                           Gini="vector")
+                             )
+## only 1 similarity function tested for now, can make as list later
+similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
+## only 1 clustering fucntion tested for now, can make as a list later
+cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+
+```
+
