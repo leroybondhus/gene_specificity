@@ -112,6 +112,17 @@ exp_mat <- gtex
 exp_mat <- log10(exp_mat+1)
 
 ## remove mitochondrial contribution
+
+
+## median normalization
+boxplot(exp_mat)
+median_normalize <- TRUE
+if(median_normalize){
+  for(i in 1:ncol(exp_mat)){
+    exp_mat[,i] <- exp_mat[,i] / median(exp_mat[,i][which(exp_mat[,i] > 0)])
+  }
+}
+boxplot(exp_mat)
 ```
 ```{r collected functions used, include=FALSE}
 
@@ -452,7 +463,7 @@ for(measure in specificity_measures$func_names){
 
 
 
-```{r measure sample similarity, fig.width = 8, fig.height=4}
+```{r measure sample similarity, fig.width = 8, fig.height=5}
 ## dot similarity from initial Z scores
 dot_sim <- similarity_func(exp_mat)
 sim_tree <- cluster_func(dot_sim)
@@ -460,14 +471,13 @@ sim_tree <- cluster_func(dot_sim)
 # filename = paste(figures_dir, "/sample_similarity_heatmap.png", sep="")
 # png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
-legend()
 # dev.off()
 
 sim_tree <- cluster_func(dot_sim)
 ## plot similarity tree with weights
 # filename = paste(figures_dir, "/weighted_tree.png", sep="")
 # png(filename = filename, width=9, height=4, units="in", res=300)
-sim_tree %>% set("nodes_pch",19) %>% set("nodes_cex", 2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
+sim_tree %>% dendextend::set("nodes_pch",19) %>% dendextend::set("nodes_cex", 2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
 # dev.off()
 
 
@@ -526,7 +536,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
   
   num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-  num_reps <- 8
+  num_reps <- 4
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
   cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
