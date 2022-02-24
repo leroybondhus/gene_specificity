@@ -242,20 +242,11 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
 }
 
 calc_weighted_tsi <- function(te_matrix,weights_vector){
-  tsi <- c()
-  weights_vector <- as.matrix(weights_vector)
-  weighted_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
-  for (m in 1:nrow(weights_vector)){
-    weighted_matrix[,m] <- weights_vector[m,1]*te_matrix[,m]
-  }
-  for (i in 1:nrow(te_matrix)){
-    num <- max(weighted_matrix[i,])
-    den <- sum(weighted_matrix[i,])
-    temp <- num/den
-    tsi <- append(tsi,temp)
-  }
+  weighted_matrix <- t(apply(te_matrix,1, "*", weights_vector))
+  tsi <- rowMax(weighted_matrix) / rowSums(weighted_matrix)
   return(tsi)
 }
+
 
 calc_weighted_gini <- function(te_matrix, weights_vector){
    gini_values <-  c()
@@ -419,7 +410,7 @@ grid.arrange(grobs=grobl_supp, nrow=4, heights=c(5,3,3,3))
 
 # genes <- getBM(attributes=c('hgnc_symbol', 'ensembl_gene_id','go_id','name_1006'),
 #                mart = ensembl, useCache = F)
-genes <- load("genes_w_go.RData")
+load("genes_w_go.RData")
 
 allOE_genes<-str_split_fixed(rownames(exp_mat),"[.]",2)[,1]
 ggl <- list()
@@ -789,7 +780,7 @@ which_list[["Z_P2_weighted"]] <- which(df_2c$measure=="Zscore"
                     & df_2c$weight_or_flat=="weighted")
 
 filename=paste(figures_dir,"/random_ttest_output.txt",sep="")
-sink(file=filename)
+#sink(file=filename)
 print("t-test P1 weighted / P1 flat : %diff between weighted and flat")
 ## t.test on logs gives ratio estimates
 temp <- t.test(x=log10(df_2c[which_list$Z_P1_weighted,]$variance),y=log10(df_2c[which_list$Z_P1_flat,]$variance) ,paired=TRUE, conf.level = 0.95)
@@ -803,7 +794,7 @@ temp <- t.test(x=log10(df_2c[which_list$Z_P2_weighted,]$variance),y=log10(df_2c[
 1-10^temp$estimate
 1-10^temp$conf.int
 ### 
-sink()
+#sink()
 ```
 
 
@@ -1059,7 +1050,7 @@ which_list[["Z_P2_weighted"]] <- which(df_2d$measure=="Zscore"
                                    & df_2d$weighted==TRUE)
 
 filename=paste(figures_dir,"/random_ttest_jaccard_output.txt",sep="")
-sink(file=filename)
+#sink(file=filename)
 
 print("t-test P2 flat jaccard")
 temp <- t.test(x=df_2d[which_list$Z_P2_flat,]$jaccard, conf.level = 0.95)
@@ -1081,11 +1072,11 @@ temp <- t.test(x=df_2d[which_list$Z_P1_weighted,]$jaccard, conf.level = 0.95)
 temp$estimate
 temp$conf.int
 
-sink()
+#sink()
 ```
 
 
-```{r  Figure 3AB flat v weighted comparisons}
+```{r  Figure 3AB flat v weighted comparisons, fig.width = 6, fig.height=12}
 if(TRUE){
 
   ### Matrix built from Z score first then add columns of change in other scores
@@ -1409,11 +1400,11 @@ sim_mat <- similarity_func(exp_mat)
 cluster_methods <- c("single","complete","average")
 for(cm in cluster_methods){
   filename = paste(figures_dir,"/cluster_method_supp_",cm,".png",sep = "")
-  png(filename = filename, width=9, height=5, units="in", res=300)
-  par(mar = c(16,2,2,2))
+  #png(filename = filename, width=9, height=5, units="in", res=300)
+  #par(mar = c(16,2,2,2))
   sim_tree <- cluster_func(sim_mat = sim_mat, method = cm)
   sim_tree %>% plot(main=cm)
-  dev.off()
+ # dev.off()
 }
 
 
@@ -1442,9 +1433,9 @@ sim_mat <- (sim_mat-min(sim_mat,na.rm=T)); sim_mat <- sim_mat/max(sim_mat,na.rm 
 hist(sim_mat)
 sim_tree <- cluster_func(sim_mat)
 filename = paste(figures_dir, "/sample_similarity_heatmap_cosine.png", sep="")
-png(filename = filename, width=10, height=10, units="in", res=300)
+#png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(sim_mat, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
-dev.off()
+#dev.off()
 
 
 ####ADDED
@@ -1465,9 +1456,9 @@ eucl_matrix <- (eucl_matrix-min(eucl_matrix,na.rm=T)); eucl_matrix <- eucl_matri
 hist(eucl_matrix)
 sim_tree <- cluster_func(eucl_matrix)
 filename = paste(figures_dir, "/sample_similarity_heatmap_eucl.png", sep="")
-png(filename = filename, width=10, height=10, units="in", res=300)
+#png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(eucl_matrix, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
-dev.off()
+#dev.off()
 
 ####ADDED
 calc_manhattan_matrix<- function(dat) {
@@ -1490,9 +1481,9 @@ manhat_matrix <- (manhat_matrix-min(manhat_matrix,na.rm=T)); manhat_matrix <- ma
 hist(manhat_matrix)
 sim_tree <- cluster_func(manhat_matrix)
 filename = paste(figures_dir, "/sample_similarity_heatmap_manhattan.png", sep="")
-png(filename = filename, width=10, height=10, units="in", res=300)
+#png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(manhat_matrix, Rowv = sim_tree, Colv = rev(sim_tree), scale = "none", margins=c(11,13))
-dev.off()
+#dev.off()
 
 calc_canberra_matrix<- function(dat) {
   canberra<- matrix(0, nrow = ncol(dat), ncol = ncol(dat))
@@ -1514,9 +1505,9 @@ canberra_mat <- (canberra_mat-min(canberra_mat,na.rm=T)); canberra_mat <- canber
 hist(canberra_mat)
 sim_tree <- cluster_func(canberra_mat)
 filename = paste(figures_dir, "/sample_similarity_heatmap_canberra.png", sep="")
-png(filename = filename, width=10, height=10, units="in", res=300)
+#png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(canberra_mat, Rowv = sim_tree, Colv = rev(sim_tree), scale = "none", margins=c(11,13))
-dev.off()
+#dev.off()
 
 
 
