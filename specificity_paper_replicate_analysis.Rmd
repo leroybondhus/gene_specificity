@@ -285,3 +285,11 @@ similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zsc
 cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
 
 ```
+
+
+```{r balanced v unbalanced in technical replicates redundant and non-redundant }
+### 3 each sample type specific and general rep 5x report mean and stdev for correlation for flat and weighted
+### gtex sample proportion, (max 10 each), sample type specifici and general rep 5x report mean and stdev for correlation for flat and weighted
+
+
+```
