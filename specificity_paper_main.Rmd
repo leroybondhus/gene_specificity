@@ -115,14 +115,18 @@ exp_mat <- log10(exp_mat+1)
 
 
 ## median normalization
-boxplot(exp_mat)
+temp <- exp_mat
+temp[which(temp==0 | is.infinite(temp))] <- NA
+boxplot(temp)
 median_normalize <- TRUE
 if(median_normalize){
   for(i in 1:ncol(exp_mat)){
     exp_mat[,i] <- exp_mat[,i] / median(exp_mat[,i][which(exp_mat[,i] > 0)])
   }
 }
-boxplot(exp_mat)
+temp <- exp_mat
+temp[which(temp==0)] <- NA
+boxplot(temp)
 ```
 ```{r collected functions used, include=FALSE}
 
@@ -1076,7 +1080,7 @@ temp$conf.int
 ```
 
 
-```{r  Figure 3AB flat v weighted comparisons, fig.width = 6, fig.height=12}
+```{r  Figure 3AB flat v weighted comparisons, fig.width = 8, fig.height=12}
 if(TRUE){
 
   ### Matrix built from Z score first then add columns of change in other scores
