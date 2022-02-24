@@ -52,6 +52,25 @@ gtex <- as.matrix(gtex[,3:ncol(gtex)])
 rownames(gtex) <- gtex_rowinfo$Name
 unlink(temp); rm(temp)
 
+## import ensembl colinfo 
+temp <- tempfile(fileext = ".txt")
+download.file("https://storage.googleapis.com/gtex_analysis_v8/annotations/GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt",temp)
+gtex_colinfo <- data.table::fread(temp, skip=0, header = TRUE, sep = "\t")
+unlink(temp); rm(temp)
+
+temp <- tempfile(fileext = ".xlsx")
+download.file("https://storage.googleapis.com/gtex_analysis_v8/annotations/GTEx_Analysis_v8_Annotations_SampleAttributesDD.xlsx",temp)
+gtex_colheader_info <- readxl::read_excel(temp)
+unlink(temp); rm(temp)
+```
+
+## clean gtex dataset here
+```{r clean dataset, fig.width = 8, fig.height=4}
+## subset gtex data
+gtex_cols <-gtex_colinfo$SAMPID[which(gtex_colinfo$SMRIN >= 6 &
+                                        gtex_colinfo$SMMPPD > 5e7 &
+                                        gtex_colinfo$SMMPPDPR > 1e7)]
+gtex <- gtex[ ,gtex_cols[is.element(gtex_cols, colnames(gtex) )]]
 
 ## import ensembl gene data
 ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", GRCh=37)
@@ -59,55 +78,47 @@ genes <- getBM(attributes=c('chromosome_name','start_position','end_position','h
                  filters = list('biotype'='protein_coding'),
                  mart = ensembl, useCache = F) 
 genes <- genes[which(is.element(genes$chromosome_name, c(1:22, "X", "Y", "MT")) & genes$hgnc_symbol != "" ) ,]
-```
 
-## clean gtex dataset here
-```{r clean dataset, fig.width = 8, fig.height=4}
-## show mitochondrial genes drive a large part of sample similarity
-## Note sum of medians in gtex not quite 1M - likely artifact of taking medians
 
-temp <- data.frame(names=colnames(gtex), total_transcripts=colSums(gtex))
+
+temp <- data.frame(names=colnames(gtex[,1:100]), total_transcripts=colSums(gtex[,1:100]))
 ggplot( temp ,aes(y=total_transcripts, x=names))+
   geom_col()+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ## match genes between gtex and ensembl
 gtex_names <- str_split_fixed(gtex_rowinfo$Name, "[.]", 2)[,1]
-which <- which(genes$chromosome_name != "MT" )
-gtex_cleaned <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
 which <- which(genes$chromosome_name == "MT" )
-gtex_cleanedMT <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
+gtex_mt <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
+which <- which(genes$chromosome_name != "MT" )
+gtex <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
 
-##non-mitochondrial TPM sum
-temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
+
+temp <- data.frame(names=colnames(gtex[,1:100]), total_transcripts=colSums(gtex[,1:100]))
+ggplot( temp ,aes(y=total_transcripts, x=names))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+temp <- data.frame(names=colnames(gtex_mt[,1:100]), total_transcripts=colSums(gtex_mt[,1:100]))
 ggplot( temp ,aes(y=total_transcripts, x=names))+
   geom_col()+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
-##mitochondrial TPM sum
-temp <- data.frame(names=colnames(gtex_cleanedMT), total_transcripts=colSums(gtex_cleanedMT))
-ggplot( temp ,aes(y=total_transcripts, x=names))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
-rm(gtex_cleanedMT)
 ##renormalize TPM without mitochondrial genes
-for(i in 1:ncol(gtex_cleaned)){
-  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
+for(i in 1:ncol(gtex)){
+  gtex[,i] <- (gtex[,i]*1e6 / sum(gtex[,i]))
 }
 
-temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
+temp <- data.frame(names=colnames(gtex[,1:100]), total_transcripts=colSums(gtex[,1:100]))
 ggplot( temp ,aes(y=total_transcripts, x=names))+
   geom_col()+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
-gtex <- gtex_cleaned; rm(gtex_cleaned)
-exp_mat <- gtex
 ## log10(TPM+1) transform of data
-exp_mat <- log10(exp_mat+1)
+exp_mat <- log10(gtex+1)
 
-## remove mitochondrial contribution
 ```
+
 
 ```{r collected functions used, include=FALSE}
 
