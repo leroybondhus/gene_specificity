@@ -12,6 +12,7 @@ knitr::opts_chunk$set(
 )
 ```
 
+
 ```{r libraries, include=FALSE}
 library(ggplot2)
 library(ggpubr)
@@ -112,8 +113,22 @@ exp_mat <- gtex
 exp_mat <- log10(exp_mat+1)
 
 ## remove mitochondrial contribution
-```
 
+
+## median normalization
+temp <- exp_mat
+temp[which(temp==0 | is.infinite(temp))] <- NA
+boxplot(temp)
+median_normalize <- TRUE
+if(median_normalize){
+  for(i in 1:ncol(exp_mat)){
+    exp_mat[,i] <- exp_mat[,i] / median(exp_mat[,i][which(exp_mat[,i] > 0)])
+  }
+}
+temp <- exp_mat
+temp[which(temp==0)] <- NA
+boxplot(temp)
+```
 ```{r collected functions used, include=FALSE}
 
 calc_zscore_matrix<- function(dat) {
@@ -217,11 +232,10 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
   for (i in 1:nrow(te_matrix)){
     temp_matrix[i,] <- weights_vector - (xhat_matrix[i,] * weights_vector)
   }
-  tau <- c()
-  den <- sum(weights_vector) - 1
+  tau <- numeric(length = nrow(temp_matrix))
   for (i in 1:nrow(temp_matrix)){
-    temp <- sum(temp_matrix[i,]) / den
-    tau <- append(tau,temp)
+    temp <- sum(temp_matrix[i,]) / (sum(weights_vector) - weights_vector[which.max(temp_matrix[i,])])
+    tau[i] <- ifelse(length(temp)==0,NA,temp)
   }
   
   ## add normalization (believe this is a numeric instability issue from dividing small numbers)
@@ -232,20 +246,11 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
 }
 
 calc_weighted_tsi <- function(te_matrix,weights_vector){
-  tsi <- c()
-  weights_vector <- as.matrix(weights_vector)
-  weighted_matrix <- matrix(nrow=nrow(te_matrix),ncol=ncol(te_matrix))
-  for (m in 1:nrow(weights_vector)){
-    weighted_matrix[,m] <- weights_vector[m,1]*te_matrix[,m]
-  }
-  for (i in 1:nrow(te_matrix)){
-    num <- max(weighted_matrix[i,])
-    den <- sum(weighted_matrix[i,])
-    temp <- num/den
-    tsi <- append(tsi,temp)
-  }
+  weighted_matrix <- t(apply(te_matrix,1, "*", weights_vector))
+  tsi <- rowMax(weighted_matrix) / rowSums(weighted_matrix)
   return(tsi)
 }
+
 
 calc_weighted_gini <- function(te_matrix, weights_vector){
    gini_values <-  c()
@@ -279,7 +284,6 @@ similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zsc
 cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
 
 ```
-
 
 ```{r test effect of sample size }
 
