@@ -285,6 +285,7 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 
 ```
 
+
 ```{r test effect of sample size }
 
 sample_size_results <- list( )
@@ -296,15 +297,18 @@ for(i in 1:length(specificity_measures$func_names)){
 }
 
 num_brain_unbalanced <- 10 
-num_samples_df <- merge(data.frame(rep=1:3), data.frame(nonbrain = c(12,20,32,40)) )
+num_samples_df <- merge(data.frame(rep=1:3), data.frame(nonbrain = c(10,14,18,22)) )
 
 results <- foreach(row_id=1:nrow(num_samples_df), .errorhandling = "pass",
                    .combine = rbind) %dopar% {
-   num_brain_unbalanced <- ceiling(num_samples_df[row_id,]$nonbrain / 4)
+   num_brain_unbalanced <- ceiling(num_samples_df[row_id,]$nonbrain * 0.5)
    which_non_brain <- colnames(gtex)[grep("brain", colnames(gtex), ignore.case = T , invert = T)]
+   which_non_dup <- colnames(gtex)[!duplicated(stringr::str_split_fixed(colnames(gtex),"\\.\\.\\.", 2)[,1])]
+   which_non_brain <- intersect(which_non_brain, which_non_dup)
    which_non_brain <- sample(which_non_brain,num_samples_df[row_id,]$nonbrain)
    
    which_brain <- colnames(gtex)[grep("brain", colnames(gtex), ignore.case = T)]
+   which_brain <- which_brain[grep("cerebell",which_brain,ignore.case = T, invert = T)]
    which_brain <- sample(which_brain,num_brain_unbalanced)
    
    
@@ -362,6 +366,5 @@ results <- foreach(row_id=1:nrow(num_samples_df), .errorhandling = "pass",
  }
 
 ```
-
 
 
