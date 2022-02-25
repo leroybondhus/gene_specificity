@@ -231,11 +231,10 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
   for (i in 1:nrow(te_matrix)){
     temp_matrix[i,] <- weights_vector - (xhat_matrix[i,] * weights_vector)
   }
-  tau <- c()
-  den <- sum(weights_vector) - 1
+  tau <- numeric(length = nrow(temp_matrix))
   for (i in 1:nrow(temp_matrix)){
-    temp <- sum(temp_matrix[i,]) / den
-    tau <- append(tau,temp)
+    temp <- sum(temp_matrix[i,]) / (sum(weights_vector) - weights_vector[which.max(temp_matrix[i,])])
+    tau[i] <- ifelse(length(temp)==0,NA,temp)
   }
   
   ## add normalization (believe this is a numeric instability issue from dividing small numbers)
