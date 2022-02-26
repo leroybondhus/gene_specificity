@@ -296,5 +296,56 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 ### 3 each sample type specific and general rep 5x report mean and stdev for correlation for flat and weighted
 ### gtex sample proportion, (max 10 each), sample type specifici and general rep 5x report mean and stdev for correlation for flat and weighted
 
+num_reps <- 2
+results <- data.frame(gene=character(),
+                      tissue=character(),
+                      measure=character(),
+                      weighted=logical(),
+                      balanced=logical(),
+                      rep=numeric()
+                      )
+
+## select subset of full exp_mat to use
+exp_mat_subsets <- list()
+for( i in 1:length(num_reps)){
+  ## select balanced subset of tissues to use (here we want to test effect of replicates without large effect of similar tissue types)
+  gtex_colinfo$numSMTS <- -1
+  gtex_colinfo$numSMTSD <- -1
+  for(tt in unique(gtex_colinfo$SMTS)){
+    which <- which(gtex_colinfo$SMTS==tt)
+    gtex_colinfo$numSMTS[which] <- sum(is.element(gtex_colinfo$SAMPID[which(gtex_colinfo$SMTS==tt)],
+                                           colnames(exp_mat)))
+  }
+  for(tt in unique(gtex_colinfo$SMTSD)){
+    which <- which(gtex_colinfo$SMTSD==tt)
+    gtex_colinfo$numSMTSD[which] <- sum(is.element(gtex_colinfo$SAMPID[which(gtex_colinfo$SMTSD==tt)],
+                                           colnames(exp_mat)))
+  }
+  tissue_types <- c()
+  for(tt in unique(gtex_colinfo$SMTS[which(gtex_colinfo$numSMTS >= 5)])){
+    tissue_types <- c(tissue_types,sample(unique(gtex_colinfo$SMTSD[which(gtex_colinfo$SMTS==tt & gtex_colinfo$numSMTSD >=5 )]),1))
+  }
+  tissue_types
+  tissue_types <- data.frame(tissue=tissue_types, num_samples=-1)
+  for(tt in tissue_types$tissue){
+    which <- which(tissue_types$tissue==tt)
+    tissue_types$num_samples[which]<- sum(is.element(gtex_colinfo$SAMPID[which(gtex_colinfo$SMTSD==tt)],
+                                                                                colnames(exp_mat)))
+  }
+  tissue_types
+  
+  
+  
+  
+  
+}
+
+
+
+foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .combine = rbind) %dopar% {
+  
+  
+}
+
 
 ```
