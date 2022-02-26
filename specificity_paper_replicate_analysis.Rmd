@@ -307,7 +307,8 @@ results <- data.frame(gene=character(),
 
 ## select subset of full exp_mat to use
 exp_mat_subsets <- list()
-for( i in 1:length(num_reps)){
+gtex_colinfo <- gtex_colinfo[which(is.element(gtex_colinfo$SAMPID, colnames(exp_mat))),]
+for( i in 1:num_reps){
   ## select balanced subset of tissues to use (here we want to test effect of replicates without large effect of similar tissue types)
   gtex_colinfo$numSMTS <- -1
   gtex_colinfo$numSMTSD <- -1
@@ -325,19 +326,23 @@ for( i in 1:length(num_reps)){
   for(tt in unique(gtex_colinfo$SMTS[which(gtex_colinfo$numSMTS >= 5)])){
     tissue_types <- c(tissue_types,sample(unique(gtex_colinfo$SMTSD[which(gtex_colinfo$SMTS==tt & gtex_colinfo$numSMTSD >=5 )]),1))
   }
-  tissue_types
+
   tissue_types <- data.frame(tissue=tissue_types, num_samples=-1)
   for(tt in tissue_types$tissue){
     which <- which(tissue_types$tissue==tt)
     tissue_types$num_samples[which]<- sum(is.element(gtex_colinfo$SAMPID[which(gtex_colinfo$SMTSD==tt)],
                                                                                 colnames(exp_mat)))
   }
-  tissue_types
+
+  tissue_types$num_subsample <- ceiling(tissue_types$num_samples/50)
+  which_cols <- c()
+  for(tt in tissue_types$tissue){
+    which_cols <- c(which_cols,
+                    sample( gtex_colinfo$SAMPID[which(gtex_colinfo$SMTSD==tt)],
+                            tissue_types$num_subsample[which(tissue_types==tt)]  ) )
+  }
   
-  
-  
-  
-  
+  exp_mat_subsets[[i]] <- exp_mat[,which_cols]
 }
 
 
