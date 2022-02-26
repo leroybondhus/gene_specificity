@@ -271,6 +271,8 @@ calc_weighted_gini <- function(te_matrix, weights_vector){
 
 
 ```
+
+
 ```{r organizing functions into lists, include=FALSE}
 ### generalizing a list to store results in - this will make it easier to extend later if necessary.
 ## Note: only need the weighted version of each equation as each simplifies to flat version when all weights are 1
@@ -297,13 +299,6 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 ### gtex sample proportion, (max 10 each), sample type specifici and general rep 5x report mean and stdev for correlation for flat and weighted
 
 num_reps <- 2
-results <- data.frame(gene=character(),
-                      tissue=character(),
-                      measure=character(),
-                      weighted=logical(),
-                      balanced=logical(),
-                      rep=numeric()
-                      )
 
 ## select subset of full exp_mat to use
 exp_mat_subsets <- list()
@@ -335,20 +330,60 @@ for( i in 1:num_reps){
   }
 
   tissue_types$num_subsample <- ceiling(tissue_types$num_samples/50)
-  which_cols <- c()
+  which_cols_balanced <- c()
+  which_cols_unbalanced <- c()
   for(tt in tissue_types$tissue){
-    which_cols <- c(which_cols,
-                    sample( gtex_colinfo$SAMPID[which(gtex_colinfo$SMTSD==tt)],
-                            tissue_types$num_subsample[which(tissue_types==tt)]  ) )
+    which_cols_tt <- sample( gtex_colinfo$SAMPID[which(gtex_colinfo$SMTSD==tt)],
+                            tissue_types$num_subsample[which(tissue_types==tt)]  ) 
+    which_cols_unbalanced <- c(which_cols_unbalanced, which_cols_tt )
+    which_cols_balanced <- c(which_cols_balanced, which_cols_tt[1] )
   }
   
-  exp_mat_subsets[[i]] <- exp_mat[,which_cols]
+  exp_mat_subsets[[i]] <- list(balanced=exp_mat[,which_cols_balanced],
+                               unbalanced=exp_mat[,which_cols_unbalanced])
 }
 
 
+results <- data.frame(gene=character(),
+                      tissue=character(),
+                      measure=character(),
+                      weighted=logical(),
+                      balanced_spec=logical(),
+                      unbalanced_spec=logical(),
+                      rep=numeric()
+                      )
 
 foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .combine = rbind) %dopar% {
   
+  for(measure in specificity_measures$func_names){
+    specificity_func <- specificity_measures$funcs[[measure]]
+    if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
+    
+    flat <- rep(1,ncol(exp_mat_subset$balanced))
+    spec_flat_balanced <- specificity_func(exp_mat_subset$balanced, flat)
+    flat <- rep(1,ncol(exp_mat_subset$unbalanced))
+    spec_flat_unbalanced <- specificity_func(exp_mat_subset$unbalanced, flat)
+    
+    dot_sim <- similarity_func(exp_mat_subset$balanced)
+    sim_tree <- cluster_func(dot_sim)
+    weights <- get_weights(sim_tree, colnames(exp_mat_subset$balanced))
+    spec_weighted_balanced <- specificity_func(exp_mat[,which], weights)
+    
+    dot_sim <- similarity_func(exp_mat_subset$unbalanced)
+    sim_tree <- cluster_func(dot_sim)
+    weights <- get_weights(sim_tree, colnames(exp_mat_subset$unbalanced))
+    spec_weighted_unbalanced <- specificity_func(exp_mat, weights)
+    
+    ## ADD: need step where columns are aggregated on their tissue type after specificity estimation in 
+    ## order to match between balanced and unbalanced
+    
+    if(measure=="Zscore"){
+       spec_one_all_list[[paste(measure, "weighted_all",sep="_")]] <- spec_one_all_list[[paste(measure, "weighted_all",sep="_")]][,which]
+    }
+    
+    
+    
+}
   
 }
 
