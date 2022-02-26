@@ -328,15 +328,17 @@ for( i in 1:num_reps){
     tissue_types$num_samples[which]<- sum(is.element(gtex_colinfo$SAMPID[which(gtex_colinfo$SMTSD==tt)],
                                                                                 colnames(exp_mat)))
   }
-
-  tissue_types$num_subsample <- ceiling(tissue_types$num_samples/50)
+  
+  min_rep <- 3
+  tissue_types$num_subsample <- ceiling(tissue_types$num_samples/25)
+  tissue_types$num_subsample[which(tissue_types$num_subsample < min_rep)] <- min_rep
   which_cols_balanced <- c()
   which_cols_unbalanced <- c()
   for(tt in tissue_types$tissue){
     which_cols_tt <- sample( gtex_colinfo$SAMPID[which(gtex_colinfo$SMTSD==tt)],
                             tissue_types$num_subsample[which(tissue_types==tt)]  ) 
     which_cols_unbalanced <- c(which_cols_unbalanced, which_cols_tt )
-    which_cols_balanced <- c(which_cols_balanced, which_cols_tt[1] )
+    which_cols_balanced <- c(which_cols_balanced, which_cols_tt[1:min_rep] )
   }
   
   exp_mat_subsets[[i]] <- list(balanced=exp_mat[,which_cols_balanced],
@@ -367,12 +369,12 @@ foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .combine = rbin
     dot_sim <- similarity_func(exp_mat_subset$balanced)
     sim_tree <- cluster_func(dot_sim)
     weights <- get_weights(sim_tree, colnames(exp_mat_subset$balanced))
-    spec_weighted_balanced <- specificity_func(exp_mat[,which], weights)
+    spec_weighted_balanced <- specificity_func(exp_mat_subset$balanced, weights)
     
     dot_sim <- similarity_func(exp_mat_subset$unbalanced)
     sim_tree <- cluster_func(dot_sim)
     weights <- get_weights(sim_tree, colnames(exp_mat_subset$unbalanced))
-    spec_weighted_unbalanced <- specificity_func(exp_mat, weights)
+    spec_weighted_unbalanced <- specificity_func(exp_mat_subset$unbalanced, weights)
     
     ## ADD: need step where columns are aggregated on their tissue type after specificity estimation in 
     ## order to match between balanced and unbalanced
@@ -386,6 +388,5 @@ foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .combine = rbin
 }
   
 }
-
 
 ```
