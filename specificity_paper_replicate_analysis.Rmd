@@ -355,7 +355,7 @@ results <- data.frame(gene=character(),
                       rep=numeric()
                       )
 
-foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .combine = rbind) %dopar% {
+results <- foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .combine = rbind) %dopar% {
   
   for(measure in specificity_measures$func_names){
     specificity_func <- specificity_measures$funcs[[measure]]
@@ -371,63 +371,89 @@ foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .combine = rbin
     dot_sim <- similarity_func(exp_mat_subset$balanced)
     sim_tree <- cluster_func(dot_sim)
     weights <- get_weights(sim_tree, colnames(exp_mat_subset$balanced))
+    weights <- weights / max(weights)
     spec_weighted_balanced <- specificity_func(exp_mat_subset$balanced, weights)
     s3 <- spec_weighted_balanced
     
     dot_sim <- similarity_func(exp_mat_subset$unbalanced)
     sim_tree <- cluster_func(dot_sim)
     weights <- get_weights(sim_tree, colnames(exp_mat_subset$unbalanced))
+    weights <- weights / max(weights)
     spec_weighted_unbalanced <- specificity_func(exp_mat_subset$unbalanced, weights)
     s4 <- spec_weighted_unbalanced
     ## ADD: need step where columns are aggregated on their tissue type after specificity estimation in 
     ## order to match between balanced and unbalanced
     
-    
-    temp <- spec_weighted_balanced
-    colnames(temp) <- (gtex_colinfo$SMTSD[match(colnames(spec_weighted_balanced), gtex_colinfo$SAMPID)])
-    spec_weighted_balanced <- matrix(nrow=nrow(temp), ncol=length(unique(colnames(temp))))
-    colnames(spec_weighted_balanced) <- unique(colnames(temp))
-    for(i in unique(colnames(temp))){
-      spec_weighted_balanced[,i] <- apply(as.data.frame(temp[,which(colnames(temp)==i)]),1,median)
-    }
-    
-    temp <- spec_weighted_unbalanced
-    colnames(temp) <- (gtex_colinfo$SMTSD[match(colnames(spec_weighted_unbalanced), gtex_colinfo$SAMPID)])
-    spec_weighted_unbalanced <- matrix(nrow=nrow(temp), ncol=length(unique(colnames(temp))))
-    colnames(spec_weighted_unbalanced) <- unique(colnames(temp))
-    for(i in unique(colnames(temp))){
-      spec_weighted_unbalanced[,i] <- apply(as.data.frame(temp[,which(colnames(temp)==i)]),1,median)
-    }
-    
-    temp <- spec_flat_balanced
-    colnames(temp) <- (gtex_colinfo$SMTSD[match(colnames(spec_flat_balanced), gtex_colinfo$SAMPID)])
-    spec_flat_balanced <- matrix(nrow=nrow(temp), ncol=length(unique(colnames(temp))))
-    colnames(spec_flat_balanced) <- unique(colnames(temp))
-    for(i in unique(colnames(temp))){
-      spec_flat_balanced[,i] <- apply(as.data.frame(temp[,which(colnames(temp)==i)]),1,median)
-    }
-    
-    temp <- spec_flat_unbalanced
-    colnames(temp) <- (gtex_colinfo$SMTSD[match(colnames(spec_flat_unbalanced), gtex_colinfo$SAMPID)])
-    spec_flat_unbalanced <- matrix(nrow=nrow(temp), ncol=length(unique(colnames(temp))))
-    colnames(spec_flat_unbalanced) <- unique(colnames(temp))
-    for(i in unique(colnames(temp))){
-      spec_flat_unbalanced[,i] <- apply(as.data.frame(temp[,which(colnames(temp)==i)]),1,median)
-    }
-    
-    cor(as.vector(spec_flat_unbalanced),as.vector(spec_flat_balanced), use="complete")
-    cor(as.vector(spec_weighted_unbalanced),as.vector(spec_weighted_balanced), use="complete")
-    plot(as.vector(spec_flat_unbalanced),as.vector(spec_flat_balanced))
-    plot(as.vector(spec_weighted_unbalanced),as.vector(spec_weighted_balanced))
-    
+
     if(measure=="Zscore"){
-       spec_one_all_list[[paste(measure, "weighted_all",sep="_")]] <- spec_one_all_list[[paste(measure, "weighted_all",sep="_")]][,which]
+          
+      temp <- spec_weighted_balanced
+      colnames(temp) <- (gtex_colinfo$SMTSD[match(colnames(spec_weighted_balanced), gtex_colinfo$SAMPID)])
+      spec_weighted_balanced <- matrix(nrow=nrow(temp), ncol=length(unique(colnames(temp))))
+      colnames(spec_weighted_balanced) <- unique(colnames(temp))
+      rownames(spec_weighted_balanced) <- rownames(temp)
+      for(i in unique(colnames(temp))){
+        spec_weighted_balanced[,i] <- apply(as.data.frame(temp[,which(colnames(temp)==i)]),1,median)
+      }
+      
+      temp <- spec_weighted_unbalanced
+      colnames(temp) <- (gtex_colinfo$SMTSD[match(colnames(spec_weighted_unbalanced), gtex_colinfo$SAMPID)])
+      spec_weighted_unbalanced <- matrix(nrow=nrow(temp), ncol=length(unique(colnames(temp))))
+      colnames(spec_weighted_unbalanced) <- unique(colnames(temp))
+      rownames(spec_weighted_unbalanced) <- rownames(temp)
+      for(i in unique(colnames(temp))){
+        spec_weighted_unbalanced[,i] <- apply(as.data.frame(temp[,which(colnames(temp)==i)]),1,median)
+      }
+      
+      temp <- spec_flat_balanced
+      colnames(temp) <- (gtex_colinfo$SMTSD[match(colnames(spec_flat_balanced), gtex_colinfo$SAMPID)])
+      spec_flat_balanced <- matrix(nrow=nrow(temp), ncol=length(unique(colnames(temp))))
+      colnames(spec_flat_balanced) <- unique(colnames(temp))
+      rownames(spec_flat_balanced) <- rownames(temp)
+      for(i in unique(colnames(temp))){
+        spec_flat_balanced[,i] <- apply(as.data.frame(temp[,which(colnames(temp)==i)]),1,median)
+      }
+      
+      temp <- spec_flat_unbalanced
+      colnames(temp) <- (gtex_colinfo$SMTSD[match(colnames(spec_flat_unbalanced), gtex_colinfo$SAMPID)])
+      spec_flat_unbalanced <- matrix(nrow=nrow(temp), ncol=length(unique(colnames(temp))))
+      colnames(spec_flat_unbalanced) <- unique(colnames(temp))
+      rownames(spec_flat_unbalanced) <- rownames(temp)
+      for(i in unique(colnames(temp))){
+        spec_flat_unbalanced[,i] <- apply(as.data.frame(temp[,which(colnames(temp)==i)]),1,median)
+      }
+      
+      for(i in 1:ncol(spec_flat_balanced) ){
+        temp_res <- rbind(  data.frame(gene=rownames(spec_flat_balanced),
+                                tissue=colnames(spec_flat_balanced)[i],
+                                measure=measure,
+                                weighted=FALSE,
+                                balanced_spec=spec_flat_balanced[,i],
+                                unbalanced_spec=spec_flat_unbalanced[,i]),
+                            data.frame(gene=rownames(spec_weighted_balanced),
+                                tissue=colnames(spec_weighted_balanced)[i],
+                                measure=measure,
+                                weighted=TRUE,
+                                balanced_spec=spec_weighted_balanced[,i],
+                                unbalanced_spec=spec_weighted_unbalanced[,i]) )                       
+      }
+    } else{
+      temp_res <- rbind(  data.frame(gene= rownames(exp_mat_subset$balanced),
+                                tissue="aggregate",
+                                measure=measure,
+                                weighted=FALSE,
+                                balanced_spec=spec_flat_balanced,
+                                unbalanced_spec=spec_flat_unbalanced),
+                            data.frame(gene= rownames(exp_mat_subset$balanced),
+                                tissue="aggregate",
+                                measure=measure,
+                                weighted=TRUE,
+                                balanced_spec=spec_weighted_balanced,
+                                unbalanced_spec=spec_weighted_unbalanced)
+                          )  
     }
-    
-    
-    
-}
-  
+  }
+  temp_res
 }
 
 ```
