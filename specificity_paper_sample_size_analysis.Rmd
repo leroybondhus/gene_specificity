@@ -245,12 +245,16 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
   return(tau)
 }
 
+
 calc_weighted_tsi <- function(te_matrix,weights_vector){
   weighted_matrix <- t(apply(te_matrix,1, "*", weights_vector))
-  tsi <- rowMax(weighted_matrix) / rowSums(weighted_matrix)
+  tsi <- numeric(length=nrow(weighted_matrix))
+  for(i in 1:nrow(weighted_matrix)){
+    tsi[i] <- weights_vector[which.max(te_matrix[i,])] * max(te_matrix[i,]) / sum(weighted_matrix[i,]) 
+  }
+  names(tsi) <- rownames(te_matrix)
   return(tsi)
 }
-
 
 calc_weighted_gini <- function(te_matrix, weights_vector){
    gini_values <-  c()

@@ -252,9 +252,14 @@ calc_weighted_tau <- function(te_matrix, weights_vector){
   return(tau)
 }
 
+
 calc_weighted_tsi <- function(te_matrix,weights_vector){
   weighted_matrix <- t(apply(te_matrix,1, "*", weights_vector))
-  tsi <- rowMax(weighted_matrix) / rowSums(weighted_matrix)
+  tsi <- numeric(length=nrow(weighted_matrix))
+  for(i in 1:nrow(weighted_matrix)){
+    tsi[i] <- weights_vector[which.max(te_matrix[i,])] * max(te_matrix[i,]) / sum(weighted_matrix[i,]) 
+  }
+  names(tsi) <- rownames(te_matrix)
   return(tsi)
 }
 
@@ -346,17 +351,13 @@ for( i in 1:num_reps){
 }
 
 
-results <- data.frame(gene=character(),
-                      tissue=character(),
-                      measure=character(),
-                      weighted=logical(),
-                      balanced_spec=logical(),
-                      unbalanced_spec=logical(),
-                      rep=numeric()
-                      )
-
 results <- foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .combine = rbind) %dopar% {
-  
+  results <- data.frame(gene=character() ,
+                 tissue=character(),
+                 measure=character(),
+                 weighted=logical(),
+                 balanced_spec=numeric(),
+                 unbalanced_spec=numeric())
   for(measure in specificity_measures$func_names){
     specificity_func <- specificity_measures$funcs[[measure]]
     if(!is.function(specificity_func)){print(paste(measure, "func is not a function")); next;}
@@ -452,8 +453,13 @@ results <- foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .com
                                 unbalanced_spec=spec_weighted_unbalanced)
                           )  
     }
+  results <- rbind(results, temp_res)   
   }
-  temp_res
+  results
 }
+
+
+ggplot(results, aes())
+
 
 ```
