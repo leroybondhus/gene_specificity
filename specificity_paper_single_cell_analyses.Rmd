@@ -41,9 +41,51 @@ library(enrichplot)
 library(data.table)
 
 figures_dir <- paste(getwd(),"figures", sep = "/")
+data_dir <- paste(getwd(),"data", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
 
 registerDoParallel(detectCores()-1)
+```
+
+
+```{r download scRNA datasets here}
+
+### if download speed via R is too slow, can also manually download files from https://figshare.com/articles/dataset/HCL_DGE_Data/7235471 ##
+download.file("https://figshare.com/ndownloader/files/22447898", paste(data_dir,"annotation_rmbatch_data_revised417.zip",sep="/"))
+unzip(paste(data_dir,"annotation_rmbatch_data_revised417.zip",sep="/"), exdir=data_dir)
+
+files <- list.files(path="./data/annotation_rmbatch_data_revised417",pattern="*.csv", full.names = T)
+rm(anno)
+for(f in files){
+  temp <- fread(f)
+  if(!exists("anno")){
+    anno <- fread(f)
+  } else{
+    anno <- rbind(anno, temp,fill=TRUE)
+  }
+}
+
+anno$V15 <- anno$V16 <- anno$V17 <- NULL
+anno$Celltype_comb <- tolower(str_replace(anno$Celltype, "_.*gh","" ))
+
+files <- list.files(path="./data/new",pattern="*.txt.gz", full.names = T)
+rm(exp_mat)
+for(f in files){
+  raw_exp <- fread(f)
+  rownames(raw_exp) <- raw_exp$V1
+  raw_exp$V1 <- NULL
+  if(!exists("exp_mat")){
+  } else{
+    anno <- rbind(anno, temp,fill=TRUE)
+  }
+}
+
+
+download.file("https://figshare.com/ndownloader/files/23043329", paste(data_dir,"dge_rmbatch_data.tar.gz",sep="/"))
+untar(paste(data_dir,"dge_rmbatch_data.tar.gz",sep="/"),exdir=data_dir)
+
+temp <- fread("data/new/AdultAdipose1.rmbatchdge.txt.gz")
+rownames(temp) <- temp$V1; temp$V1 <- NULL
 ```
 
 ## load gtex here
@@ -108,6 +150,9 @@ genes_list$all <- genes_list$all[is.element(genes_list$all$hsapiens_gene_id, nam
 genes_list$all <- genes_list$all[is.element(genes_list$all$mmusculus_gene_id, names(which(table(genes_list$all$mmusculus_gene_id)==1))),]
 genes_list$all <- genes_list$all[is.element(genes_list$all$drerio_gene_id, names(which(table(genes_list$all$drerio_gene_id)==1))),]
 ```
+
+
+
 
 ## clean gtex dataset here
 ```{r clean dataset, fig.width = 8, fig.height=4}
