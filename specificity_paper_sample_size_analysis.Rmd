@@ -285,7 +285,7 @@ specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
 ## only 1 similarity function tested for now, can make as list later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 ## only 1 clustering fucntion tested for now, can make as a list later
-cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "average") ) ))}  
 
 ```
 

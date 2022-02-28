@@ -283,7 +283,7 @@ specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
 ## only 1 similarity function tested for now, can make as list later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 ## only 1 clustering fucntion tested for now, can make as a list later
-cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "average") ) ))}  
 
 ```
 
@@ -555,7 +555,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   num_reps <- 4
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
-  cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+  cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "average") ) ))}  
   
   
   ## to switch analysis between True Brain Partition and equalivalent sized Random Partition set random_partition ##
@@ -1416,7 +1416,7 @@ cluster_summary$frac_terms <- as.numeric(str_split_fixed(cluster_summary$GeneRat
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 
 ## only 1 clustering fucntion tested for now, can make as a list later
-cluster_func <- function(sim_mat, method="single"){
+cluster_func <- function(sim_mat, method="average"){
   add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = method) ) ))
 }
 
