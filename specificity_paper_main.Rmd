@@ -422,45 +422,55 @@ allOE_genes<-str_split_fixed(rownames(exp_mat),"[.]",2)[,1]
 ggl <- list()
 for(f_or_w in c("flat","weighted")){
   for(measure in specificity_measures$func_names){
-    spec_delta_cut <- ifelse(measure=="Zscore",1,0.1)
-    temp_df <- df_1b[which( df_1b$measure == measure &
-                              df_1b$f_or_w == f_or_w),]
-    temp_df_sub <- slice_max(temp_df, order_by=delta, n=nrow(temp_df)/100 )
-    temp_df_sub <- temp_df_sub[which(temp_df_sub$delta > spec_delta_cut),]
-    sigOE_genes <- str_split_fixed(temp_df_sub$Var1,"[.]",2)[,1]
-    ego <- enrichGO(gene = sigOE_genes, 
-                    universe = allOE_genes,
-                    keyType = "ENSEMBL",
-                    OrgDb = org.Hs.eg.db, 
-                    ont = "BP", 
-                    pAdjustMethod = "BH",
-                    qvalueCutoff = 0.05,
-                    readable = TRUE,
-                    pool=TRUE)
-    
-    ggl[[measure]] <- ggplot(temp_df, aes(x=all, y=one))+
-      geom_point(size=0.1)+
-      geom_point(data=temp_df_sub, aes( x=all, y=one), color="red")+
-      ggtitle(measure)+
-      geom_abline(slope=1,intercept=0, color="red", size=0.3)+
-      theme_bw()+
-        theme(panel.grid.minor.x = element_blank())
-    
-    n=10
-    filename <- paste(figures_dir,"/",measure,"_",f_or_w,"_top1percent_deltas_go.png",sep = "")
-    p1 <- ggl[[measure]]
-    if(is.null(ego)){
-      p2 <- ggplot()
-      p3 <- ggplot()
-    } else{
-      ego <- enrichplot::pairwise_termsim(ego)
-      p2 <- dotplot(ego, showCategory = n)
-      p3 <- emapplot(ego, showCategory = n ) #, node_label="none"))
+    for(slice_func in c("max", "min")){
+      spec_delta_cut <- ifelse(measure=="Zscore",1,0.1)
+      temp_df <- df_1b[which( df_1b$measure == measure &
+                                df_1b$f_or_w == f_or_w),]
+      if(slice_func=="max"){
+        temp_df_sub <- slice_max(temp_df, order_by=delta, n=nrow(temp_df)/100 )
+      }
+      if(slice_func=="min"){
+        temp_df_sub <- slice_min(temp_df, order_by=delta, n=nrow(temp_df)/100 )
+      }
+      
+      temp_df_sub <- temp_df_sub[which(abs(temp_df_sub$delta) > spec_delta_cut),]
+      sigOE_genes <- str_split_fixed(temp_df_sub$Var1,"[.]",2)[,1]
+      ego <- enrichGO(gene = sigOE_genes, 
+                      universe = allOE_genes,
+                      keyType = "ENSEMBL",
+                      OrgDb = org.Hs.eg.db, 
+                      ont = "BP", 
+                      pAdjustMethod = "BH",
+                      qvalueCutoff = 0.05,
+                      readable = TRUE,
+                      pool=TRUE)
+      
+      ggl[[measure]] <- ggplot(temp_df, aes(x=all, y=one))+
+        geom_point(size=0.1)+
+        geom_point(data=temp_df_sub, aes( x=all, y=one), color="red")+
+        ggtitle(measure)+
+        geom_abline(slope=1,intercept=0, color="red", size=0.3)+
+        theme_bw()+
+          theme(panel.grid.minor.x = element_blank())
+      
+      n=10
+      filename <- paste(figures_dir,"/",measure,"_",f_or_w,"_", slice_func,
+                        "_1percent_deltas_go.png",sep = "")
+      p1 <- ggl[[measure]]
+      if(is.null(ego) || nrow(ego)==0){
+        p2 <- ggplot()
+        p3 <- ggplot()
+      } else{
+        ego <- enrichplot::pairwise_termsim(ego)
+        p2 <- dotplot(ego, showCategory = n)
+        p3 <- emapplot(ego, showCategory = n ) #, node_label="none"))
+      }
+      png(filename, width = 18, height = 5, units = "in", res=200 )
+      grid.arrange(p1,p2,p3, ncol=3)
+      dev.off()
+      
     }
-    png(filename, width = 16, height = 5, units = "in", res=200 )
-    grid.arrange(p1,p2,p3, ncol=3)
-    dev.off()
-  
+    
   }
 }
 
