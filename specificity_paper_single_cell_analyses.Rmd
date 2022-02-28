@@ -78,19 +78,29 @@ rownames_genes <- foreach(f=files, .combine="c") %dopar% {
 }
 rownames_genes <- unique(rownames_genes)
 
-exp_mat <- foreach(f=files, .combine = "+") %dopar% {
-  exp_mat <- matrix(0, nrow=length(rownames_genes), ncol=length(unique(anno$Celltype_comb)) )
-  colnames(exp_mat) <- unique(anno$Celltype_comb)
-  rownames(exp_mat) <- rownames_genes
-  raw_exp <- fread(f)
-  rownames(raw_exp) <- raw_exp$V1
-  raw_exp$V1 <- NULL
-  cts <- unique(anno$Celltype_comb[which(is.element(anno$Cell_id, colnames(raw_exp)))])
-  for(ct in cts){
-    exp_mat[rownames(raw_exp),ct] <-  exp_mat[rownames(raw_exp),ct]+
-      rowSums(as.matrix(raw_exp)[,which(is.element(colnames(raw_exp),anno$Cell_id[which(anno$Celltype_comb==ct)]  ))])
+rm(exp_mat)
+## foreach crashing r if called over too many files at once-  break into chunks and aggregate 1 chunk at a time
+file_chunks <- split(files, cut(seq_along(files), 10, labels = F))
+for(i in 1:length(file_chunks)){
+  temp_mat <- foreach(f=file_chunks[[i]], .combine = "+") %dopar% {
+      temp_mat <- matrix(0, nrow=length(rownames_genes), ncol=length(unique(anno$Celltype_comb)) )
+      colnames(temp_mat) <- unique(anno$Celltype_comb)
+      rownames(temp_mat) <- rownames_genes
+      raw_exp <- fread(f)
+      rownames(raw_exp) <- raw_exp$V1
+      raw_exp$V1 <- NULL
+      cts <- unique(anno$Celltype_comb[which(is.element(anno$Cell_id, colnames(raw_exp)))])
+      for(ct in cts){
+        temp_mat[rownames(raw_exp),ct] <-  temp_mat[rownames(raw_exp),ct]+
+          rowSums(as.matrix(raw_exp)[,which(is.element(colnames(raw_exp),anno$Cell_id[which(anno$Celltype_comb==ct)]  ))])
+      }
+      temp_mat
   }
-  exp_mat
+  if(!exists("exp_mat")){
+    exp_mat <- temp_mat
+  } else {
+    exp_mat <- exp_mat + temp_mat
+  }
 }
 
 save.image()
