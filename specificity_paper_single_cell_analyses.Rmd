@@ -214,6 +214,9 @@ genes_list$all <- genes_list$all[is.element(genes_list$all$drerio_gene_id, names
 exp_mat_raw_list <- list(mmusculus = mouse_exp_mat, drerio = zebrafish_exp_mat, hsapiens = gtex)
 exp_mat_list <- list(mmusculus=NA, drerio=NA, hsapiens=NA)
 
+
+### strip non-protein coding genes
+
 which <- which(is.element(tolower(rownames(exp_mat_raw_list$mmusculus)),tolower(genes_list$mmusculus$external_gene_name) ))
 exp_mat_raw_list$mmusculus <- exp_mat_raw_list$mmusculus[which,]
 rownames(exp_mat_raw_list$mmusculus) <- unique(genes_list$mmusculus$ensembl_gene_id)[match( 
@@ -232,6 +235,31 @@ exp_mat_raw_list$hsapiens <- exp_mat_raw_list$hsapiens[which,]
 rownames(exp_mat_raw_list$hsapiens) <- unique(genes_list$hsapiens$ensembl_gene_id)[match(
   str_split_fixed(rownames(exp_mat_raw_list$hsapiens),"\\.",2)[,1],unique(genes_list$hsapiens$ensembl_gene_id) 
 )]
+
+
+### strip mitochondrial genes
+for(sp in names(exp_mat_raw_list) ){
+  which <- which(is.element(rownames(exp_mat_raw_list[[sp]]),
+                            genes_list[[sp]]$ensembl_gene_id[grep("MT-", 
+                              genes_list[[sp]]$external_gene_name, ignore.case = TRUE)]), )
+  exp_mat_raw_list[[sp]] <- exp_mat_raw_list[[sp]][-which,]
+  barplot(log10(colSums(exp_mat_raw_list[[sp]])+1))
+}
+
+for(sp in names(exp_mat_raw_list) ){
+  barplot(log10(colSums(exp_mat_raw_list[[sp]])+1))
+  print(sum((colSums(exp_mat_raw_list[[sp]]) > 5e5 )))
+  
+  ## filter for cell types with at least 500k reads total
+  exp_mat_raw_list[[sp]] <- exp_mat_raw_list[[sp]][,which(colSums(exp_mat_raw_list[[sp]]) > 5e5 )]
+  exp_mat_raw_list[[sp]] <- t(apply((exp_mat_raw_list[[sp]]*1e6), 1, "/", colSums(exp_mat_raw_list[[sp]]) ))
+  
+  barplot(log10(colSums(exp_mat_raw_list[[sp]])+1))
+  print(sum((colSums(exp_mat_raw_list[[sp]]) )))
+}
+### renormalize
+
+
 
 ```
 
