@@ -105,8 +105,11 @@ ggplot( temp ,aes(y=total_transcripts, x=names))+
 
 
 ##renormalize TPM without mitochondrial genes
-for(i in 1:ncol(gtex)){
-  gtex[,i] <- (gtex[,i]*1e6 / sum(gtex[,i]))
+for(i in 1:ncol(gtex_cleaned)){
+  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
+  ## set all very low counts to zero to avoid variable read depth issues
+  gtex_cleaned[,i] [which(gtex_cleaned[,i]  < 1)] <- 0
+  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
 }
 
 temp <- data.frame(names=colnames(gtex[,1:100]), total_transcripts=colSums(gtex[,1:100]))

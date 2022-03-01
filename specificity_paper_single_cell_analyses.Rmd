@@ -248,10 +248,13 @@ for(sp in names(exp_mat_raw_list) ){
 
 for(sp in names(exp_mat_raw_list) ){
   barplot(log10(colSums(exp_mat_raw_list[[sp]])+1))
-  print(sum((colSums(exp_mat_raw_list[[sp]]) > 5e5 )))
+  print(sum((colSums(exp_mat_raw_list[[sp]]) > 1e5 )))
   
-  ## filter for cell types with at least 500k reads total
-  exp_mat_raw_list[[sp]] <- exp_mat_raw_list[[sp]][,which(colSums(exp_mat_raw_list[[sp]]) > 5e5 )]
+  ## filter for cell types with at least 100k reads total
+  exp_mat_raw_list[[sp]] <- exp_mat_raw_list[[sp]][,which(colSums(exp_mat_raw_list[[sp]]) > 1e5 )]
+  exp_mat_raw_list[[sp]] <- t(apply((exp_mat_raw_list[[sp]]*1e6), 1, "/", colSums(exp_mat_raw_list[[sp]]) ))
+  ## set all very low counts to zero to avoid variable read depth issues
+  exp_mat_raw_list[[sp]][which(exp_mat_raw_list[[sp]] < 10)] <- 0
   exp_mat_raw_list[[sp]] <- t(apply((exp_mat_raw_list[[sp]]*1e6), 1, "/", colSums(exp_mat_raw_list[[sp]]) ))
   
   barplot(log10(colSums(exp_mat_raw_list[[sp]])+1))
@@ -262,8 +265,6 @@ for(sp in names(exp_mat_raw_list) ){
 ## median normalization
 exp_mat_list <- exp_mat_raw_list
 for(sp in names(exp_mat_list) ){
-  ## set all below 
-  exp_mat_list[[sp]][which(exp_mat_list[[sp]] < 5)] <- 0
   exp_mat_list[[sp]] <- log10(exp_mat_list[[sp]] + 1) 
   temp <- exp_mat_list[[sp]]
   temp[which(temp==0 | is.infinite(temp))] <- NA
@@ -271,7 +272,7 @@ for(sp in names(exp_mat_list) ){
   median_normalize <- TRUE
   if(median_normalize){
     for(i in 1:ncol(exp_mat_list[[sp]])){
-      exp_mat_list[[sp]][,i] <- exp_mat_list[[sp]][,i] / median(exp_mat_list[[sp]][,i][which(exp_mat_list[[sp]][,i] > 0)])
+       exp_mat_list[[sp]][,i] <- exp_mat_list[[sp]][,i] / median(exp_mat_list[[sp]][,i][which(exp_mat_list[[sp]][,i] > 0)])
     }
   }
   temp <- exp_mat_list[[sp]]
@@ -280,56 +281,6 @@ for(sp in names(exp_mat_list) ){
 }
 ```
 
-## clean gtex dataset here
-```{r clean dataset, fig.width = 8, fig.height=4}
-## show mitochondrial genes drive a large part of sample similarity
-## Note sum of medians in gtex not quite 1M - likely artifact of taking medians
-
-temp <- data.frame(names=colnames(gtex), total_transcripts=colSums(gtex))
-ggplot( temp ,aes(y=total_transcripts, x=names))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-## match genes between gtex and ensembl
-gtex_names <- str_split_fixed(gtex_rowinfo$Name, "[.]", 2)[,1]
-which <- which(genes$chromosome_name != "MT" )
-gtex_cleaned <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
-which <- which(genes$chromosome_name == "MT" )
-gtex_cleanedMT <- gtex[which(is.element(gtex_names, genes$ensembl_gene_id[which])),]
-
-##non-mitochondrial TPM sum
-temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
-ggplot( temp ,aes(y=total_transcripts, x=names))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-##mitochondrial TPM sum
-temp <- data.frame(names=colnames(gtex_cleanedMT), total_transcripts=colSums(gtex_cleanedMT))
-ggplot( temp ,aes(y=total_transcripts, x=names))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-rm(gtex_cleanedMT)
-##renormalize TPM without mitochondrial genes
-for(i in 1:ncol(gtex_cleaned)){
-  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
-}
-
-temp <- data.frame(names=colnames(gtex_cleaned), total_transcripts=colSums(gtex_cleaned))
-ggplot( temp ,aes(y=total_transcripts, x=names))+
-  geom_col()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-gtex <- gtex_cleaned; rm(gtex_cleaned)
-exp_mat <- gtex
-## log10(TPM+1) transform of data
-exp_mat <- log10(exp_mat+1)
-
-## remove mitochondrial contribution
-
-
-
-```
 ```{r collected functions used, include=FALSE}
 
 calc_zscore_matrix<- function(dat) {
@@ -492,7 +443,39 @@ specificity_measures <- list(func_names=c("Zscore", "Tau", "Tsi","Gini"),
 ## only 1 similarity function tested for now, can make as list later
 similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
 ## only 1 clustering fucntion tested for now, can make as a list later
-cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "single") ) ))}  
+cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "average") ) ))}  
 
 ```
+
+
+
+
+### analyze each dataset in turn
+```{r}
+
+for(i in 1:length(exp_mat_list) ){
+  exp_mat <- exp_mat_list[[i]]
+  ## dot similarity from initial Z scores
+  dot_sim <- similarity_func(exp_mat)
+  sim_tree <- cluster_func(dot_sim)
+  
+  # filename = paste(figures_dir, "/sample_similarity_heatmap.png", sep="")
+  # png(filename = filename, width=10, height=10, units="in", res=300)
+  heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
+  # dev.off()
+  
+  sim_tree <- cluster_func(dot_sim)
+  ## plot similarity tree with weights
+  # filename = paste(figures_dir, "/weighted_tree.png", sep="")
+  # png(filename = filename, width=9, height=4, units="in", res=300)
+  sim_tree %>% dendextend::set("nodes_pch",19) %>% dendextend::set("nodes_cex", 2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
+  # dev.off()
+}
+
+
+
+
+```
+
+
 
