@@ -103,11 +103,11 @@ for(i in 1:length(file_chunks)){
     exp_mat <- exp_mat + temp_mat
   }
 }
-save(exp_mat, file = "mouse_sc.Rdata")
 
 mouse_exp_mat <- exp_mat
-
-mouse_exp_mat <- load("mouse_sc.Rdata")
+save(mouse_exp_mat, file = "mouse_sc.Rdata")
+load("mouse_sc.Rdata")
+fwrite(mouse_exp_mat,file="mouse_sc.csv")
 ```
 
 ```{r download zebrafish scRNA datasets here}
@@ -128,9 +128,10 @@ for(ct in cts){
   exp_mat[,ct] <- rowSums(mat[,which(is.element(colnames(mat), rownames(meta)[which(meta$Cluster == ct)]))] )
 }
 
-save(exp_mat, file="zebrafish_sc.Rdata")
+save(zebrafish_exp_mat, file="zebrafish_sc.Rdata")
 zebrafish_exp_mat <- exp_mat
-zebrafish_exp_mat <- "zebrafish_sc.Rdata"
+load("zebrafish_sc.Rdata")
+fwrite(zebrafish_exp_mat,file="zebrafish_sc.csv")
 ```
 
 
