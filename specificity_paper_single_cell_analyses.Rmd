@@ -134,11 +134,20 @@ load("zebrafish_sc.Rdata")
 fwrite(zebrafish_exp_mat,file="zebrafish_sc.csv")
 ```
 
+##download gtex
+```{r}
+## import gtex medians data
+temp <- tempfile()
+download.file("https://storage.googleapis.com/gtex_analysis_v8/rna_seq_data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz",temp)
+gtex <- read.table( temp, skip=2, header = TRUE, sep = "\t")
+gtex_rowinfo <- data.frame(Name=gtex$Name, Description=gtex$Description)
+rownames(gtex) <- gtex$Name
+gtex <- as.matrix(gtex[,3:ncol(gtex)])
+unlink(temp); rm(temp)
+```
 
 
-
-## load gtex here
-```{r import dataset}
+```{r setup gene lists}
 ## import mouse single cell data
 
 ## import zebrafish single cell data
@@ -200,8 +209,31 @@ genes_list$all <- genes_list$all[is.element(genes_list$all$mmusculus_gene_id, na
 genes_list$all <- genes_list$all[is.element(genes_list$all$drerio_gene_id, names(which(table(genes_list$all$drerio_gene_id)==1))),]
 ```
 
+### clean exp datasets here
+```{r}
+exp_mat_raw_list <- list(mmusculus = mouse_exp_mat, drerio = zebrafish_exp_mat, hsapiens = gtex)
+exp_mat_list <- list(mmusculus=NA, drerio=NA, hsapiens=NA)
+
+which <- which(is.element(tolower(rownames(exp_mat_raw_list$mmusculus)),tolower(genes_list$mmusculus$external_gene_name) ))
+exp_mat_raw_list$mmusculus <- exp_mat_raw_list$mmusculus[which,]
+rownames(exp_mat_raw_list$mmusculus) <- unique(genes_list$mmusculus$ensembl_gene_id)[match( 
+  tolower(rownames(exp_mat_raw_list$mmusculus)),
+  tolower(unique(genes_list$mmusculus$external_gene_name)))]
 
 
+which <- which(is.element(str_split_fixed(rownames(exp_mat_raw_list$drerio),"\\|",2)[,1], genes_list$drerio$ensembl_gene_id ))
+exp_mat_raw_list$drerio <- exp_mat_raw_list$drerio[which,]
+rownames(exp_mat_raw_list$drerio) <- unique(genes_list$drerio$ensembl_gene_id)[match(
+  str_split_fixed(rownames(exp_mat_raw_list$drerio),"\\|",2)[,1], unique(genes_list$drerio$ensembl_gene_id))]
+
+
+which <- which(is.element(str_split_fixed(rownames(exp_mat_raw_list$hsapiens),"\\.",2)[,1],genes_list$hsapiens$ensembl_gene_id ))
+exp_mat_raw_list$hsapiens <- exp_mat_raw_list$hsapiens[which,]
+rownames(exp_mat_raw_list$hsapiens) <- unique(genes_list$hsapiens$ensembl_gene_id)[match(
+  str_split_fixed(rownames(exp_mat_raw_list$hsapiens),"\\.",2)[,1],unique(genes_list$hsapiens$ensembl_gene_id) 
+)]
+
+```
 
 ## clean gtex dataset here
 ```{r clean dataset, fig.width = 8, fig.height=4}
@@ -249,6 +281,9 @@ exp_mat <- gtex
 exp_mat <- log10(exp_mat+1)
 
 ## remove mitochondrial contribution
+
+
+
 ```
 ```{r collected functions used, include=FALSE}
 
