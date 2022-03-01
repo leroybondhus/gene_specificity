@@ -114,8 +114,11 @@ ggplot( temp ,aes(y=total_transcripts, x=names))+
   geom_col()+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
+exp_mat <- gtex
+## set all very low counts to zero to avoid variable read depth issues
+exp_mat[which(exp_mat < 1)] <- 0 
 ## log10(TPM+1) transform of data
-exp_mat <- log10(gtex+1)
+exp_mat <- log10(exp_mat+1)
 
 
 ## median normalization

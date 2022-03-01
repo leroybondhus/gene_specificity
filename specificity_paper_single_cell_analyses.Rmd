@@ -259,8 +259,25 @@ for(sp in names(exp_mat_raw_list) ){
 }
 ### renormalize
 
-
-
+## median normalization
+exp_mat_list <- exp_mat_raw_list
+for(sp in names(exp_mat_list) ){
+  ## set all below 
+  exp_mat_list[[sp]][which(exp_mat_list[[sp]] < 5)] <- 0
+  exp_mat_list[[sp]] <- log10(exp_mat_list[[sp]] + 1) 
+  temp <- exp_mat_list[[sp]]
+  temp[which(temp==0 | is.infinite(temp))] <- NA
+  boxplot(temp)
+  median_normalize <- TRUE
+  if(median_normalize){
+    for(i in 1:ncol(exp_mat_list[[sp]])){
+      exp_mat_list[[sp]][,i] <- exp_mat_list[[sp]][,i] / median(exp_mat_list[[sp]][,i][which(exp_mat_list[[sp]][,i] > 0)])
+    }
+  }
+  temp <- exp_mat_list[[sp]]
+  temp[which(temp==0)] <- NA
+  boxplot(temp)
+}
 ```
 
 ## clean gtex dataset here
