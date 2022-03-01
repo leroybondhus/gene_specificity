@@ -48,7 +48,7 @@ registerDoParallel(detectCores()-2)
 ```
 
 
-```{r download scRNA datasets here}
+```{r download mouse scRNA datasets here}
 
 ### if download speed via R is too slow, can also manually download files from https://figshare.com/articles/dataset/HCL_DGE_Data/7235471 ##
 download.file("https://figshare.com/ndownloader/files/22447898", paste(data_dir,"annotation_rmbatch_data_revised417.zip",sep="/"))
@@ -82,6 +82,7 @@ rm(exp_mat)
 ## foreach crashing r if called over too many files at once-  break into chunks and aggregate 1 chunk at a time
 file_chunks <- split(files, cut(seq_along(files), 10, labels = F))
 for(i in 1:length(file_chunks)){
+  print(i)
   temp_mat <- foreach(f=file_chunks[[i]], .combine = "+") %dopar% {
       temp_mat <- matrix(0, nrow=length(rownames_genes), ncol=length(unique(anno$Celltype_comb)) )
       colnames(temp_mat) <- unique(anno$Celltype_comb)
@@ -102,12 +103,38 @@ for(i in 1:length(file_chunks)){
     exp_mat <- exp_mat + temp_mat
   }
 }
+save(exp_mat, file = "mouse_sc.Rdata")
 
-save.image()
+mouse_exp_mat <- exp_mat
 
-temp <- fread("data/new/AdultAdipose1.rmbatchdge.txt.gz")
-rownames(temp) <- temp$V1; temp$V1 <- NULL
+mouse_exp_mat <- load("mouse_sc.Rdata")
 ```
+
+```{r download zebrafish scRNA datasets here}
+
+mat <- fread("https://cells.ucsc.edu/zebrafish-dev/exprMatrix.tsv.gz")
+meta <- data.frame(fread("https://cells.ucsc.edu/zebrafish-dev/meta.tsv"), row.names=1)
+rownames(mat) <- mat$gene
+mat$gene <- NULL
+
+cts <- unique(meta$Cluster)
+exp_mat <- matrix(0, nrow = nrow(mat),ncol = length(cts) )
+rownames(exp_mat) <- rownames(mat)
+colnames(exp_mat) <- cts
+
+mat <- as.matrix(mat)
+rownames(mat) <- rownames(exp_mat)
+for(ct in cts){
+  exp_mat[,ct] <- rowSums(mat[,which(is.element(colnames(mat), rownames(meta)[which(meta$Cluster == ct)]))] )
+}
+
+save(exp_mat, file="zebrafish_sc.Rdata")
+zebrafish_exp_mat <- exp_mat
+zebrafish_exp_mat <- "zebrafish_sc.Rdata"
+```
+
+
+
 
 ## load gtex here
 ```{r import dataset}
