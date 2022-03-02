@@ -459,7 +459,7 @@ for(f_or_w in c("flat","weighted")){
       
       n=10
       filename <- paste(figures_dir,"/",measure,"_",f_or_w,"_", slice_func,
-                        "_1percent_deltas_go.png",sep = "")
+                        "v3_1percent_deltas_go.png",sep = "")
       p1 <- ggl[[measure]]
       if(is.null(ego) || nrow(ego)==0){
         p2 <- ggplot()
@@ -469,7 +469,7 @@ for(f_or_w in c("flat","weighted")){
         p2 <- dotplot(ego, showCategory = n)
         p3 <- emapplot(ego, showCategory = n ) #, node_label="none"))
       }
-      png(filename, width = 18, height = 5, units = "in", res=200 )
+      png(filename, width = 18, height = 5.5, units = "in", res=200 )
       grid.arrange(p1,p2,p3, ncol=3)
       dev.off()
       
