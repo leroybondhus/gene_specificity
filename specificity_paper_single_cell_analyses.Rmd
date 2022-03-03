@@ -488,10 +488,36 @@ for(i in 1:length(exp_mat_list) ){
   sim_tree %>% dendextend::set("nodes_pch",16) %>% dendextend::set("nodes_cex", 1.5*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
 #  dev.off()
   
-  
-  
   ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
+  num_reps <- 2
+  dist_cutoff <- 0.75
+  sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
+  balanced_sample_sets <- list()
+  for(i in 1:num_reps){
+    temp_sample_set <- c()
+    for(j in 1:length(sample_groups)){
+      temp_sample_set <- c(temp_sample_set, sample(sample_groups[[j]],1) )
+    }
+    balanced_sample_sets[[i]] <- temp_sample_set 
+  } 
   
+  ### for each measure get unbalanced once, each balanced, get cor between each balanced and unbalanced for flat and weighted
+  
+  run_df <- merge(merge(data.frame(measure=specificity_measures$func_names),
+                        data.frame(weighted=c(T,F))),
+                  data.frame(balanced=T,rep=rep(1:num_reps)))
+  run_df <- rbind(run_df,
+                  merge(merge(data.frame(measure=specificity_measures$func_names),
+                              data.frame(weighted=c(T,F))),
+                        data.frame(balanced=F,rep=1)))
+  
+  results <- foreach() 
+  # for(measure in specificity_measures$func_names){
+  #   specificity_func <- specificity_measures$funcs[[measure]]
+    
+    
+    
+  }
   
   ## make clusters of samples that are linked
   
