@@ -492,11 +492,21 @@ for(i in 1:length(exp_mat_list) ){
   num_reps <- 2
   dist_cutoff <- 0.5
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
+  ### artificially unbalance sample_groups
+  sample_groups_lengths <- unlist(lapply(sample_groups, length))
+  which_deep <- which(sample_groups_lengths >= 5)
+  which_shallow <- which(sample_groups_lengths < 3)
+  
+  unbalanced_sample_sets <- list()
   balanced_sample_sets <- list()
   for(i in 1:num_reps){
+    ### downsample more shallowly sampled clusters to exaggerate dataset imbalance 
+    temp_sample_groups <- sample_groups[c(which_deep, sample(which_shallow, 2*length(which_deep) ) ) ]
+    
+    unbalanced_sample_sets[[i]] <- unlist(temp_sample_groups)
     temp_sample_set <- c()
-    for(j in 1:length(sample_groups)){
-      temp_sample_set <- c(temp_sample_set, sample(sample_groups[[j]],1) )
+    for(j in 1:length(temp_sample_groups)){
+      temp_sample_set <- c(temp_sample_set, sample(temp_sample_groups[[j]],1) )
     }
     balanced_sample_sets[[i]] <- temp_sample_set 
   } 
@@ -509,7 +519,7 @@ for(i in 1:length(exp_mat_list) ){
   run_df <- rbind(run_df,
                   merge(merge(data.frame(measure=specificity_measures$func_names),
                               data.frame(weighted=c(T,F))),
-                        data.frame(balanced=F,rep=1)))
+                        data.frame(balanced=F,rep=1:num_reps)))
   
   results <- foreach(run=1:nrow(run_df), .errorhandling = "pass",
                      .final = function(x) setNames(x,paste(run_df$measure,
@@ -520,7 +530,7 @@ for(i in 1:length(exp_mat_list) ){
     if(run_df$balanced[run]){
       exp_mat_subset <- exp_mat[,balanced_sample_sets[[run_df$rep[run]]]]
     } else {
-      exp_mat_subset <- exp_mat
+      exp_mat_subset <- exp_mat[,unbalanced_sample_sets[[run_df$rep[[run]]]]]
     }
     sim_mat_subset <- similarity_func(exp_mat_subset)
     sim_tree_subset <- cluster_func(sim_mat_subset)
@@ -536,19 +546,19 @@ for(i in 1:length(exp_mat_list) ){
     
 }
 
-cor(as.vector(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_FALSE__balanced_FALSE__rep_1[,colnames(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2)]), use="pairwise.complete")
-cor(as.vector(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_TRUE__balanced_FALSE__rep_1[,colnames(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2)]), use="pairwise.complete")
+cor(as.vector(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_FALSE__balanced_FALSE__rep_2[,colnames(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2)]), use="pairwise.complete")
+cor(as.vector(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_TRUE__balanced_FALSE__rep_2[,colnames(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2)]), use="pairwise.complete")
 
-plot(as.vector(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_FALSE__balanced_FALSE__rep_1[,colnames(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2)]));abline(0,1,col="red")
-plot(as.vector(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_TRUE__balanced_FALSE__rep_1[,colnames(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2)]));abline(0,1,col="red")
-
-
-cor(as.vector(results$Tau__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_FALSE__balanced_FALSE__rep_1), use="pairwise.complete")
-cor(as.vector(results$Tau__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_TRUE__balanced_FALSE__rep_1), use="pairwise.complete")
+plot(as.vector(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_FALSE__balanced_FALSE__rep_2[,colnames(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2)]));abline(0,1,col="red")
+plot(as.vector(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_TRUE__balanced_FALSE__rep_2[,colnames(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2)]));abline(0,1,col="red")
 
 
-plot(as.vector(results$Tau__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_FALSE__balanced_FALSE__rep_1));abline(0,1,col="red")
-plot(as.vector(results$Tau__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_TRUE__balanced_FALSE__rep_1));abline(0,1,col="red")
+cor(as.vector(results$Tau__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_FALSE__balanced_FALSE__rep_2), use="pairwise.complete")
+cor(as.vector(results$Tau__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_TRUE__balanced_FALSE__rep_2), use="pairwise.complete")
+
+
+plot(as.vector(results$Tau__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_FALSE__balanced_FALSE__rep_2));abline(0,1,col="red")
+plot(as.vector(results$Tau__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_TRUE__balanced_FALSE__rep_2));abline(0,1,col="red")
 
 ```
 
