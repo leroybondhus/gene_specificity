@@ -468,21 +468,21 @@ group_samples_by_dend_dist <- function(tree, cutoff_dist){
   return(samp_groups)
 }
 
-
-for(i in 1:length(exp_mat_list) ){
-  exp_mat <- exp_mat_list[[i]]
+results_list <- list()
+for(exp_mat_id in 1:length(exp_mat_list) ){
+  exp_mat <- exp_mat_list[[exp_mat_id]]
   ## dot similarity from initial Z scores
   dot_sim <- similarity_func(exp_mat)
   sim_tree <- cluster_func(dot_sim)
   
-  # filename = paste(figures_dir, "/", names(exp_mat_list)[i], "sample_similarity_heatmap.png", sep="")
+  # filename = paste(figures_dir, "/", names(exp_mat_list)[exp_mat_id], "sample_similarity_heatmap.png", sep="")
   # png(filename = filename, width=10, height=10, units="in", res=250)
   heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
   # dev.off()
   
   sim_tree <- cluster_func(dot_sim)
   ## plot similarity tree with weights
-#  filename = paste(figures_dir, "/", names(exp_mat_list)[i], "weighted_tree.png", sep="")
+#  filename = paste(figures_dir, "/", names(exp_mat_list)[exp_mat_id], "weighted_tree.png", sep="")
 #  png(filename = filename, width=24, height=6, units="in", res=250)
 #  par(mar = c(15,2,2,2))
   sim_tree %>% dendextend::set("nodes_pch",16) %>% dendextend::set("nodes_cex", 1.5*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
@@ -494,14 +494,14 @@ for(i in 1:length(exp_mat_list) ){
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
   ### artificially unbalance sample_groups
   sample_groups_lengths <- unlist(lapply(sample_groups, length))
-  which_deep <- which(sample_groups_lengths >= 5)
+  which_deep <- order(sample_groups_lengths, decreasing = TRUE)[1:2]
   which_shallow <- which(sample_groups_lengths < 3)
   
   unbalanced_sample_sets <- list()
   balanced_sample_sets <- list()
   for(i in 1:num_reps){
     ### downsample more shallowly sampled clusters to exaggerate dataset imbalance 
-    temp_sample_groups <- sample_groups[c(which_deep, sample(which_shallow, 2*length(which_deep) ) ) ]
+    temp_sample_groups <- sample_groups[c(which_deep, sample(which_shallow, sum(sample_groups_lengths[which_deep]) ) ) ]
     
     unbalanced_sample_sets[[i]] <- unlist(temp_sample_groups)
     temp_sample_set <- c()
@@ -539,26 +539,40 @@ for(i in 1:length(exp_mat_list) ){
       weights_subset[] <- 1
     }
     spec_mat_subset <- specificity_func(exp_mat_subset, weights_subset)
-    
-  } 
-  # for(measure in specificity_measures$func_names){
-  #   specificity_func <- specificity_measures$funcs[[measure]]
-    
+   }
+  results_list[[names(exp_mat_list)[exp_mat_id]]] <- list(
+    spec_results = results,
+    balanced_sample_sets = balanced_sample_sets,
+    unbalanced_sample_sets = unbalanced_sample_sets,
+    run_df = run_df
+  )
+  
+  
+  
 }
+  
+```
 
-cor(as.vector(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_FALSE__balanced_FALSE__rep_2[,colnames(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2)]), use="pairwise.complete")
-cor(as.vector(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_TRUE__balanced_FALSE__rep_2[,colnames(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2)]), use="pairwise.complete")
+```{r plots for correlation}
+for()
+for( i in 1:length(results)){
+  measure <- str_split_fixed(names(results)[i], "__", 4)[1]
+  weighted <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[2])
+  balanced <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[3])
+  rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
+  if(balanced){next}
+  
+  result <- results[[i]]
+  result_pair <- results[[str_replace(names(results)[i], "balanced_FALSE", "balanced_TRUE")]]
+  
+  
+  
+  
+  
+}
+  
+  
 
-plot(as.vector(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_FALSE__balanced_FALSE__rep_2[,colnames(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2)]));abline(0,1,col="red")
-plot(as.vector(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_TRUE__balanced_FALSE__rep_2[,colnames(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2)]));abline(0,1,col="red")
-
-
-cor(as.vector(results$Tau__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_FALSE__balanced_FALSE__rep_2), use="pairwise.complete")
-cor(as.vector(results$Tau__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_TRUE__balanced_FALSE__rep_2), use="pairwise.complete")
-
-
-plot(as.vector(results$Tau__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_FALSE__balanced_FALSE__rep_2));abline(0,1,col="red")
-plot(as.vector(results$Tau__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_TRUE__balanced_FALSE__rep_2));abline(0,1,col="red")
 
 ```
 
