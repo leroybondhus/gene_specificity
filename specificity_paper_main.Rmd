@@ -293,7 +293,7 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 
 ```{r measure difference between 1 and all brain samples included, include=FALSE }
 
-## select which to be all non-brain and one brain
+## select which to be all non-brain and one brain 
 which <- c(grep("Brain", colnames(exp_mat), invert = TRUE ),sample(grep("Brain", colnames(exp_mat)),1))
 flat <- rep(1,ncol(exp_mat)); names(flat) <- colnames(exp_mat)
 spec_one_all_list <- list()
@@ -556,7 +556,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   
   
   num_brain_samples <- length(colnames(exp_mat)[grep("[Bb]rain",colnames(exp_mat))])
-  num_reps <- 4
+  num_reps <- 8
   ## use general similarity_func and cluster_func in case we want to test more later
   similarity_func <- function(exp_mat){calc_dot_product_similarity_matrix(calc_zscore_matrix(exp_mat))}
   cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(hclust(as.dist(1-sim_mat), method = "average") ) ))}  
@@ -1263,7 +1263,7 @@ head(gtex_rowinfo)
 ## create list of marker genes (common name and ENS map in genes object and gtex_rowinfo object)
 #"NEUROD1","NEUROD2" ,"SOX2",  "TPPP","NEUROD4", "NEUROD6","MBP", "MAP2","GFAP" ,"NSG2","ADCY8","HEPACAM","VSTM2B","SLITRK3","MBP","MAP2","SOX2",  "TPPP","BCAN", "NCAN","OPALIN","STMN4", "GFAP" ,"NSG2","ADCY8",
 specific_genes <- c( "OLIG1","OLIG2",
-                     "PRSS1", "PTF1A", # "CTRB2",
+                     "PRSS1", "CTRB2", # "CTRB2",
                      "MYH6", "MYL4")
 spec_genes_w_ids <- gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
 spec_genes_w_ids <- spec_genes_w_ids[which(is.element(spec_genes_w_ids$Name, rownames(spec_mats$delta_Zscore))),]
@@ -1341,6 +1341,105 @@ for(i in 1:nrow(spec_genes_w_ids)){
 rownames(temp_mat) <- paste(c("flat","weighted"), spec_genes_w_ids$Description)
 ```
 
+```{r Supp gene count specific at variable cutoffs}
+
+df_gc <- data.frame(measure=character(), weighted=logical(), 
+                      cut_point=numeric(), gene_count=numeric(),
+                      total=numeric())
+df_gc_jaccard <- data.frame(measure=character(), cut_point=numeric(),
+                              jaccard=numeric())
+
+for(el in names(spec_mats)){
+  if(grepl("delta", el)){next}
+  measure <- str_split_fixed(el,"_",n=2)[2]
+  w_or_f <- str_split_fixed(el,"_",n=2)[1]
+  if(measure == "Zscore"){cuts <- seq(0,4,0.5)   ## set cutoffs
+  }else{ cuts <- seq(0,1,0.05)}
+  el_pair <- grep(names(spec_mats), )
+  ncuts <- length(cuts)
+  temp_df_gc <- data.frame(measure=rep(measure, ncuts), 
+                           weighted=rep( grepl("weighted", w_or_f), ncuts),
+                           cut_point=numeric(length=ncuts), gene_count=numeric(length=ncuts),
+                           total=nrow(spec_mats[[el]])*ncol(spec_mats[[el]]))
+  temp_df_gc_jaccard <- data.frame(measure=rep(measure, ncuts),
+                           cut_point=numeric(length=ncuts),
+                           jaccard=numeric(length=ncuts))
+  for(cut_index in 1:length(cuts)){
+    temp_df_gc$cut_point[cut_index] <- cuts[cut_index]
+    temp_df_gc$gene_count[cut_index] <- length(which(spec_mats[[el]] > cuts[cut_index]))
+    
+    temp_df_gc_jaccard$cut_point[cut_index] <- cuts[cut_index]
+    temp_df_gc_jaccard$jaccard[cut_index] <- cuts[cut_index]
+  }
+  
+}
+
+      
+      for(s in 1:ncol(temp_mat) ){  ## add a row to df for each sample   
+        for(cut_index in 1:length(cuts)){
+          ind <- (s-1)*length(cuts)+cut_index  ### use arr_ind here instead
+          temp_df[ind,]$cut_point <- cuts[cut_index]
+          if(cuts[cut_index]<0){
+            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] <= cuts[cut_index] & temp_mat[,s] <= cuts[cut_index]  )) /
+                                        length( which( baseline_mat[,s] <= cuts[cut_index] | temp_mat[,s] <= cuts[cut_index]  )) )
+            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] <= cuts[cut_index]  ) )
+            temp_df[ind,]$gene_count_baseline <- length( which(baseline_mat[,s] <= cuts[cut_index]  ) ) 
+            temp_df[ind,]$gene_count_intersect <-  length( which( baseline_mat[,s] <= cuts[cut_index] & temp_mat[,s] <= cuts[cut_index]  ))
+          } else {
+            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] >= cuts[cut_index] & temp_mat[,s] >= cuts[cut_index]  )) /
+                                        length( which( baseline_mat[,s] >= cuts[cut_index] | temp_mat[,s] >= cuts[cut_index]  )) )
+            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] >= cuts[cut_index]  ) )
+            temp_df[ind,]$gene_count_baseline <-  length( which(baseline_mat[,s] >= cuts[cut_index]  ) )
+            temp_df[ind,]$gene_count_intersect <-  length( which( baseline_mat[,s] >= cuts[cut_index] & temp_mat[,s] >= cuts[cut_index]  ))
+          }
+          temp_df[ind,]$samp <- ifelse(!is.null((colnames(baseline_mat[,s,drop=FALSE] ) )),
+                                       unique(colnames(baseline_mat[,s,drop=FALSE] ),
+                                              colnames(temp_mat[,s,drop=FALSE] ) ), NA )
+        }
+      }
+
+
+for(measure in c("Zscore", "notZscore")){
+  if(measure == "Zscore"){
+    which <- which(df_2d_summary_by_partition$measure == measure)
+  } else {
+    which <- which(df_2d_summary_by_partition$measure != "Zscore")
+  }
+  gg <- ggplot(df_2d_summary_by_partition[which,],
+               aes(x=cut_point, y=gene_count / nrow(genes),
+                   group=n, fill=n))+
+    theme_bw()+
+    theme(
+          panel.grid.minor.x = element_blank())+
+    #ggtitle(paste("Number of genes above threshold for\n ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
+    geom_line(aes(color=n))+
+    scale_color_continuous(low="steelblue2", high="steelblue4")+
+    #scale_y_log10( #limits = c(1,3e4),
+    scale_y_continuous( limits=c(1e-4,1) , trans = log10_trans(),
+                       breaks = trans_breaks("log10", function(x) 10^x), # ) #,
+                       labels = percent,  )
+    
+  if(measure == "Zscore"){
+    gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
+    gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    gg <- gg+theme(legend.position = "none")
+  } else {
+    gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))
+    gg <- gg + facet_grid(measure ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+  }
+  plot(gg)
+  ggl_count[[measure]] <- gg
+}
+grobl <- list()
+for(n in names(ggl_count)){
+  grobl[[n]] <- ggplotGrob(ggl_count[[n]])
+}
+grid.arrange(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(6,1)  ) ), nrow=2, heights=c(5,4) )
+g <- arrangeGrob(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(5,1)  ) ), nrow=2, heights=c(5,4) )
+filename <- paste(figures_dir,"/",date,"_jaccard_gene_count_random_v01.png",sep = "")
+#ggsave(filename, g, device = "png", width = 6, height = 4)
+
+```
 
 ```{r Figure 3D}
 ## gene ontology summaries
