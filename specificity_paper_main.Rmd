@@ -1345,9 +1345,9 @@ rownames(temp_mat) <- paste(c("flat","weighted"), spec_genes_w_ids$Description)
 
 df_gc <- data.frame(measure=character(), weighted=logical(), 
                       cut_point=numeric(), gene_count=numeric(),
-                      total=numeric())
+                      total=numeric(), brain=logical())
 df_gc_jaccard <- data.frame(measure=character(), cut_point=numeric(),
-                              jaccard=numeric())
+                              jaccard=numeric(), brain=logical())
 
 for(el in names(spec_mats)){
   if(grepl("delta", el)){next}
@@ -1355,89 +1355,132 @@ for(el in names(spec_mats)){
   w_or_f <- str_split_fixed(el,"_",n=2)[1]
   if(measure == "Zscore"){cuts <- seq(0,4,0.5)   ## set cutoffs
   }else{ cuts <- seq(0,1,0.05)}
-  el_pair <- grep(names(spec_mats), )
+  el_pair <- intersect( grep(measure, names(spec_mats) ),
+                        grep(ifelse(w_or_f=="weighted", "flat","weighted"), names(spec_mats) ))
   ncuts <- length(cuts)
-  temp_df_gc <- data.frame(measure=rep(measure, ncuts), 
-                           weighted=rep( grepl("weighted", w_or_f), ncuts),
-                           cut_point=numeric(length=ncuts), gene_count=numeric(length=ncuts),
-                           total=nrow(spec_mats[[el]])*ncol(spec_mats[[el]]))
-  temp_df_gc_jaccard <- data.frame(measure=rep(measure, ncuts),
-                           cut_point=numeric(length=ncuts),
-                           jaccard=numeric(length=ncuts))
-  for(cut_index in 1:length(cuts)){
-    temp_df_gc$cut_point[cut_index] <- cuts[cut_index]
-    temp_df_gc$gene_count[cut_index] <- length(which(spec_mats[[el]] > cuts[cut_index]))
-    
-    temp_df_gc_jaccard$cut_point[cut_index] <- cuts[cut_index]
-    temp_df_gc_jaccard$jaccard[cut_index] <- cuts[cut_index]
+  for(only_brain in c(T,F)){
+    temp_df_gc <- data.frame(measure=rep(measure, ncuts), 
+                             weighted=rep( grepl("weighted", w_or_f), ncuts),
+                             cut_point=numeric(length=ncuts), gene_count=numeric(length=ncuts),
+                             total=nrow(spec_mats[[el]])*ncol(spec_mats[[el]]), brain=only_brain)
+    temp_df_gc_jaccard <- data.frame(measure=rep(measure, ncuts),
+                             cut_point=numeric(length=ncuts),
+                             jaccard=numeric(length=ncuts), brain=only_brain)
+    for(cut_index in 1:length(cuts)){
+      temp_df_gc$cut_point[cut_index] <- cuts[cut_index]
+      temp_df_gc_jaccard$cut_point[cut_index] <- cuts[cut_index]
+      if(measure == "Zscore" & only_brain){
+        temp_df_gc$total[cut_index] <- length(grep("Brain",colnames(spec_mats[[el]]))) *
+          nrow(spec_mats[[el]])
+        temp_df_gc$gene_count[cut_index] <- length(which(
+          spec_mats[[el]][,grep("Brain",colnames(spec_mats[[el]]),ignore.case = T)] >
+            cuts[cut_index]))
+        temp_df_gc_jaccard$jaccard[cut_index] <- 
+        length(which(spec_mats[[el]][,grep("Brain",colnames(spec_mats[[el]]),ignore.case = T)] 
+                     > cuts[cut_index] &
+                       spec_mats[[el_pair]][,grep("Brain",colnames(spec_mats[[el]]),ignore.case = T)]
+                     > cuts[cut_index] )) /
+        length(which(spec_mats[[el]][,grep("Brain",colnames(spec_mats[[el]]),ignore.case = T)] >
+                       cuts[cut_index] |
+                       spec_mats[[el_pair]][,grep("Brain",colnames(spec_mats[[el]]),ignore.case = T)]
+                     > cuts[cut_index] ))
+      } else{
+        temp_df_gc$gene_count[cut_index] <- length(which(spec_mats[[el]] > cuts[cut_index]))
+        temp_df_gc_jaccard$jaccard[cut_index] <- 
+        length(which(spec_mats[[el]] > cuts[cut_index] &
+                       spec_mats[[el_pair]] > cuts[cut_index] )) /
+        length(which(spec_mats[[el]] > cuts[cut_index] |
+                       spec_mats[[el_pair]] > cuts[cut_index] ))
+        
+      }
+      
+    }
+    df_gc <- rbind(df_gc, temp_df_gc)
+    df_gc_jaccard <- rbind(df_gc_jaccard, temp_df_gc_jaccard)
   }
-  
 }
 
-      
-      for(s in 1:ncol(temp_mat) ){  ## add a row to df for each sample   
-        for(cut_index in 1:length(cuts)){
-          ind <- (s-1)*length(cuts)+cut_index  ### use arr_ind here instead
-          temp_df[ind,]$cut_point <- cuts[cut_index]
-          if(cuts[cut_index]<0){
-            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] <= cuts[cut_index] & temp_mat[,s] <= cuts[cut_index]  )) /
-                                        length( which( baseline_mat[,s] <= cuts[cut_index] | temp_mat[,s] <= cuts[cut_index]  )) )
-            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] <= cuts[cut_index]  ) )
-            temp_df[ind,]$gene_count_baseline <- length( which(baseline_mat[,s] <= cuts[cut_index]  ) ) 
-            temp_df[ind,]$gene_count_intersect <-  length( which( baseline_mat[,s] <= cuts[cut_index] & temp_mat[,s] <= cuts[cut_index]  ))
-          } else {
-            temp_df[ind,]$jaccard <- (  length( which( baseline_mat[,s] >= cuts[cut_index] & temp_mat[,s] >= cuts[cut_index]  )) /
-                                        length( which( baseline_mat[,s] >= cuts[cut_index] | temp_mat[,s] >= cuts[cut_index]  )) )
-            temp_df[ind,]$gene_count <-  length( which(temp_mat[,s] >= cuts[cut_index]  ) )
-            temp_df[ind,]$gene_count_baseline <-  length( which(baseline_mat[,s] >= cuts[cut_index]  ) )
-            temp_df[ind,]$gene_count_intersect <-  length( which( baseline_mat[,s] >= cuts[cut_index] & temp_mat[,s] >= cuts[cut_index]  ))
-          }
-          temp_df[ind,]$samp <- ifelse(!is.null((colnames(baseline_mat[,s,drop=FALSE] ) )),
-                                       unique(colnames(baseline_mat[,s,drop=FALSE] ),
-                                              colnames(temp_mat[,s,drop=FALSE] ) ), NA )
-        }
-      }
+df_gc$brain[which(df_gc$measure != "Zscore")] <- F
+df_gc_jaccard$brain[which(df_gc_jaccard$measure != "Zscore")] <- F
+df_gc <- unique(df_gc)
+df_gc_jaccard <- unique(df_gc_jaccard)
 
 
+ggl_jacc_count <- list()
 for(measure in c("Zscore", "notZscore")){
   if(measure == "Zscore"){
-    which <- which(df_2d_summary_by_partition$measure == measure)
+    which_count <- which(df_gc$measure == measure)
+    which_jac <- which(df_gc_jaccard$measure == measure)
   } else {
-    which <- which(df_2d_summary_by_partition$measure != "Zscore")
+    which_count <- which(df_gc$measure != "Zscore")
+    which_jac <- which(df_gc_jaccard$measure != "Zscore")
   }
-  gg <- ggplot(df_2d_summary_by_partition[which,],
-               aes(x=cut_point, y=gene_count / nrow(genes),
-                   group=n, fill=n))+
+  gg <- ggplot(df_gc[which_count,],
+               aes(x=cut_point, y=gene_count / total,
+                   group=weighted))+
     theme_bw()+
     theme(
-          panel.grid.minor.x = element_blank())+
-    #ggtitle(paste("Number of genes above threshold for\n ", measure, " P1 and  P2, weighted and flat measures",sep=""))+
-    geom_line(aes(color=n))+
-    scale_color_continuous(low="steelblue2", high="steelblue4")+
-    #scale_y_log10( #limits = c(1,3e4),
+      panel.grid.minor.x = element_blank())+
+    geom_line(aes(color=weighted))+
+    scale_color_manual(values=c("grey20","steelblue3"))+
     scale_y_continuous( limits=c(1e-4,1) , trans = log10_trans(),
                        breaks = trans_breaks("log10", function(x) 10^x), # ) #,
-                       labels = percent,  )
-    
+                       labels = percent  )
   if(measure == "Zscore"){
     gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
-    gg <- gg + facet_grid(P1orP2 ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    gg <- gg + facet_grid(. ~ brain , labeller=labeller(brain=c("TRUE"="brain subset",
+                                                                "FALSE"="all tissues")) )
     gg <- gg+theme(legend.position = "none")
   } else {
+    gg <- gg + theme(axis.text.y = element_blank(), axis.title.y = element_blank())
     gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))
-    gg <- gg + facet_grid(measure ~ weighted, labeller=labeller(weighted=c("TRUE"="weighted", "FALSE"="flat")) )
+    gg <- gg + facet_grid(. ~ measure )
   }
   plot(gg)
-  ggl_count[[measure]] <- gg
+  ggl_jacc_count[[paste(measure,"_count",sep="")]] <- gg
+  
+  
+  gg <- ggplot(df_gc_jaccard[which_jac,],
+               aes(x=cut_point, y=jaccard))+
+    theme_bw()+
+    theme(
+      panel.grid.minor.x = element_blank())+
+    geom_line(aes(color="grey20"))+
+    scale_color_manual(values=c("grey20"))+
+    scale_y_continuous( limits=c(0,1),  breaks=seq(0,1,by=0.1) )
+  if(measure == "Zscore"){
+    gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
+    gg <- gg + facet_grid(. ~ brain , labeller=labeller(brain=c("TRUE"="brain subset",
+                                                                "FALSE"="all tissues")) )
+    gg <- gg+theme(legend.position = "none")
+  } else {
+    gg <- gg + theme(axis.text.y = element_blank(), axis.title.y = element_blank())
+    gg <- gg+scale_x_continuous(limits = c(0,1),  breaks=seq(0,1,by=0.1) ,expand = c(0,0))
+    gg <- gg + facet_grid(. ~ measure )
+  }
+  plot(gg)
+  ggl_jacc_count[[paste(measure,"_jacc",sep="")]] <- gg
 }
+
+
 grobl <- list()
-for(n in names(ggl_count)){
-  grobl[[n]] <- ggplotGrob(ggl_count[[n]])
+for(n in names(ggl_jacc_count)){
+  grobl[[n]] <- ggplotGrob(ggl_jacc_count[[n]])
 }
-grid.arrange(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(6,1)  ) ), nrow=2, heights=c(5,4) )
-g <- arrangeGrob(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(5,1)  ) ), nrow=2, heights=c(5,4) )
-filename <- paste(figures_dir,"/",date,"_jaccard_gene_count_random_v01.png",sep = "")
-#ggsave(filename, g, device = "png", width = 6, height = 4)
+
+g <-  arrangeGrob(grobs =  list(grobl$Zscore_count, grobl$notZscore_count), ncol=2, widths=c(5,7))
+filename <- paste(figures_dir,"/gtex_gene_count_supp.png",sep = "")
+ggsave(filename, g, device = "png", width = 10, height = 4)
+
+g <-  arrangeGrob(grobs =  list(grobl$Zscore_jacc, grobl$notZscore_jacc), ncol=2, widths=c(5,7))
+filename <- paste(figures_dir,"/gtex_jac_supp.png",sep = "")
+ggsave(filename, g, device = "png", width = 10, height = 4)
+
+
+
+
+
+
 
 ```
 
