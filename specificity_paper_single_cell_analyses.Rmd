@@ -453,25 +453,55 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 ### analyze each dataset in turn
 ```{r}
 
+## need a function that can return list of all samples clustered within cutoff distance
+
+group_samples_by_dend_dist <- function(tree, cutoff_dist){
+  ## if tree height is less than cutoff, return all descendent node labels as a vector
+  if(get_nodes_attr(tree, "height")[1] < cutoff_dist){
+    return( list(get_leaves_attr(tree, "label") ) )
+  }
+  samp_groups <- list()
+  for(i in 1:length(tree)){
+    temp_groups <- group_samples_by_dend_dist(tree[[i]], cutoff_dist)
+    samp_groups <- c(samp_groups, temp_groups)
+  }
+  return(samp_groups)
+}
+
+
 for(i in 1:length(exp_mat_list) ){
   exp_mat <- exp_mat_list[[i]]
   ## dot similarity from initial Z scores
   dot_sim <- similarity_func(exp_mat)
   sim_tree <- cluster_func(dot_sim)
   
-  filename = paste(figures_dir, "/", names(exp_mat_list)[i], "sample_similarity_heatmap.png", sep="")
-  png(filename = filename, width=10, height=10, units="in", res=250)
+  # filename = paste(figures_dir, "/", names(exp_mat_list)[i], "sample_similarity_heatmap.png", sep="")
+  # png(filename = filename, width=10, height=10, units="in", res=250)
   heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
-  dev.off()
+  # dev.off()
   
   sim_tree <- cluster_func(dot_sim)
   ## plot similarity tree with weights
-  filename = paste(figures_dir, "/", names(exp_mat_list)[i], "weighted_tree.png", sep="")
-  png(filename = filename, width=24, height=6, units="in", res=250)
-  par(mar = c(15,2,2,2))
+#  filename = paste(figures_dir, "/", names(exp_mat_list)[i], "weighted_tree.png", sep="")
+#  png(filename = filename, width=24, height=6, units="in", res=250)
+#  par(mar = c(15,2,2,2))
   sim_tree %>% dendextend::set("nodes_pch",16) %>% dendextend::set("nodes_cex", 1.5*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
-  dev.off()
+#  dev.off()
+  
+  
+  
+  ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
+  
+  
+  ## make clusters of samples that are linked
+  
+  get_nodes_attr(sim_tree, "height")
+  
 }
+
+
+
+
 
 
 
