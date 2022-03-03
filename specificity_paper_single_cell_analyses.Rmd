@@ -490,7 +490,7 @@ for(i in 1:length(exp_mat_list) ){
   
   ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
   num_reps <- 2
-  dist_cutoff <- 0.75
+  dist_cutoff <- 0.5
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
   balanced_sample_sets <- list()
   for(i in 1:num_reps){
@@ -511,26 +511,44 @@ for(i in 1:length(exp_mat_list) ){
                               data.frame(weighted=c(T,F))),
                         data.frame(balanced=F,rep=1)))
   
-  results <- foreach() 
+  results <- foreach(run=1:nrow(run_df), .errorhandling = "pass",
+                     .final = function(x) setNames(x,paste(run_df$measure,
+                                                           "__weighted_", run_df$weighted,
+                                                           "__balanced_", run_df$balanced,
+                                                           "__rep_",run_df$rep,sep=""))) %dopar% {
+    specificity_func <- specificity_measures$funcs[[run_df$measure[run]]]
+    if(run_df$balanced[run]){
+      exp_mat_subset <- exp_mat[,balanced_sample_sets[[run_df$rep[run]]]]
+    } else {
+      exp_mat_subset <- exp_mat
+    }
+    sim_mat_subset <- similarity_func(exp_mat_subset)
+    sim_tree_subset <- cluster_func(sim_mat_subset)
+    weights_subset <- get_weights(sim_tree_subset, colnames(exp_mat_subset))
+    if(!run_df$weighted[run]){
+      weights_subset[] <- 1
+    }
+    spec_mat_subset <- specificity_func(exp_mat_subset, weights_subset)
+    
+  } 
   # for(measure in specificity_measures$func_names){
   #   specificity_func <- specificity_measures$funcs[[measure]]
     
-    
-    
-  }
-  
-  ## make clusters of samples that are linked
-  
-  get_nodes_attr(sim_tree, "height")
-  
 }
 
+cor(as.vector(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_FALSE__balanced_FALSE__rep_1[,colnames(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2)]), use="pairwise.complete")
+cor(as.vector(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_TRUE__balanced_FALSE__rep_1[,colnames(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2)]), use="pairwise.complete")
+
+plot(as.vector(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_FALSE__balanced_FALSE__rep_1[,colnames(results$Zscore__weighted_FALSE__balanced_TRUE__rep_2)]));abline(0,1,col="red")
+plot(as.vector(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Zscore__weighted_TRUE__balanced_FALSE__rep_1[,colnames(results$Zscore__weighted_TRUE__balanced_TRUE__rep_2)]));abline(0,1,col="red")
 
 
+cor(as.vector(results$Tau__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_FALSE__balanced_FALSE__rep_1), use="pairwise.complete")
+cor(as.vector(results$Tau__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_TRUE__balanced_FALSE__rep_1), use="pairwise.complete")
 
 
-
-
+plot(as.vector(results$Tau__weighted_FALSE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_FALSE__balanced_FALSE__rep_1));abline(0,1,col="red")
+plot(as.vector(results$Tau__weighted_TRUE__balanced_TRUE__rep_2),as.vector(results$Tau__weighted_TRUE__balanced_FALSE__rep_1));abline(0,1,col="red")
 
 ```
 
