@@ -501,7 +501,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
   balanced_sample_sets <- list()
   for(i in 1:num_reps){
     ### downsample more shallowly sampled clusters to exaggerate dataset imbalance 
-    temp_sample_groups <- sample_groups[c(which_deep, sample(which_shallow, sum(sample_groups_lengths[which_deep]) ) ) ]
+    temp_sample_groups <- sample_groups[c(which_deep, sample(which_shallow, 2*sum(sample_groups_lengths[which_deep]) ) ) ]
     
     unbalanced_sample_sets[[i]] <- unlist(temp_sample_groups)
     temp_sample_set <- c()
@@ -683,16 +683,17 @@ for(results_list_id in 1:length(results_list)){
   results <- results_list[[results_list_id]]$spec_results
   run_df <- results_list[[results_list_id]]$run_df
   
-  #for( i in 1:length(results)){
-  temp_list <- foreach(i=1:length(results), .errorhandling = "pass") %dopar% {
-    #print(i)
+  for( i in 1:length(results)){
+  #temp_list <- foreach(i=1:length(results), .errorhandling = "pass") %dopar% {
+    print(i)
     measure <- str_split_fixed(names(results)[i], "__", 4)[1]
     weighted <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[2])
     balanced <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[3])
     rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
-    if(balanced){return(NULL)} ## only need to look at unbalanced
-    if(measure != "Zscore"){return(NULL)} ## only need to do for Zscore
-    if(!weighted){return(NULL)} ## only need to do for either weighted OR flat
+    if(balanced){next} ## only need to look at unbalanced
+    if(measure != "Zscore"){next} ## only need to do for Zscore
+    if(!weighted){next} ## only need to do for either weighted OR flat ## result is weighted result_pair is flat
+    print(i);print("hello");print(i)
     result <- results[[i]]$spec_mat_subset
     result_pair <- results[[str_replace(names(results)[i], "weighted_TRUE", "weighted_FALSE")]]$spec_mat_subset
     
@@ -702,15 +703,67 @@ for(results_list_id in 1:length(results_list)){
     ## store plot modelled on Figure 3A/B
     
     temp_gene_list <- list(up=data.frame("gene"=character()), down=data.frame("gene"=character()))
-    temp_fwd <- list(flat=temp_gene_list,weighted=temp_gene_list,diff=temp_gene_list)
+    temp_delta <- result - result_pair
     if(measure =="Zscore"){
-      n=5 ## top n
-      for(i in get_leaves_attr(sim_tree, "label")){
+      n=20 ## top n
+      for(l in get_leaves_attr(sim_tree, "label")){
         
-        temp_fwd$flat$up[[measure]] <- rbind( temp_gene_list$up[[measure]],
-                                               data.frame("gene"=rownames()))
+        temp_gene_list$up <- rbind(temp_gene_list$up,
+                                   data.frame("gene"=rownames(temp_delta)[order(temp_delta[,l], decreasing=T)[1:n]] )
+                                   )
+        temp_gene_list$down <- rbind(temp_gene_list$down,
+                                     data.frame("gene"=rownames(temp_delta)[order(temp_delta[,l]*(-1), decreasing=T)[1:n]] )
+                                     )
       }
-      sim_tree
+      
+      
+      
+      ## set up color functions for heatmaps
+      col_funs <- list()
+      col_funs[["diff"]] <-colorRamp2(c(min(c(-2, min(temp_delta, na.rm = T)) ),
+                                               -1.99, -1, 0, 1, 1.99,
+                                               max(c(2, max(temp_delta, na.rm = T) ) )),
+                                               c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
+      col_funs[["weighted_and_flat"]] <-colorRamp2(c(min(c(-2, min(result, na.rm = T), min(result_pair, na.rm = T)) ),
+                                               -1.99, -1, 0, 1, 1.99,
+                                               max(c(2, max(result, na.rm = T), max(result_pair, na.rm = T)) )),
+                                               c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
+      
+      heatmaps <- list()
+      heatmaps[["diff_up"]] <- Heatmap(temp_delta[temp_gene_list$up$gene,], name="diff_up",
+                                       row_order = temp_gene_list$up$gene, show_row_names = FALSE,
+                                       cluster_columns = sim_tree, column_order = colnames(temp_delta),
+                                       col = col_funs$diff)
+      heatmaps[["diff_down"]] <- Heatmap(temp_delta[temp_gene_list$down$gene,], name="diff_down",
+                                       row_order = temp_gene_list$down$gene, show_row_names = FALSE,
+                                       cluster_columns = sim_tree, column_order = colnames(temp_delta),
+                                       col = col_funs$diff)
+      
+      
+      heatmaps[["weighted_up"]] <- Heatmap(result[temp_gene_list$up$gene,], name="weighted_up",
+                                       row_order = temp_gene_list$up$gene, show_row_names = FALSE,
+                                       cluster_columns = sim_tree, column_order = colnames(result),
+                                       col = col_funs$diff)
+      heatmaps[["weighted_down"]] <- Heatmap(result[temp_gene_list$down$gene,], name="weighted_down",
+                                       row_order = temp_gene_list$down$gene, show_row_names = FALSE,
+                                       cluster_columns = sim_tree, column_order = colnames(result),
+                                       col = col_funs$diff)
+      
+      
+      heatmaps[["flat_up"]] <- Heatmap(result_pair[temp_gene_list$up$gene,], name="flat_up",
+                                       row_order = temp_gene_list$up$gene, show_row_names = FALSE,
+                                       cluster_columns = sim_tree, column_order = colnames(result_pair),
+                                       col = col_funs$diff)
+      heatmaps[["flat_down"]] <- Heatmap(result_pair[temp_gene_list$down$gene,], name="flat_down",
+                                       row_order = temp_gene_list$down$gene, show_row_names = FALSE,
+                                       cluster_columns = sim_tree, column_order = colnames(result_pair),
+                                       col = col_funs$diff)
+      
+      heatmaps$diff_up;heatmaps$diff_down
+      heatmaps$weighted_up;heatmaps$flat_up
+      heatmaps$weighted_down;heatmaps$flat_down
+      
+      
       
     }
     
