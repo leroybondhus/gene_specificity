@@ -489,19 +489,20 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
 #  dev.off()
   
   ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
-  num_reps <- 3
+  num_reps <- 1
   dist_cutoff <- 0.5
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
   ### artificially unbalance sample_groups
   sample_groups_lengths <- unlist(lapply(sample_groups, length))
   which_deep <- order(sample_groups_lengths, decreasing = TRUE)[1:2]
-  which_shallow <- which(sample_groups_lengths < 3)
+  which_shallow <- which(sample_groups_lengths < 2)
   
   unbalanced_sample_sets <- list()
   balanced_sample_sets <- list()
   for(i in 1:num_reps){
     ### downsample more shallowly sampled clusters to exaggerate dataset imbalance 
-    temp_sample_groups <- sample_groups[c(which_deep, sample(which_shallow, 2*sum(sample_groups_lengths[which_deep]) ) ) ]
+    temp_sample_groups <- sample_groups[c(which_deep, sample(which_shallow, min(c(length(which_shallow),
+                                                                                  2*sum(sample_groups_lengths[which_deep]))) ) ) ]
     
     unbalanced_sample_sets[[i]] <- unlist(temp_sample_groups)
     temp_sample_set <- c()
@@ -644,15 +645,16 @@ for(results_list_id in 1:length(results_list)){
     
     temp_result_list
   }
-}
+  
 
-temp_list[sapply(temp_list, is.null)] <- NULL
-
-for(i in 1:length(temp_list)){
-  result_plot_df_list$balanced_v_unbalanced <- rbind(result_plot_df_list$balanced_v_unbalanced,
-                                                     temp_list[[i]]$balanced_v_unbalanced)
-  result_plot_df_list$balanced_v_unbalanced_cor <- rbind(result_plot_df_list$balanced_v_unbalanced_cor,
-                                                         temp_list[[i]]$balanced_v_unbalanced_cor)
+  temp_list[sapply(temp_list, is.null)] <- NULL
+  
+  for(i in 1:length(temp_list)){
+    result_plot_df_list$balanced_v_unbalanced <- rbind(result_plot_df_list$balanced_v_unbalanced,
+                                                       temp_list[[i]]$balanced_v_unbalanced)
+    result_plot_df_list$balanced_v_unbalanced_cor <- rbind(result_plot_df_list$balanced_v_unbalanced_cor,
+                                                           temp_list[[i]]$balanced_v_unbalanced_cor)
+  }
 }
 ```
 
@@ -705,7 +707,7 @@ for(results_list_id in 1:length(results_list)){
     temp_gene_list <- list(up=data.frame("gene"=character()), down=data.frame("gene"=character()))
     temp_delta <- result - result_pair
     if(measure =="Zscore"){
-      n=20 ## top n
+      n=5## top n
       for(l in get_leaves_attr(sim_tree, "label")){
         
         temp_gene_list$up <- rbind(temp_gene_list$up,
@@ -721,7 +723,7 @@ for(results_list_id in 1:length(results_list)){
       ## set up color functions for heatmaps
       col_funs <- list()
       col_funs[["diff"]] <-colorRamp2(c(min(c(-2, min(temp_delta, na.rm = T)) ),
-                                               -1.99, -1, 0, 1, 1.99,
+                                               -1, -0.5, 0, 0.5, 1,
                                                max(c(2, max(temp_delta, na.rm = T) ) )),
                                                c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
       col_funs[["weighted_and_flat"]] <-colorRamp2(c(min(c(-2, min(result, na.rm = T), min(result_pair, na.rm = T)) ),
@@ -743,21 +745,21 @@ for(results_list_id in 1:length(results_list)){
       heatmaps[["weighted_up"]] <- Heatmap(result[temp_gene_list$up$gene,], name="weighted_up",
                                        row_order = temp_gene_list$up$gene, show_row_names = FALSE,
                                        cluster_columns = sim_tree, column_order = colnames(result),
-                                       col = col_funs$diff)
+                                       col = col_funs$weighted_and_flat)
       heatmaps[["weighted_down"]] <- Heatmap(result[temp_gene_list$down$gene,], name="weighted_down",
                                        row_order = temp_gene_list$down$gene, show_row_names = FALSE,
                                        cluster_columns = sim_tree, column_order = colnames(result),
-                                       col = col_funs$diff)
+                                       col = col_funs$weighted_and_flat)
       
       
       heatmaps[["flat_up"]] <- Heatmap(result_pair[temp_gene_list$up$gene,], name="flat_up",
                                        row_order = temp_gene_list$up$gene, show_row_names = FALSE,
                                        cluster_columns = sim_tree, column_order = colnames(result_pair),
-                                       col = col_funs$diff)
+                                       col = col_funs$weighted_and_flat)
       heatmaps[["flat_down"]] <- Heatmap(result_pair[temp_gene_list$down$gene,], name="flat_down",
                                        row_order = temp_gene_list$down$gene, show_row_names = FALSE,
                                        cluster_columns = sim_tree, column_order = colnames(result_pair),
-                                       col = col_funs$diff)
+                                       col = col_funs$weighted_and_flat)
       
       heatmaps$diff_up;heatmaps$diff_down
       heatmaps$weighted_up;heatmaps$flat_up
@@ -774,11 +776,13 @@ for(results_list_id in 1:length(results_list)){
 }
 
 
-
-
-    
     
 ```
 
+
+
+```{r}
+
+```
 
 
