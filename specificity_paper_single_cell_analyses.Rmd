@@ -547,33 +547,28 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
     run_df = run_df
   )
   
-  
-  
 }
   
 ```
 
 ```{r plots for correlation}
-for()
-for( i in 1:length(results)){
-  measure <- str_split_fixed(names(results)[i], "__", 4)[1]
-  weighted <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[2])
-  balanced <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[3])
-  rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
-  if(balanced){next}
+for(results_list_id in 1:length(results_list)){
+  results <- results_list[[results_list_id]]$spec_results
+  balanced_sample_sets <- results_list[[results_list_id]]$balanced_sample_sets
+  unbalanced_sample_sets <- results_list[[results_list_id]]$unbalanced_sample_sets
+  run_df <- results_list[[results_list_id]]$run_df
   
-  result <- results[[i]]
-  result_pair <- results[[str_replace(names(results)[i], "balanced_FALSE", "balanced_TRUE")]]
-  
-  
-  
-  
-  
+  for( i in 1:length(results)){
+    measure <- str_split_fixed(names(results)[i], "__", 4)[1]
+    weighted <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[2])
+    balanced <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[3])
+    rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
+    if(balanced){next}
+    
+    result <- results[[i]]
+    result_pair <- results[[str_replace(names(results)[i], "balanced_FALSE", "balanced_TRUE")]]
+  }
 }
-  
-  
-
-
 ```
 
 
