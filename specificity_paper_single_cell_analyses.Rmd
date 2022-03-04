@@ -477,7 +477,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
   
   # filename = paste(figures_dir, "/", names(exp_mat_list)[exp_mat_id], "sample_similarity_heatmap.png", sep="")
   # png(filename = filename, width=10, height=10, units="in", res=250)
-  heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
+#  heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
   # dev.off()
   
   sim_tree <- cluster_func(dot_sim)
@@ -542,8 +542,10 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
     spec_mat_subset <- specificity_func(exp_mat_subset, weights_subset)
     if(run_df$measure[run] != "Zscore"){
       names(spec_mat_subset) <- rownames(exp_mat_subset)
+      sim_tree_subset <- NULL ## only need sim_tree for Zscore since others are aggregates
     }
-    spec_mat_subset
+    
+    list(spec_mat_subset=spec_mat_subset, sim_tree_subset=sim_tree_subset)
    }
   results_list[[names(exp_mat_list)[exp_mat_id]]] <- list(
     spec_results = results,
@@ -579,9 +581,11 @@ result_plot_df_list <- list(
 
 for(results_list_id in 1:length(results_list)){
   print(results_list_id)
+  
   results <- results_list[[results_list_id]]$spec_results
   balanced_sample_sets <- results_list[[results_list_id]]$balanced_sample_sets
   unbalanced_sample_sets <- results_list[[results_list_id]]$unbalanced_sample_sets
+  balanced_tree <- results_list[[results_list_id]]$balanced_sample_sets
   run_df <- results_list[[results_list_id]]$run_df
   
   #for( i in 1:length(results)){
@@ -593,9 +597,11 @@ for(results_list_id in 1:length(results_list)){
     rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
     if(balanced){return(NULL)}
     
-    result <- results[[i]]
-    result_pair <- results[[str_replace(names(results)[i], "balanced_FALSE", "balanced_TRUE")]]
+    result <- results[[i]]$spec_mat_subset
+    result_pair <- results[[str_replace(names(results)[i], "balanced_FALSE", "balanced_TRUE")]]$spec_mat_subset
     
+    ## only look at sim_tree for unbalanced since figure 3 modelled only on unbalanced
+    sim_tree <- results[[i]]$sim_tree_subset
     
     ## store plot of balanced v unbalanced specificity estimate (model on supp 4)
     if(measure=="Zscore"){
@@ -637,8 +643,6 @@ for(results_list_id in 1:length(results_list)){
     )
     
     temp_result_list
-    ## store plot modelled on Figure 3A/B
-    ## store plot modelled on 3D with GO enrichment in top diff genes 
   }
 }
 
@@ -650,6 +654,77 @@ for(i in 1:length(temp_list)){
   result_plot_df_list$balanced_v_unbalanced_cor <- rbind(result_plot_df_list$balanced_v_unbalanced_cor,
                                                          temp_list[[i]]$balanced_v_unbalanced_cor)
 }
+```
+
+
+
+```{r go plots}
+
+result_go_df_list <- list(
+  balanced_v_unbalanced = data.frame(
+    dataset = character(),
+    measure = character(),
+    weighted = logical(),
+    rep = numeric(),
+    gene = character(),
+    balanced_spec = numeric(),
+    unbalanced_spec = numeric()
+  ),
+  balanced_v_unbalanced_cor = data.frame(
+    dataset = character(),
+    measure = character(),
+    weighted = logical(),
+    rep = numeric(),
+    cor = numeric()
+  )
+)
+
+for(results_list_id in 1:length(results_list)){
+  results <- results_list[[results_list_id]]$spec_results
+  run_df <- results_list[[results_list_id]]$run_df
+  
+  #for( i in 1:length(results)){
+  temp_list <- foreach(i=1:length(results), .errorhandling = "pass") %dopar% {
+    #print(i)
+    measure <- str_split_fixed(names(results)[i], "__", 4)[1]
+    weighted <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[2])
+    balanced <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[3])
+    rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
+    if(balanced){return(NULL)} ## only need to look at unbalanced
+    if(measure != "Zscore"){return(NULL)} ## only need to do for Zscore
+    if(!weighted){return(NULL)} ## only need to do for either weighted OR flat
+    result <- results[[i]]$spec_mat_subset
+    result_pair <- results[[str_replace(names(results)[i], "weighted_TRUE", "weighted_FALSE")]]$spec_mat_subset
+    
+    ## only look at sim_tree for unbalanced since figure 3 modelled only on unbalanced
+    sim_tree <- results[[i]]$sim_tree_subset
+    
+    ## store plot modelled on Figure 3A/B
+    
+    temp_gene_list <- list(up=data.frame("gene"=character()), down=data.frame("gene"=character()))
+    temp_fwd <- list(flat=temp_gene_list,weighted=temp_gene_list,diff=temp_gene_list)
+    if(measure =="Zscore"){
+      n=5 ## top n
+      for(i in get_leaves_attr(sim_tree, "label")){
+        
+        temp_fwd$flat$up[[measure]] <- rbind( temp_gene_list$up[[measure]],
+                                               data.frame("gene"=rownames()))
+      }
+      sim_tree
+      
+    }
+    
+    
+    ## store plot modelled on 3D with GO enrichment in top diff genes
+        
+  }
+}
+
+
+
+
+    
+    
 ```
 
 
