@@ -489,7 +489,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
 #  dev.off()
   
   ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
-  num_reps <- 2
+  num_reps <- 3
   dist_cutoff <- 0.5
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
   ### artificially unbalance sample_groups
@@ -578,17 +578,20 @@ result_plot_df_list <- list(
 )
 
 for(results_list_id in 1:length(results_list)){
+  print(results_list_id)
   results <- results_list[[results_list_id]]$spec_results
   balanced_sample_sets <- results_list[[results_list_id]]$balanced_sample_sets
   unbalanced_sample_sets <- results_list[[results_list_id]]$unbalanced_sample_sets
   run_df <- results_list[[results_list_id]]$run_df
   
-  for( i in 1:length(results)){
+  #for( i in 1:length(results)){
+  temp_list <- foreach(i=1:length(results), .errorhandling = "pass") %dopar% {
+    #print(i)
     measure <- str_split_fixed(names(results)[i], "__", 4)[1]
     weighted <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[2])
     balanced <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[3])
     rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
-    if(balanced){next}
+    if(balanced){return(NULL)}
     
     result <- results[[i]]
     result_pair <- results[[str_replace(names(results)[i], "balanced_FALSE", "balanced_TRUE")]]
@@ -606,9 +609,8 @@ for(results_list_id in 1:length(results_list)){
         unbalanced_spec = result
       )
     }
-    result_plot_df_list$balanced_v_unbalanced <- rbind(
-      result_plot_df_list$balanced_v_unbalanced,
-      data.frame(
+    temp_result_list <- list()
+    temp_result_list$balanced_v_unbalanced <- data.frame(
         dataset = names(results_list)[results_list_id],
         measure = measure,
         weighted = weighted,
@@ -616,8 +618,7 @@ for(results_list_id in 1:length(results_list)){
         gene = temp$Var1,
         balanced_spec = temp$balanced_spec,
         unbalanced_spec = temp$unbalanced_spec
-        )
-      )
+    )
     rm(temp)
     
     ## store correlation to data.frame (will use to get mean and stdev)
@@ -627,22 +628,27 @@ for(results_list_id in 1:length(results_list)){
       temp <- cor( as.vector(result), as.vector(result_pair), use="pairwise.complete" )
     }
     
-    result_plot_df_list$balanced_v_unbalanced_cor <- rbind(
-      result_plot_df_list$balanced_v_unbalanced_cor,
-      data.frame(
+    temp_result_list$balanced_v_unbalanced_cor <- data.frame(
         dataset = names(results_list)[results_list_id],
         measure = measure,
         weighted = weighted,
         rep = rep,
         cor = temp
-      )
     )
     
+    temp_result_list
     ## store plot modelled on Figure 3A/B
     ## store plot modelled on 3D with GO enrichment in top diff genes 
-    
-    
   }
+}
+
+temp_list[sapply(temp_list, is.null)] <- NULL
+
+for(i in 1:length(temp_list)){
+  result_plot_df_list$balanced_v_unbalanced <- rbind(result_plot_df_list$balanced_v_unbalanced,
+                                                     temp_list[[i]]$balanced_v_unbalanced)
+  result_plot_df_list$balanced_v_unbalanced_cor <- rbind(result_plot_df_list$balanced_v_unbalanced_cor,
+                                                         temp_list[[i]]$balanced_v_unbalanced_cor)
 }
 ```
 
