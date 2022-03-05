@@ -485,7 +485,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
 #  filename = paste(figures_dir, "/", names(exp_mat_list)[exp_mat_id], "weighted_tree.png", sep="")
 #  png(filename = filename, width=24, height=6, units="in", res=250)
 #  par(mar = c(15,2,2,2))
-#  sim_tree %>% dendextend::set("nodes_pch",16) %>% dendextend::set("nodes_cex", 1.5*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
+  sim_tree %>% dendextend::set("nodes_pch",16) %>% dendextend::set("nodes_cex", 1.5*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
 #  dev.off()
   
   ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
@@ -502,7 +502,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
   for(i in 1:num_reps){
     ### downsample more shallowly sampled clusters to exaggerate dataset imbalance 
     temp_sample_groups <- sample_groups[c(which_deep, sample(which_shallow, min(c(length(which_shallow),
-                                                                                  sum(sample_groups_lengths[which_deep]))) ) ) ]
+                                                                                  2*sum(sample_groups_lengths[which_deep]))) ) ) ]
     
     unbalanced_sample_sets[[i]] <- unlist(temp_sample_groups)
     temp_sample_set <- c()
@@ -828,10 +828,11 @@ for(results_list_id in 1:length(results_list)){
   if(names(results_list)[results_list_id]=="mmusculus"){
     ## Kidney: Dcn, Hoxc9, Mest, Wt1, Ywhaq, Ren1, Wt1
     ## Kidney: Eya1, Six1, Six4, Odd1
+    ## Kidney: Hoxd10, Slc12a1, Adamts16,Pappa2, Nphs2, Hoxa10, Tmem72, Sim1, Lama1, Hoxb9 
     ## Myeloid: Cebpe, Csf1r, Cebpa,Pu.1, Elane, Prtn3, Mpo, Apoe, Gata2, Gata1, Gfi1b, Car1, Car2, Klf1
-    specific_genes <- c("Dcn", "Hoxc9", "Mest", "Ywhaq", "Ren1", "Wt1",
-                        "Eya1", "Six1", "Six4", "Odd1",
-                         "Cebpe", "Csf1r", "Cebpa","Pu.1", "Elane"," Prtn3", "Mpo", "Apoe"," Gata2", "Gata1", "Gfi1b", "Car1", "Car2", "Klf1"
+    specific_genes <- c("Dcn","Hoxd10", "Slc12a1", "Adams16", "Pappa2", "Nphs2", "Hoxa10", "Tmem72", "Sim1",
+                        "Lama1", "Hoxb9", "Six4", "Odd1"
+                        # "Cebpe", "Csf1r", "Cebpa","Spi1", "Elane"," Prtn3", "Mpo", "Apoe"," Gata2", "Gata1", "Gfi1b", "Car1", "Car2", "Klf1"
                         )
     spec_genes_w_ids <- genes_list$mmusculus[which(is.element(tolower(genes_list$mmusculus$external_gene_name),
                                                               tolower(specific_genes))),
@@ -870,9 +871,9 @@ for(results_list_id in 1:length(results_list)){
     
     ## set up color functions for heatmaps
     col_funs <- list()
-    col_funs[["weighted_and_flat"]] <-colorRamp2(c(min(c(-2, min(result, na.rm = T), min(result_pair, na.rm = T)) ),
-                                             3, -2, 0, 2, 3,
-                                             max(c(2, max(result, na.rm = T), max(result_pair, na.rm = T)) )),
+    col_funs[["weighted_and_flat"]] <-colorRamp2(c(min(c(-3, min(result, na.rm = T), min(result_pair, na.rm = T)) ),
+                                             -2, -1.5, 0, 1.5, 2.5,
+                                             max(c(3, max(result, na.rm = T), max(result_pair, na.rm = T)) )),
                                              c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
     
     heatmaps <- HeatmapList()
@@ -888,13 +889,14 @@ for(results_list_id in 1:length(results_list)){
       }
     }
     
+    
     split <- rep(1:(nrow(spec_genes_w_ids)/2), each=2)
     ra <- rowAnnotation(foo = anno_block(labels = unique(spec_genes_w_ids$external_gene_name)))
     h1 <- Heatmap(temp_mat, name=measure,
                   cluster_rows = FALSE, show_row_names = FALSE,
                   cluster_columns = sim_tree, column_order=colnames(temp_mat),
                   row_split = split, left_annotation = ra,
-                  col=col_funs[[measure]]
+                  col=col_funs[["weighted_and_flat"]]
                   )
       
     
