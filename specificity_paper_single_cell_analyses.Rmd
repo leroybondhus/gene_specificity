@@ -824,13 +824,8 @@ for(results_list_id in 1:length(results_list)){
 
 ```{r marker genes}
 
-
 for(results_list_id in 1:length(results_list)){
   if(names(results_list)[results_list_id]=="mmusculus"){
-    ## Kidney: Dcn, Hoxc9, Mest, Wt1, Ywhaq, Ren1, Wt1
-    ## Kidney: Eya1, Six1, Six4, Eya4
-    ## Kidney: Hoxd10, Slc12a1, Adamts16,Pappa2, Nphs2, Hoxa10, Tmem72, Sim1, Lama1, Hoxb9 
-    ## Myeloid: Cebpe, Csf1r, Cebpa,Pu.1, Elane, Prtn3, Mpo, Apoe, Gata2, Gata1, Gfi1b, Car1, Car2, Klf1,  ,"Lilra5","Ifi30","Pram1","Elane"
     specific_genes <- c("Slc12a1", "Nphs2", ## Kidney markers
                         "Csf1r","Asgr2", ## Myeloid lineage markers
                         "Nes","Prss1","Hhex","Cryaa"
@@ -864,20 +859,38 @@ for(results_list_id in 1:length(results_list)){
   run_df <- results_list[[results_list_id]]$run_df
   
   for( i in 1:length(results)){
-    
+    csv_out_filename <- paste(figures_dir,"/","markergenetable_", names(results_list)[result_list_id] , i,".csv",sep="") 
   #temp_list <- foreach(i=1:length(results), .errorhandling = "pass") %dopar% {
-    print(i)
+    print(i) 
     measure <- str_split_fixed(names(results)[i], "__", 4)[1]
     weighted <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[2])
     balanced <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[3])
     rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
     if(balanced){next} ## only need to look at unbalanced
-    if(measure != "Zscore"){next} ## only need to do for Zscore
     if(!weighted){next} ## only need to do for either weighted OR flat ## result is weighted result_pair is flat
+    if(measure != "Zscore"){
+      result <- results[[i]]$spec_mat_subset
+      result_pair <- results[[str_replace(names(results)[i], "weighted_TRUE", "weighted_FALSE")]]$spec_mat_subset
+      fwrite( data.frame(geneid=spec_genes_w_ids$ensembl_gene_id,
+                         genenames=spec_genes_w_ids$external_gene_name,
+                         weighted_specificity_value=result[spec_genes_w_ids$ensembl_gene_id],
+                         flat_specificity_value=result_pair[spec_genes_w_ids$ensembl_gene_id]), csv_out_filename)
+      next
+    } ## only need to do following for Zscore
     print(i);print("hello");print(i)
     result <- results[[i]]$spec_mat_subset
     result_pair <- results[[str_replace(names(results)[i], "weighted_TRUE", "weighted_FALSE")]]$spec_mat_subset
     sim_tree <- results[[i]]$sim_tree_subset
+    
+    fwrite( rbind(cbind(data.frame(geneid=unique(spec_genes_w_ids$ensembl_gene_id),
+                         genenames=unique(spec_genes_w_ids$external_gene_name),
+                        flat_or_weighted = "weighted"),
+                        result[spec_genes_w_ids$ensembl_gene_id,]),
+                  cbind(data.frame(geneid=unique(spec_genes_w_ids$ensembl_gene_id),
+                         genenames=unique(spec_genes_w_ids$external_gene_name),
+                        flat_or_weighted = "flat"),
+                        result_pair[spec_genes_w_ids$ensembl_gene_id,])),
+            csv_out_filename)
     
     ## set up color functions for heatmaps
     col_funs <- list()
@@ -908,9 +921,10 @@ for(results_list_id in 1:length(results_list)){
                   row_split = split, left_annotation = ra,
                   col=col_funs[["weighted_and_flat"]]
                   )
-      
-    
-    
+    filename <- paste(figures_dir,"/","markergeneplot_", names(results_list)[result_list_id] , i,".png",sep="")
+    png(filename, width=ifelse(names(results_list)[result_list_id]=="drerio", 12, 8), height=7, units="in", res=250)
+    draw(h1)
+    dev.off()
   }
 }
 
