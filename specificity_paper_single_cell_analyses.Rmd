@@ -485,7 +485,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
 #  filename = paste(figures_dir, "/", names(exp_mat_list)[exp_mat_id], "weighted_tree.png", sep="")
 #  png(filename = filename, width=24, height=6, units="in", res=250)
 #  par(mar = c(15,2,2,2))
-  sim_tree %>% dendextend::set("nodes_pch",16) %>% dendextend::set("nodes_cex", 1.5*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
+#  sim_tree %>% dendextend::set("nodes_pch",16) %>% dendextend::set("nodes_cex", 1.5*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
 #  dev.off()
   
   ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
@@ -494,7 +494,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
   ### artificially unbalance sample_groups
   sample_groups_lengths <- unlist(lapply(sample_groups, length))
-  which_deep <- order(sample_groups_lengths, decreasing = TRUE)[1]
+  which_deep <- order(sample_groups_lengths, decreasing = TRUE)[1:2]
   which_shallow <- which(sample_groups_lengths < 2)
   
   unbalanced_sample_sets <- list()
@@ -502,7 +502,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
   for(i in 1:num_reps){
     ### downsample more shallowly sampled clusters to exaggerate dataset imbalance 
     temp_sample_groups <- sample_groups[c(which_deep, sample(which_shallow, min(c(length(which_shallow),
-                                                                                  2*sum(sample_groups_lengths[which_deep]))) ) ) ]
+                                                                                  sum(sample_groups_lengths[which_deep]))) ) ) ]
     
     unbalanced_sample_sets[[i]] <- unlist(temp_sample_groups)
     temp_sample_set <- c()
