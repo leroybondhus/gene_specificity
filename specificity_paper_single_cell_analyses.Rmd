@@ -495,11 +495,11 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
 #  filename = paste(figures_dir, "/", names(exp_mat_list)[exp_mat_id], "weighted_tree.png", sep="")
 #  png(filename = filename, width=24, height=6, units="in", res=250)
 #  par(mar = c(15,2,2,2))
-  sim_tree %>% dendextend::set("nodes_pch",16) %>% dendextend::set("nodes_cex", 1.5*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
+#  sim_tree %>% dendextend::set("nodes_pch",16) %>% dendextend::set("nodes_cex", 1.5*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
 #  dev.off()
   
   ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
-  num_reps <- 2
+  num_reps <- 5
   dist_cutoff <- 0.5
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
   ### artificially unbalance sample_groups
@@ -713,8 +713,6 @@ for(results_list_id in 1:length(results_list)){
                                      )
       }
       
-      
-      
       ## set up color functions for heatmaps
       col_funs <- list()
       col_funs[["diff"]] <-colorRamp2(c(min(c(-2, min(temp_delta, na.rm = T)) ),
@@ -758,15 +756,15 @@ for(results_list_id in 1:length(results_list)){
       #                                  cluster_columns = sim_tree, column_order = colnames(result_pair),
       #                                  col = col_funs$weighted_and_flat)
       
-      
+    
       filename <- paste(figures_dir,"/","heatmapplotdiff_", names(results_list)[results_list_id] , i,".png",sep="")
       png(filename = filename, width=8, height=14, units="in", res=250)
-      heatmaps$diff
+      plot(heatmaps$diff)
       dev.off()
       
       filename <- paste(figures_dir,"/","heatmapplotflatweighted_", names(results_list)[results_list_id] , i,".png",sep="")
       png(filename = filename, width=16, height=14, units="in", res=250)
-      heatmaps$flat + heatmaps$weighted
+      plot(heatmaps$flat + heatmaps$weighted)
       dev.off()
       
       
@@ -873,7 +871,7 @@ for(results_list_id in 1:length(results_list)){
   if(names(results_list)[results_list_id]=="mmusculus"){
     specific_genes <- c("Slc12a1", "Nphs2", ## Kidney markers
                         "Csf1r","Asgr2", ## Myeloid lineage markers
-                        "Nes","Prss1","Hhex","Cryaa"
+                        "Mmp9","Prss1","Creg2"
                         )
     spec_genes_w_ids <- unique(genes_list$mmusculus[which(is.element(tolower(genes_list$mmusculus$external_gene_name),
                                                               tolower(specific_genes))),
@@ -967,7 +965,7 @@ for(results_list_id in 1:length(results_list)){
                   col=col_funs[["weighted_and_flat"]]
                   )
     filename <- paste(figures_dir,"/","markergeneplot_", names(results_list)[results_list_id] , i,".png",sep="")
-    png(filename, width=ifelse(names(results_list)[results_list_id]=="drerio", 12, 8), height=7, units="in", res=250)
+    png(filename, width=ifelse(names(results_list)[results_list_id]=="drerio", 12, 8), height=8, units="in", res=250)
     draw(h1)
     dev.off()
   }
