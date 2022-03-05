@@ -494,7 +494,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
   ### artificially unbalance sample_groups
   sample_groups_lengths <- unlist(lapply(sample_groups, length))
-  which_deep <- order(sample_groups_lengths, decreasing = TRUE)[1:2]
+  which_deep <- order(sample_groups_lengths, decreasing = TRUE)[1]
   which_shallow <- which(sample_groups_lengths < 2)
   
   unbalanced_sample_sets <- list()
@@ -837,23 +837,23 @@ for(results_list_id in 1:length(results_list)){
                                                               tolower(specific_genes))),
                                              c("external_gene_name","ensembl_gene_id")]
     spec_genes_w_ids <- unique(spec_genes_w_ids[complete.cases(spec_genes_w_ids),])
+    spec_genes_w_ids <- spec_genes_w_ids[which(is.element(spec_genes_w_ids$ensembl_gene_id,
+                                                          rownames(results_list[[results_list_id]]$spec_results[[1]]$spec_mat_subset))) ,]
+    spec_genes_w_ids <- merge( data.frame(f_or_w = c("flat","weighted")),spec_genes_w_ids)
+    
     
   } 
   if(names(results_list)[results_list_id]=="drerio"){
-    ]
-    
     
   }
   if(names(results_list)[results_list_id]=="hsapiens"){next;}
       
   
-  
-  
-  
   results <- results_list[[results_list_id]]$spec_results
   run_df <- results_list[[results_list_id]]$run_df
   
   for( i in 1:length(results)){
+    
   #temp_list <- foreach(i=1:length(results), .errorhandling = "pass") %dopar% {
     print(i)
     measure <- str_split_fixed(names(results)[i], "__", 4)[1]
@@ -866,16 +866,37 @@ for(results_list_id in 1:length(results_list)){
     print(i);print("hello");print(i)
     result <- results[[i]]$spec_mat_subset
     result_pair <- results[[str_replace(names(results)[i], "weighted_TRUE", "weighted_FALSE")]]$spec_mat_subset
+    sim_tree <- results[[i]]$sim_tree_subset
     
-      
-    cutoff <- 2
-    n <- 20
-    allOE_genes <- rownames(result)
-    sigOE_genes <- character()
-    for(j in 1:ncol(result)){
-      which <- which((result[,j]) >= cutoff & result_pair[,j] < cutoff )
-      sigOE_genes <- unique(c(sigOE_genes,names(result[,j])[which]))
+    ## set up color functions for heatmaps
+    col_funs <- list()
+    col_funs[["weighted_and_flat"]] <-colorRamp2(c(min(c(-2, min(result, na.rm = T), min(result_pair, na.rm = T)) ),
+                                             3, -2, 0, 2, 3,
+                                             max(c(2, max(result, na.rm = T), max(result_pair, na.rm = T)) )),
+                                             c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
+    
+    heatmaps <- HeatmapList()
+    temp_mat <- matrix(nrow=nrow(spec_genes_w_ids), ncol=ncol(result))
+    colnames(temp_mat) <- colnames(result)
+    rownames(temp_mat) <- spec_genes_w_ids$external_gene_name
+    
+    for(j in 1:nrow(spec_genes_w_ids)){
+      if(spec_genes_w_ids$f_or_w[j] =="flat"){
+        temp_mat[j,] <- result_pair[spec_genes_w_ids$ensembl_gene_id[j],]
+      } else if (spec_genes_w_ids$f_or_w[j]=="weighted"){
+        temp_mat[j,] <- result[spec_genes_w_ids$ensembl_gene_id[j],]
+      }
     }
+    
+    split <- rep(1:(nrow(spec_genes_w_ids)/2), each=2)
+    ra <- rowAnnotation(foo = anno_block(labels = unique(spec_genes_w_ids$external_gene_name)))
+    h1 <- Heatmap(temp_mat, name=measure,
+                  cluster_rows = FALSE, show_row_names = FALSE,
+                  cluster_columns = sim_tree, column_order=colnames(temp_mat),
+                  row_split = split, left_annotation = ra,
+                  col=col_funs[[measure]]
+                  )
+      
     
     
   }
