@@ -50,92 +50,101 @@ registerDoParallel(detectCores()-1)
 
 ```{r download mouse scRNA datasets here}
 
-### if download speed via R is too slow, can also manually download files from https://figshare.com/articles/dataset/HCL_DGE_Data/7235471 ##
-download.file("https://figshare.com/ndownloader/files/22447898", paste(data_dir,"annotation_rmbatch_data_revised417.zip",sep="/"))
-unzip(paste(data_dir,"annotation_rmbatch_data_revised417.zip",sep="/"), exdir=data_dir)
-
-download.file("https://figshare.com/ndownloader/files/23043329", paste(data_dir,"dge_rmbatch_data.tar.gz",sep="/"))
-untar(paste(data_dir,"dge_rmbatch_data.tar.gz",sep="/"),exdir=data_dir)
-
-files <- list.files(path="./data/annotation_rmbatch_data_revised417",pattern="*.csv", full.names = T)
-rm(anno)
-for(f in files){
-  temp <- fread(f)
-  if(!exists("anno")){
-    anno <- fread(f)
-  } else{
-    anno <- rbind(anno, temp,fill=TRUE)
+### USE THIS CODE AND LINKS TO DOWNLOAD AND PROCESSES EXPRESSION MATRIX IF NOT ALREADY SAVED
+if(FALSE){
+  ### if download speed via R is too slow, can also manually download files from https://figshare.com/articles/dataset/HCL_DGE_Data/7235471 ##
+  download.file("https://figshare.com/ndownloader/files/22447898", paste(data_dir,"annotation_rmbatch_data_revised417.zip",sep="/"))
+  unzip(paste(data_dir,"annotation_rmbatch_data_revised417.zip",sep="/"), exdir=data_dir)
+  
+  download.file("https://figshare.com/ndownloader/files/23043329", paste(data_dir,"dge_rmbatch_data.tar.gz",sep="/"))
+  untar(paste(data_dir,"dge_rmbatch_data.tar.gz",sep="/"),exdir=data_dir)
+  
+  files <- list.files(path="./data/annotation_rmbatch_data_revised417",pattern="*.csv", full.names = T)
+  rm(anno)
+  for(f in files){
+    temp <- fread(f)
+    if(!exists("anno")){
+      anno <- fread(f)
+    } else{
+      anno <- rbind(anno, temp,fill=TRUE)
+    }
   }
-}
-
-anno$V15 <- anno$V16 <- anno$V17 <- NULL
-anno$Celltype_comb <- tolower(str_replace(anno$Celltype, "_.*gh","" ))
-
-files <- list.files(path="./data/new",pattern="*.txt.gz", full.names = T)
-rownames_genes <- foreach(f=files, .combine="c") %dopar% {
-  rownames_genes <- fread(f)$V1
-  rownames_genes
-}
-rownames_genes <- unique(rownames_genes)
-
-rm(exp_mat)
-## foreach crashing r if called over too many files at once-  break into chunks and aggregate 1 chunk at a time
-file_chunks <- split(files, cut(seq_along(files), 10, labels = F))
-for(i in 1:length(file_chunks)){
-  print(i)
-  temp_mat <- foreach(f=file_chunks[[i]], .combine = "+") %dopar% {
-      temp_mat <- matrix(0, nrow=length(rownames_genes), ncol=length(unique(anno$Celltype_comb)) )
-      colnames(temp_mat) <- unique(anno$Celltype_comb)
-      rownames(temp_mat) <- rownames_genes
-      raw_exp <- fread(f)
-      rownames(raw_exp) <- raw_exp$V1
-      raw_exp$V1 <- NULL
-      cts <- unique(anno$Celltype_comb[which(is.element(anno$Cell_id, colnames(raw_exp)))])
-      for(ct in cts){
-        temp_mat[rownames(raw_exp),ct] <-  temp_mat[rownames(raw_exp),ct]+
-          rowSums(as.matrix(raw_exp)[,which(is.element(colnames(raw_exp),anno$Cell_id[which(anno$Celltype_comb==ct)]  ))])
-      }
-      temp_mat
+  
+  anno$V15 <- anno$V16 <- anno$V17 <- NULL
+  anno$Celltype_comb <- tolower(str_replace(anno$Celltype, "_.*gh","" ))
+  
+  files <- list.files(path="./data/new",pattern="*.txt.gz", full.names = T)
+  rownames_genes <- foreach(f=files, .combine="c") %dopar% {
+    rownames_genes <- fread(f)$V1
+    rownames_genes
   }
-  if(!exists("exp_mat")){
-    exp_mat <- temp_mat
-  } else {
-    exp_mat <- exp_mat + temp_mat
+  rownames_genes <- unique(rownames_genes)
+  
+  rm(exp_mat)
+  ## foreach crashing r if called over too many files at once-  break into chunks and aggregate 1 chunk at a time
+  file_chunks <- split(files, cut(seq_along(files), 10, labels = F))
+  for(i in 1:length(file_chunks)){
+    print(i)
+    temp_mat <- foreach(f=file_chunks[[i]], .combine = "+") %dopar% {
+        temp_mat <- matrix(0, nrow=length(rownames_genes), ncol=length(unique(anno$Celltype_comb)) )
+        colnames(temp_mat) <- unique(anno$Celltype_comb)
+        rownames(temp_mat) <- rownames_genes
+        raw_exp <- fread(f)
+        rownames(raw_exp) <- raw_exp$V1
+        raw_exp$V1 <- NULL
+        cts <- unique(anno$Celltype_comb[which(is.element(anno$Cell_id, colnames(raw_exp)))])
+        for(ct in cts){
+          temp_mat[rownames(raw_exp),ct] <-  temp_mat[rownames(raw_exp),ct]+
+            rowSums(as.matrix(raw_exp)[,which(is.element(colnames(raw_exp),anno$Cell_id[which(anno$Celltype_comb==ct)]  ))])
+        }
+        temp_mat
+    }
+    if(!exists("exp_mat")){
+      exp_mat <- temp_mat
+    } else {
+      exp_mat <- exp_mat + temp_mat
+    }
   }
+  
+  mouse_exp_mat <- exp_mat
+  save(mouse_exp_mat, file = "mouse_sc.Rdata")
+  
+  fwrite(mouse_exp_mat,file="mouse_sc.csv")
 }
-
-mouse_exp_mat <- exp_mat
-save(mouse_exp_mat, file = "mouse_sc.Rdata")
-load("mouse_sc.Rdata")
-fwrite(mouse_exp_mat,file="mouse_sc.csv")
 ```
 
 ```{r download zebrafish scRNA datasets here}
 
-mat <- fread("https://cells.ucsc.edu/zebrafish-dev/exprMatrix.tsv.gz")
-meta <- data.frame(fread("https://cells.ucsc.edu/zebrafish-dev/meta.tsv"), row.names=1)
-rownames(mat) <- mat$gene
-mat$gene <- NULL
-
-cts <- unique(meta$Cluster)
-exp_mat <- matrix(0, nrow = nrow(mat),ncol = length(cts) )
-rownames(exp_mat) <- rownames(mat)
-colnames(exp_mat) <- cts
-
-mat <- as.matrix(mat)
-rownames(mat) <- rownames(exp_mat)
-for(ct in cts){
-  exp_mat[,ct] <- rowSums(mat[,which(is.element(colnames(mat), rownames(meta)[which(meta$Cluster == ct)]))] )
+### USE THIS CODE AND LINKS TO DOWNLOAD AND PROCESSES EXPRESSION MATRIX IF NOT ALREADY SAVED
+if(FALSE){
+  mat <- fread("https://cells.ucsc.edu/zebrafish-dev/exprMatrix.tsv.gz")
+  meta <- data.frame(fread("https://cells.ucsc.edu/zebrafish-dev/meta.tsv"), row.names=1)
+  rownames(mat) <- mat$gene
+  mat$gene <- NULL
+  
+  cts <- unique(meta$Cluster)
+  exp_mat <- matrix(0, nrow = nrow(mat),ncol = length(cts) )
+  rownames(exp_mat) <- rownames(mat)
+  colnames(exp_mat) <- cts
+  
+  mat <- as.matrix(mat)
+  rownames(mat) <- rownames(exp_mat)
+  for(ct in cts){
+    exp_mat[,ct] <- rowSums(mat[,which(is.element(colnames(mat), rownames(meta)[which(meta$Cluster == ct)]))] )
+  }
+  
+  save(zebrafish_exp_mat, file="zebrafish_sc.Rdata")
+  zebrafish_exp_mat <- exp_mat
+  
+  fwrite(zebrafish_exp_mat,file="zebrafish_sc.csv")
 }
-
-save(zebrafish_exp_mat, file="zebrafish_sc.Rdata")
-zebrafish_exp_mat <- exp_mat
-load("zebrafish_sc.Rdata")
-fwrite(zebrafish_exp_mat,file="zebrafish_sc.csv")
 ```
 
 ##download gtex
 ```{r}
+load("mouse_sc.Rdata")
+load("zebrafish_sc.Rdata")
+
 ## import gtex medians data
 temp <- tempfile()
 download.file("https://storage.googleapis.com/gtex_analysis_v8/rna_seq_data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz",temp)
@@ -490,7 +499,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
 #  dev.off()
   
   ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
-  num_reps <- 1
+  num_reps <- 2
   dist_cutoff <- 0.5
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
   ### artificially unbalance sample_groups
