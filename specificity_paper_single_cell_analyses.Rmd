@@ -44,7 +44,7 @@ figures_dir <- paste(getwd(),"figures", sep = "/")
 data_dir <- paste(getwd(),"data", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
 
-registerDoParallel(detectCores()-2)
+registerDoParallel(detectCores()-1)
 ```
 
 
@@ -265,6 +265,7 @@ for(sp in names(exp_mat_raw_list) ){
 ## median normalization
 exp_mat_list <- exp_mat_raw_list
 for(sp in names(exp_mat_list) ){
+  exp_mat_list[[sp]] <- exp_mat_list[[sp]][,grep("nonspecific",colnames(exp_mat_list[[sp]]) , ignore.case = T, invert = T)]
   exp_mat_list[[sp]] <- log10(exp_mat_list[[sp]] + 1) 
   temp <- exp_mat_list[[sp]]
   temp[which(temp==0 | is.infinite(temp))] <- NA
@@ -827,28 +828,37 @@ for(results_list_id in 1:length(results_list)){
 for(results_list_id in 1:length(results_list)){
   if(names(results_list)[results_list_id]=="mmusculus"){
     ## Kidney: Dcn, Hoxc9, Mest, Wt1, Ywhaq, Ren1, Wt1
-    ## Kidney: Eya1, Six1, Six4, Odd1
+    ## Kidney: Eya1, Six1, Six4, Eya4
     ## Kidney: Hoxd10, Slc12a1, Adamts16,Pappa2, Nphs2, Hoxa10, Tmem72, Sim1, Lama1, Hoxb9 
-    ## Myeloid: Cebpe, Csf1r, Cebpa,Pu.1, Elane, Prtn3, Mpo, Apoe, Gata2, Gata1, Gfi1b, Car1, Car2, Klf1
-    specific_genes <- c("Dcn","Hoxd10", "Slc12a1", "Adams16", "Pappa2", "Nphs2", "Hoxa10", "Tmem72", "Sim1",
-                        "Lama1", "Hoxb9", "Six4", "Odd1"
-                        # "Cebpe", "Csf1r", "Cebpa","Spi1", "Elane"," Prtn3", "Mpo", "Apoe"," Gata2", "Gata1", "Gfi1b", "Car1", "Car2", "Klf1"
+    ## Myeloid: Cebpe, Csf1r, Cebpa,Pu.1, Elane, Prtn3, Mpo, Apoe, Gata2, Gata1, Gfi1b, Car1, Car2, Klf1,  ,"Lilra5","Ifi30","Pram1","Elane"
+    specific_genes <- c("Slc12a1", "Nphs2", ## Kidney markers
+                        "Csf1r","Asgr2", ## Myeloid lineage markers
+                        "Nes","Prss1","Hhex","Cryaa"
                         )
-    spec_genes_w_ids <- genes_list$mmusculus[which(is.element(tolower(genes_list$mmusculus$external_gene_name),
+    spec_genes_w_ids <- unique(genes_list$mmusculus[which(is.element(tolower(genes_list$mmusculus$external_gene_name),
                                                               tolower(specific_genes))),
-                                             c("external_gene_name","ensembl_gene_id")]
-    spec_genes_w_ids <- unique(spec_genes_w_ids[complete.cases(spec_genes_w_ids),])
-    spec_genes_w_ids <- spec_genes_w_ids[which(is.element(spec_genes_w_ids$ensembl_gene_id,
-                                                          rownames(results_list[[results_list_id]]$spec_results[[1]]$spec_mat_subset))) ,]
-    spec_genes_w_ids <- merge( data.frame(f_or_w = c("flat","weighted")),spec_genes_w_ids)
-    
-    
+                                             c("external_gene_name","ensembl_gene_id")])
   } 
   if(names(results_list)[results_list_id]=="drerio"){
+    specific_genes <- c("notch1b", "nes", ## brain markers
+                        ## eye lineage markers
+                        #"rmi2","mcm10","mcph1","cep192","DEPDC4","rad9a","mms22l","tgfbr1b","kat6a"
+                        #"pou3f2b","foxb1a","ascl1b","notch1b","pbx4","ntn1a","nes"
+                        "myoz2a","cacna1sb", ## muscle markers
+                        "prss1","hhex","nphs2","cryaa"
+                        )
+    spec_genes_w_ids <- unique(genes_list$drerio[which(is.element(tolower(genes_list$drerio$external_gene_name),
+                                                              tolower(specific_genes))),
+                                             c("external_gene_name","ensembl_gene_id")])
     
   }
   if(names(results_list)[results_list_id]=="hsapiens"){next;}
-      
+  spec_genes_w_ids <- spec_genes_w_ids[match(specific_genes[which(is.element(specific_genes,spec_genes_w_ids$external_gene_name))],
+                                             spec_genes_w_ids$external_gene_name),]
+  spec_genes_w_ids <- unique(spec_genes_w_ids[complete.cases(spec_genes_w_ids),])
+  spec_genes_w_ids <- spec_genes_w_ids[which(is.element(spec_genes_w_ids$ensembl_gene_id,
+                                                        rownames(results_list[[results_list_id]]$spec_results[[1]]$spec_mat_subset))) ,]
+  spec_genes_w_ids <- merge( data.frame(f_or_w = c("flat","weighted")),spec_genes_w_ids)
   
   results <- results_list[[results_list_id]]$spec_results
   run_df <- results_list[[results_list_id]]$run_df
@@ -871,9 +881,9 @@ for(results_list_id in 1:length(results_list)){
     
     ## set up color functions for heatmaps
     col_funs <- list()
-    col_funs[["weighted_and_flat"]] <-colorRamp2(c(min(c(-3, min(result, na.rm = T), min(result_pair, na.rm = T)) ),
-                                             -2, -1.5, 0, 1.5, 2.5,
-                                             max(c(3, max(result, na.rm = T), max(result_pair, na.rm = T)) )),
+    col_funs[["weighted_and_flat"]] <-colorRamp2(c(min(c(-4, min(result, na.rm = T), min(result_pair, na.rm = T)) ),
+                                             -3, -1.5, 0, 1.5, 3,
+                                             max(c(4, max(result, na.rm = T), max(result_pair, na.rm = T)) )),
                                              c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
     
     heatmaps <- HeatmapList()
