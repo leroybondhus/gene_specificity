@@ -662,6 +662,10 @@ for(results_list_id in 1:length(results_list)){
 
 
 ```{r heatmap plots}
+temp_figures_dir <- figures_dir
+figures_dir <- paste(figures_dir,"/heatmap_plots",sep="")
+dir.create(figures_dir)
+
 
 for(results_list_id in 1:length(results_list)){
   results <- results_list[[results_list_id]]$spec_results
@@ -714,39 +718,54 @@ for(results_list_id in 1:length(results_list)){
                                                c("darkblue", "blue", "#B8B8FF" ,"white", "#FFB8B8",  "red","red4"))
       
       heatmaps <- list()
-      heatmaps[["diff_up"]] <- Heatmap(temp_delta[temp_gene_list$up$gene,], name="diff_up",
-                                       row_order = temp_gene_list$up$gene, show_row_names = FALSE,
+      heatmaps[["diff"]] <- Heatmap(temp_delta[c(temp_gene_list$up$gene,temp_gene_list$down$gene),], name="diff",
+                                       row_order = c(temp_gene_list$up$gene,temp_gene_list$down$gene), show_row_names = FALSE,
                                        cluster_columns = sim_tree, column_order = colnames(temp_delta),
                                        col = col_funs$diff)
-      heatmaps[["diff_down"]] <- Heatmap(temp_delta[temp_gene_list$down$gene,], name="diff_down",
-                                       row_order = temp_gene_list$down$gene, show_row_names = FALSE,
-                                       cluster_columns = sim_tree, column_order = colnames(temp_delta),
-                                       col = col_funs$diff)
-      
-      
-      heatmaps[["weighted_up"]] <- Heatmap(result[temp_gene_list$up$gene,], name="weighted_up",
-                                       row_order = temp_gene_list$up$gene, show_row_names = FALSE,
+      heatmaps[["weighted"]] <- Heatmap(result[c(temp_gene_list$up$gene,temp_gene_list$down$gene),], name="weighted",
+                                       row_order = c(temp_gene_list$up$gene,temp_gene_list$down$gene), show_row_names = FALSE,
                                        cluster_columns = sim_tree, column_order = colnames(result),
                                        col = col_funs$weighted_and_flat)
-      heatmaps[["weighted_down"]] <- Heatmap(result[temp_gene_list$down$gene,], name="weighted_down",
-                                       row_order = temp_gene_list$down$gene, show_row_names = FALSE,
-                                       cluster_columns = sim_tree, column_order = colnames(result),
-                                       col = col_funs$weighted_and_flat)
-      
-      
-      heatmaps[["flat_up"]] <- Heatmap(result_pair[temp_gene_list$up$gene,], name="flat_up",
-                                       row_order = temp_gene_list$up$gene, show_row_names = FALSE,
+      heatmaps[["flat"]] <- Heatmap(result_pair[c(temp_gene_list$up$gene,temp_gene_list$down$gene),], name="flat",
+                                       row_order = c(temp_gene_list$up$gene,temp_gene_list$down$gene), show_row_names = FALSE,
                                        cluster_columns = sim_tree, column_order = colnames(result_pair),
                                        col = col_funs$weighted_and_flat)
-      heatmaps[["flat_down"]] <- Heatmap(result_pair[temp_gene_list$down$gene,], name="flat_down",
-                                       row_order = temp_gene_list$down$gene, show_row_names = FALSE,
-                                       cluster_columns = sim_tree, column_order = colnames(result_pair),
-                                       col = col_funs$weighted_and_flat)
+      # heatmaps[["diff_down"]] <- Heatmap(temp_delta[temp_gene_list$down$gene,], name="diff_down",
+      #                                  row_order = temp_gene_list$down$gene, show_row_names = FALSE,
+      #                                  cluster_columns = sim_tree, column_order = colnames(temp_delta),
+      #                                  col = col_funs$diff)
+      # 
+      # 
+
+      # heatmaps[["weighted_down"]] <- Heatmap(result[temp_gene_list$down$gene,], name="weighted_down",
+      #                                  row_order = temp_gene_list$down$gene, show_row_names = FALSE,
+      #                                  cluster_columns = sim_tree, column_order = colnames(result),
+      #                                  col = col_funs$weighted_and_flat)
+      # 
+      # 
+
+      # heatmaps[["flat_down"]] <- Heatmap(result_pair[temp_gene_list$down$gene,], name="flat_down",
+      #                                  row_order = temp_gene_list$down$gene, show_row_names = FALSE,
+      #                                  cluster_columns = sim_tree, column_order = colnames(result_pair),
+      #                                  col = col_funs$weighted_and_flat)
       
-      heatmaps$diff_up;heatmaps$diff_down
-      heatmaps$weighted_up;heatmaps$flat_up
-      heatmaps$weighted_down;heatmaps$flat_down
       
+      filename <- paste(figures_dir,"/","heatmapplotdiff_", names(results_list)[results_list_id] , i,".png",sep="")
+      png(filename = filename, width=8, height=14, units="in", res=250)
+      heatmaps$diff
+      dev.off()
+      
+      filename <- paste(figures_dir,"/","heatmapplotflatweighted_", names(results_list)[results_list_id] , i,".png",sep="")
+      png(filename = filename, width=16, height=14, units="in", res=250)
+      heatmaps$flat + heatmaps$weighted
+      dev.off()
+      
+      
+      # 
+      # heatmaps$diff_up;heatmaps$diff_down
+      # heatmaps$weighted_up;heatmaps$flat_up
+      # heatmaps$weighted_down;heatmaps$flat_down
+      # 
       
       
     }
@@ -758,12 +777,16 @@ for(results_list_id in 1:length(results_list)){
 }
 
 
-    
+figures_dir <- temp_figures_dir    
 ```
 
 
 
 ```{r go plots}
+temp_figures_dir <- figures_dir
+figures_dir <- paste(figures_dir,"/go_plots",sep="")
+dir.create(figures_dir)
+
 
 library(org.Hs.eg.db)
 library(org.Mm.eg.db)
@@ -789,7 +812,7 @@ for(results_list_id in 1:length(results_list)){
     
       
     cutoff <- 2
-    n <- 20
+    n <- 15
     allOE_genes <- rownames(result)
     sigOE_genes <- character()
     for(j in 1:ncol(result)){
@@ -813,16 +836,29 @@ for(results_list_id in 1:length(results_list)){
                     pool=TRUE)
     
     ## store plot modelled on 3D with GO enrichment in top diff genes
+    filename <- paste(figures_dir,"/","gotermdotplot_", names(results_list)[results_list_id] , i,".png",sep="")
+    png(filename, width=6, height=8, units="in", res=250)
     print(dotplot(ego, showCategory = n))
+    dev.off()
+    
+    filename <- paste(figures_dir,"/","gotermemmaplot_", names(results_list)[results_list_id] , i,".png",sep="")
+    png(filename, width=8, height=6, units="in", res=250)
     print(emapplot(enrichplot::pairwise_termsim(ego), showCategory = n))
+    dev.off()
+    
   }
 }
 
+
+figures_dir <- temp_figures_dir  
 ```
 
 
 
 ```{r marker genes}
+temp_figures_dir <- figures_dir
+figures_dir <- paste(figures_dir,"/marker_genes",sep="")
+dir.create(figures_dir)
 
 for(results_list_id in 1:length(results_list)){
   if(names(results_list)[results_list_id]=="mmusculus"){
@@ -859,7 +895,7 @@ for(results_list_id in 1:length(results_list)){
   run_df <- results_list[[results_list_id]]$run_df
   
   for( i in 1:length(results)){
-    csv_out_filename <- paste(figures_dir,"/","markergenetable_", names(results_list)[result_list_id] , i,".csv",sep="") 
+    csv_out_filename <- paste(figures_dir,"/","markergenetable_", names(results_list)[results_list_id] , i,".csv",sep="") 
   #temp_list <- foreach(i=1:length(results), .errorhandling = "pass") %dopar% {
     print(i) 
     measure <- str_split_fixed(names(results)[i], "__", 4)[1]
@@ -921,16 +957,14 @@ for(results_list_id in 1:length(results_list)){
                   row_split = split, left_annotation = ra,
                   col=col_funs[["weighted_and_flat"]]
                   )
-    filename <- paste(figures_dir,"/","markergeneplot_", names(results_list)[result_list_id] , i,".png",sep="")
-    png(filename, width=ifelse(names(results_list)[result_list_id]=="drerio", 12, 8), height=7, units="in", res=250)
+    filename <- paste(figures_dir,"/","markergeneplot_", names(results_list)[results_list_id] , i,".png",sep="")
+    png(filename, width=ifelse(names(results_list)[results_list_id]=="drerio", 12, 8), height=7, units="in", res=250)
     draw(h1)
     dev.off()
   }
 }
 
-
-
-
+figures_dir <- temp_figures_dir  
 ```
 
 
