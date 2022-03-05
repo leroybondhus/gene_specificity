@@ -660,26 +660,7 @@ for(results_list_id in 1:length(results_list)){
 
 
 
-```{r go plots}
-
-result_go_df_list <- list(
-  balanced_v_unbalanced = data.frame(
-    dataset = character(),
-    measure = character(),
-    weighted = logical(),
-    rep = numeric(),
-    gene = character(),
-    balanced_spec = numeric(),
-    unbalanced_spec = numeric()
-  ),
-  balanced_v_unbalanced_cor = data.frame(
-    dataset = character(),
-    measure = character(),
-    weighted = logical(),
-    rep = numeric(),
-    cor = numeric()
-  )
-)
+```{r heatmap plots}
 
 for(results_list_id in 1:length(results_list)){
   results <- results_list[[results_list_id]]$spec_results
@@ -781,7 +762,59 @@ for(results_list_id in 1:length(results_list)){
 
 
 
-```{r}
+```{r go plots}
+
+library(org.Hs.eg.db)
+library(org.Mm.eg.db)
+library(org.Dr.eg.db)
+
+for(results_list_id in 1:length(results_list)){
+  results <- results_list[[results_list_id]]$spec_results
+  run_df <- results_list[[results_list_id]]$run_df
+  
+  for( i in 1:length(results)){
+  #temp_list <- foreach(i=1:length(results), .errorhandling = "pass") %dopar% {
+    print(i)
+    measure <- str_split_fixed(names(results)[i], "__", 4)[1]
+    weighted <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[2])
+    balanced <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[3])
+    rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
+    if(balanced){next} ## only need to look at unbalanced
+    if(measure != "Zscore"){next} ## only need to do for Zscore
+    if(!weighted){next} ## only need to do for either weighted OR flat ## result is weighted result_pair is flat
+    print(i);print("hello");print(i)
+    result <- results[[i]]$spec_mat_subset
+    result_pair <- results[[str_replace(names(results)[i], "weighted_TRUE", "weighted_FALSE")]]$spec_mat_subset
+    
+      
+    cutoff <- 2
+    n <- 20
+    allOE_genes <- rownames(result)
+    sigOE_genes <- character()
+    for(j in 1:ncol(result)){
+      which <- which((result[,j]) >= cutoff & result_pair[,j] < cutoff )
+      sigOE_genes <- unique(c(sigOE_genes,names(result[,j])[which]))
+    }
+    
+    if(names(results_list)[results_list_id]=="mmusculus"){ orgdb <- "org.Mm.eg.db" } 
+    if(names(results_list)[results_list_id]=="drerio"){ orgdb <- "org.Dr.eg.db" }
+    if(names(results_list)[results_list_id]=="hsapiens"){orgdb <- "org.Hs.eg.db"}
+      
+    
+    ego <- enrichGO(gene = sigOE_genes,
+                    universe = allOE_genes,
+                    keyType = "ENSEMBL",
+                    OrgDb = orgdb,
+                    ont = "BP", 
+                    pAdjustMethod = "BH",
+                    qvalueCutoff = 0.05,
+                    readable = TRUE,
+                    pool=TRUE)
+    
+    ## store plot modelled on 3D with GO enrichment in top diff genes
+    print(dotplot(ego, showCategory = n))
+  }
+}
 
 ```
 
