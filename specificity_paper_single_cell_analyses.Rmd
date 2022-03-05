@@ -813,8 +813,76 @@ for(results_list_id in 1:length(results_list)){
     
     ## store plot modelled on 3D with GO enrichment in top diff genes
     print(dotplot(ego, showCategory = n))
+    print(emapplot(enrichplot::pairwise_termsim(ego), showCategory = n))
   }
 }
+
+```
+
+
+
+```{r marker genes}
+
+
+for(results_list_id in 1:length(results_list)){
+  if(names(results_list)[results_list_id]=="mmusculus"){
+    ## Kidney: Dcn, Hoxc9, Mest, Wt1, Ywhaq, Ren1, Wt1
+    ## Kidney: Eya1, Six1, Six4, Odd1
+    ## Myeloid: Cebpe, Csf1r, Cebpa,Pu.1, Elane, Prtn3, Mpo, Apoe, Gata2, Gata1, Gfi1b, Car1, Car2, Klf1
+    specific_genes <- c("Dcn", "Hoxc9", "Mest", "Ywhaq", "Ren1", "Wt1",
+                        "Eya1", "Six1", "Six4", "Odd1",
+                         "Cebpe", "Csf1r", "Cebpa","Pu.1", "Elane"," Prtn3", "Mpo", "Apoe"," Gata2", "Gata1", "Gfi1b", "Car1", "Car2", "Klf1"
+                        )
+    spec_genes_w_ids <- genes_list$mmusculus[which(is.element(tolower(genes_list$mmusculus$external_gene_name),
+                                                              tolower(specific_genes))),
+                                             c("external_gene_name","ensembl_gene_id")]
+    spec_genes_w_ids <- unique(spec_genes_w_ids[complete.cases(spec_genes_w_ids),])
+    
+  } 
+  if(names(results_list)[results_list_id]=="drerio"){
+    ]
+    
+    
+  }
+  if(names(results_list)[results_list_id]=="hsapiens"){next;}
+      
+  
+  
+  
+  
+  results <- results_list[[results_list_id]]$spec_results
+  run_df <- results_list[[results_list_id]]$run_df
+  
+  for( i in 1:length(results)){
+  #temp_list <- foreach(i=1:length(results), .errorhandling = "pass") %dopar% {
+    print(i)
+    measure <- str_split_fixed(names(results)[i], "__", 4)[1]
+    weighted <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[2])
+    balanced <- grepl("TRUE",str_split_fixed(names(results)[i], "__", 4)[3])
+    rep <- as.numeric(str_split_fixed(str_split_fixed(names(results)[i], "__", 4)[4],"_",2)[2])
+    if(balanced){next} ## only need to look at unbalanced
+    if(measure != "Zscore"){next} ## only need to do for Zscore
+    if(!weighted){next} ## only need to do for either weighted OR flat ## result is weighted result_pair is flat
+    print(i);print("hello");print(i)
+    result <- results[[i]]$spec_mat_subset
+    result_pair <- results[[str_replace(names(results)[i], "weighted_TRUE", "weighted_FALSE")]]$spec_mat_subset
+    
+      
+    cutoff <- 2
+    n <- 20
+    allOE_genes <- rownames(result)
+    sigOE_genes <- character()
+    for(j in 1:ncol(result)){
+      which <- which((result[,j]) >= cutoff & result_pair[,j] < cutoff )
+      sigOE_genes <- unique(c(sigOE_genes,names(result[,j])[which]))
+    }
+    
+    
+  }
+}
+
+
+
 
 ```
 
