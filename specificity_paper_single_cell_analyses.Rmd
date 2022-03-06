@@ -759,12 +759,12 @@ for(results_list_id in 1:length(results_list)){
     
       filename <- paste(figures_dir,"/","heatmapplotdiff_", names(results_list)[results_list_id] , i,".png",sep="")
       png(filename = filename, width=8, height=14, units="in", res=250)
-      plot(heatmaps$diff)
+      print(heatmaps$diff)
       dev.off()
       
       filename <- paste(figures_dir,"/","heatmapplotflatweighted_", names(results_list)[results_list_id] , i,".png",sep="")
       png(filename = filename, width=16, height=14, units="in", res=250)
-      plot(heatmaps$flat + heatmaps$weighted)
+      print(heatmaps$flat + heatmaps$weighted)
       dev.off()
       
       
@@ -849,7 +849,7 @@ for(results_list_id in 1:length(results_list)){
     dev.off()
     
     filename <- paste(figures_dir,"/","gotermemmaplot_", names(results_list)[results_list_id] , i,".png",sep="")
-    png(filename, width=8, height=6, units="in", res=250)
+    png(filename, width=5, height=8, units="in", res=250)
     print(emapplot(enrichplot::pairwise_termsim(ego), showCategory = n))
     dev.off()
     
@@ -870,8 +870,8 @@ dir.create(figures_dir)
 for(results_list_id in 1:length(results_list)){
   if(names(results_list)[results_list_id]=="mmusculus"){
     specific_genes <- c("Slc12a1", "Nphs2", ## Kidney markers
-                        "Csf1r","Asgr2", ## Myeloid lineage markers
-                        "Mmp9","Prss1","Creg2"
+                        "Ctsw","Asgr2", ## Myeloid lineage markers
+                        "Prss1","Creg2"
                         )
     spec_genes_w_ids <- unique(genes_list$mmusculus[which(is.element(tolower(genes_list$mmusculus$external_gene_name),
                                                               tolower(specific_genes))),
