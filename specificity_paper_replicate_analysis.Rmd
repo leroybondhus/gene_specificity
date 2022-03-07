@@ -34,7 +34,7 @@ library(enrichplot)
 
 library(data.table)
 
-figures_dir <- paste(getwd(),"figures", sep = "/")
+figures_dir <- paste(getwd(),"figures_2", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
 
 registerDoParallel(detectCores()-1)
@@ -105,11 +105,11 @@ ggplot( temp ,aes(y=total_transcripts, x=names))+
 
 
 ##renormalize TPM without mitochondrial genes
-for(i in 1:ncol(gtex_cleaned)){
-  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
+for(i in 1:ncol(gtex)){
+  gtex[,i] <- (gtex[,i]*1e6 / sum(gtex[,i]))
   ## set all very low counts to zero to avoid variable read depth issues
-  gtex_cleaned[,i] [which(gtex_cleaned[,i]  < 1)] <- 0
-  gtex_cleaned[,i] <- (gtex_cleaned[,i]*1e6 / sum(gtex_cleaned[,i]))
+  gtex[,i] [which(gtex[,i]  < 1)] <- 0
+  gtex[,i] <- (gtex[,i]*1e6 / sum(gtex[,i]))
 }
 
 temp <- data.frame(names=colnames(gtex[,1:100]), total_transcripts=colSums(gtex[,1:100]))
@@ -309,7 +309,7 @@ cluster_func <- function(sim_mat){add_weights(add_dist_to_parent(as.dendrogram(h
 ### 3 each sample type specific and general rep 5x report mean and stdev for correlation for flat and weighted
 ### gtex sample proportion, (max 10 each), sample type specifici and general rep 5x report mean and stdev for correlation for flat and weighted
 
-num_reps <- 2
+num_reps <- 4
 
 ## select subset of full exp_mat to use
 exp_mat_subsets <- list()
@@ -357,7 +357,7 @@ for( i in 1:num_reps){
 }
 
 
-results <- foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .combine = rbind) %dopar% {
+results <- foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass") %dopar% {
   results <- data.frame(gene=character() ,
                  tissue=character(),
                  measure=character(),
@@ -465,7 +465,35 @@ results <- foreach(exp_mat_subset=exp_mat_subsets, .errorhandling = "pass", .com
 }
 
 
-ggplot(results, aes())
+cor_df <- data.frame(measure=character(),
+                     rep=numeric(),
+                     weighted=logical(),
+                     cor=numeric())
+for(rep in 1:length(results) ){
+  for(measure in specificity_measures$func_names){
+    #for(weighted in c(T,F)){
+      which <- which(results[[rep]]$measure==measure & results[[rep]]$weighted==T)
+      w_cor <- cor(results[[rep]]$balanced_spec[which],results[[rep]]$unbalanced_spec[which],use="pairwise.complete")
+      
+      which <- which(results[[rep]]$measure==measure & results[[rep]]$weighted==F)
+      f_cor <- cor(results[[rep]]$balanced_spec[which],results[[rep]]$unbalanced_spec[which],use="pairwise.complete")
+      
+      cor_df <- rbind(cor_df,
+                      data.frame(
+                        measure=measure,
+                        rep=rep,
+                        weighted_cor=w_cor,
+                        flat_cor=f_cor
+                      ))
+    #}
+  }
+}
 
+
+#ggplot(results, aes())
+ggparcoord(cor_df,
+           columns = 3:4,
+           scale="globalminmax")+
+  facet_grid(. ~ measure)
 
 ```
