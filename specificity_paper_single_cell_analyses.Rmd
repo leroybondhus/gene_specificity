@@ -499,7 +499,7 @@ for(exp_mat_id in 1:length(exp_mat_list) ){
 #  dev.off()
   
   ## make balanced subsets to compare include several reps several + add statistical test for difference in correlation
-  num_reps <- 5
+  num_reps <- 8
   dist_cutoff <- 0.5
   sample_groups <- group_samples_by_dend_dist(sim_tree, dist_cutoff) 
   ### artificially unbalance sample_groups
@@ -666,6 +666,55 @@ for(results_list_id in 1:length(results_list)){
                                                            temp_list[[i]]$balanced_v_unbalanced_cor)
   }
 }
+
+#write.csv(result_plot_df_list$balanced_v_unbalanced_cor, file=paste(figures_dir,"/balanced_v_unbalanced_model_org_cor_table.csv",sep=""))
+
+which <- which(result_plot_df_list$balanced_v_unbalanced$dataset == "mmusculus" &
+                 result_plot_df_list$balanced_v_unbalanced$rep == 1)
+rd_df <- result_plot_df_list$balanced_v_unbalanced[which,]
+rd_df <- rd_df[complete.cases(rd_df),]
+ggl <- list()
+for(measure in unique(rd_df$measure)){
+  which_measure <- which(rd_df$measure==measure)
+  temp <- data.frame(min=min(c(rd_df$balanced_spec[which_measure],rd_df$unbalanced_spec[which_measure]) ),
+                     max=max(c(rd_df$balanced_spec[which_measure],rd_df$unbalanced_spec[which_measure]) ),
+                     cor_f = cor(rd_df$balanced_spec[which_measure][which(!rd_df$weighted[which_measure])],
+                                 rd_df$unbalanced_spec[which_measure][which(!rd_df$weighted[which_measure])] ),
+                     cor_w = cor(rd_df$balanced_spec[which_measure][which(rd_df$weighted[which_measure])],
+                                 rd_df$unbalanced_spec[which_measure][which(rd_df$weighted[which_measure])]) )
+  title <- paste(measure, ": cor_f =",round(temp$cor_f,3), ": cor_w =", round(temp$cor_w,3))
+  ggl[[measure]] <- ggplot(rd_df[which_measure,], aes(x=balanced_spec, y=unbalanced_spec))+
+    geom_point(size=0.1)+
+    ggtitle(title)+
+    scale_x_continuous(limits = c(temp$min,temp$max),
+                       breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",2,0.1)),
+                       expand = c(0,0))+
+    scale_y_continuous(limits = c(temp$min,temp$max),
+                       breaks=seq(round(temp$min),round(temp$max),by=ifelse(measure=="Zscore",2,0.1)),
+                       expand = c(0,0))+
+    geom_abline(slope=1, intercept = 0, color="red",size=0.3)+
+    theme_bw()+
+        theme(panel.grid.minor.x = element_blank())+
+    facet_grid(. ~ weighted)
+}
+grobl <- list()
+grobl <- list()
+for(n in names(ggl)){
+  grobl[[n]] <- ggplotGrob(ggl[[n]])
+}
+
+grid.arrange(grobs=grobl, ncol=4, widths=c(5,3,3,3))
+g <-arrangeGrob(grobs=grobl, nrow=4, heights=c(4,4,4,4))
+filename = paste(figures_dir, "/mmusculus_one_v_all.png", sep="")
+ggsave(filename, g, device = "png", width = 4, height = 10, dpi = 250)
+
+
+
+
+
+
+
+
 ```
 
 
