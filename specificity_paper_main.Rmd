@@ -40,7 +40,7 @@ library(enrichplot)
 
 library(data.table)
 
-figures_dir <- paste(getwd(),"figures", sep = "/")
+figures_dir <- paste(getwd(),"figures_2", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
 
 registerDoParallel(detectCores()-1)
@@ -405,6 +405,16 @@ for(is_main in c(T,F)){
   }
 }
 
+grid.arrange(grobs=grobl_main, ncol=4, widths=c(5,3,3,3))
+g <-arrangeGrob(grobs=grobl_main, ncol=4, widths=c(4,4,4,4))
+filename = paste(figures_dir, "/main_one_v_all.png", sep="")
+ggsave(filename, g, device = "png", width = 10, height = 2.8, dpi = 250)
+
+grid.arrange(grobs=grobl_supp, nrow=4, heights=c(5,3,3,3))
+g <-arrangeGrob(grobs=grobl_supp, nrow=4, heights=c(4,4,4,4))
+filename = paste(figures_dir, "/supp_one_v_all.png", sep="")
+ggsave(filename, g, device = "png", width = 4, height = 10, dpi = 250)
+
 ```
 
 
@@ -488,17 +498,17 @@ for(f_or_w in c("flat","weighted")){
 dot_sim <- similarity_func(exp_mat)
 sim_tree <- cluster_func(dot_sim)
 
-# filename = paste(figures_dir, "/sample_similarity_heatmap.png", sep="")
-# png(filename = filename, width=10, height=10, units="in", res=300)
+filename = paste(figures_dir, "/sample_similarity_heatmap.png", sep="")
+png(filename = filename, width=10, height=10, units="in", res=300)
 heatmap(dot_sim, Rowv = rev(sim_tree), Colv = sim_tree, scale = "none", margins=c(11,13))
-# dev.off()
+dev.off()
 
 sim_tree <- cluster_func(dot_sim)
 ## plot similarity tree with weights
-# filename = paste(figures_dir, "/weighted_tree.png", sep="")
-# png(filename = filename, width=9, height=4, units="in", res=300)
+filename = paste(figures_dir, "/weighted_tree.png", sep="")
+png(filename = filename, width=9, height=4, units="in", res=300)
 sim_tree %>% dendextend::set("nodes_pch",19) %>% dendextend::set("nodes_cex", 2*sqrt(get_nodes_attr(sim_tree,"weight"))) %>% plot
-# dev.off()
+dev.off()
 
 
 ## take a look at the weights
@@ -509,8 +519,8 @@ g <- ggplot( temp ,aes(y=names, x=weights))+
   #theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust=1))
 g
 
-# filename = paste(figures_dir, "/sample_weights.png", sep="")
-# ggsave(filename, g, device = "png", width = 8, height = 8, dpi = 300)
+filename = paste(figures_dir, "/sample_weights.png", sep="")
+ggsave(filename, g, device = "png", width = 8, height = 8, dpi = 300)
 
 weights <- get_weights(sim_tree, colnames(exp_mat))
 spec_mat_weighted <- calc_weighted_zscore_matrix(exp_mat, weights = weights)
@@ -773,7 +783,7 @@ g <-arrangeGrob(grobs=grobl, ncol=2, widths=c(5,4))
 #grid.arrange(ggl$Zscore, ggl$Tau, ggl$Tsi, ggl$Gini, nrow=2)
 
 filename <- paste(figures_dir,"/",date,"_variance_random_v01.png",sep = "")
-#ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
+ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
 
 ## for random supplemental
 if(FALSE){
@@ -809,7 +819,7 @@ which_list[["Z_P2_weighted"]] <- which(df_2c$measure=="Zscore"
                     & df_2c$weight_or_flat=="weighted")
 
 filename=paste(figures_dir,"/random_ttest_output.txt",sep="")
-#sink(file=filename)
+sink(file=filename)
 print("t-test P1 weighted / P1 flat : %diff between weighted and flat")
 ## t.test on logs gives ratio estimates
 temp <- t.test(x=log10(df_2c[which_list$Z_P1_weighted,]$variance),y=log10(df_2c[which_list$Z_P1_flat,]$variance) ,paired=TRUE, conf.level = 0.95)
@@ -823,7 +833,7 @@ temp <- t.test(x=log10(df_2c[which_list$Z_P2_weighted,]$variance),y=log10(df_2c[
 1-10^temp$estimate
 1-10^temp$conf.int
 ### 
-#sink()
+sink()
 ```
 
 
@@ -833,7 +843,7 @@ temp <- t.test(x=log10(df_2c[which_list$Z_P2_weighted,]$variance),y=log10(df_2c[
 
 ```{r Figure_2D flat v weighted jaccard plot}
 #system("mkdir figures")
-figures_dir <- paste(getwd(),"figures", sep = "/")
+figures_dir <- paste(getwd(),"figures_2", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
 
 ## jaccard between n = 1 and n = num_brain_samples for brain v non-brain OR P1 v P2 
@@ -985,8 +995,8 @@ for(n in names(ggl_jacc)){
 #grid.arrange(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(6,1)  ) ), nrow=2, heights=c(5,4) )
 grid.arrange(grobs =list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), nrow=2, heights=c(6,1)  ) ), ncol=2, widths=c(5,4) )
 g <- arrangeGrob(grobs =grobl, ncol=2, widths=c(5,4) )
-filename <- paste(figures_dir,"/",date,"_jaccard_random_v01.png",sep = "")
-#ggsave(filename, g, device = "png", width = 8, height = 3, dpi=300)
+filename <- paste(figures_dir,"/",date,"_jaccard_v01.png",sep = "")
+ggsave(filename, g, device = "png", width = 8, height = 3, dpi=300)
 
 ## for random supplemental
 if(FALSE){
@@ -1079,7 +1089,7 @@ which_list[["Z_P2_weighted"]] <- which(df_2d$measure=="Zscore"
                                    & df_2d$weighted==TRUE)
 
 filename=paste(figures_dir,"/random_ttest_jaccard_output.txt",sep="")
-#sink(file=filename)
+sink(file=filename)
 
 print("t-test P2 flat jaccard")
 temp <- t.test(x=df_2d[which_list$Z_P2_flat,]$jaccard, conf.level = 0.95)
@@ -1101,7 +1111,7 @@ temp <- t.test(x=df_2d[which_list$Z_P1_weighted,]$jaccard, conf.level = 0.95)
 temp$estimate
 temp$conf.int
 
-#sink()
+sink()
 ```
 
 
@@ -1226,15 +1236,15 @@ if(TRUE){
 }
 
 filename <- paste(figures_dir,"/",date,"_heatmap_v01.png",sep = "")
-#png(filename = filename, width=8, height=14, units="in", res=300)
+png(filename = filename, width=8, height=14, units="in", res=300)
 heatmaps$delta
-#dev.off()
+dev.off()
 
 
 filename <- paste(figures_dir,"/",date,"_heatmap_fw_v01.png",sep = "")
-#png(filename = filename, width=16, height=14, units="in", res=300)
+png(filename = filename, width=16, height=14, units="in", res=300)
 heatmaps$flat + heatmaps$weighted
-#dev.off()
+dev.off()
 
 
 ## write csvs of flat v weighted tables for supplement
@@ -1262,7 +1272,7 @@ write_xlsx(temp_list, filename)
 head(gtex_rowinfo)
 ## create list of marker genes (common name and ENS map in genes object and gtex_rowinfo object)
 #"NEUROD1","NEUROD2" ,"SOX2",  "TPPP","NEUROD4", "NEUROD6","MBP", "MAP2","GFAP" ,"NSG2","ADCY8","HEPACAM","VSTM2B","SLITRK3","MBP","MAP2","SOX2",  "TPPP","BCAN", "NCAN","OPALIN","STMN4", "GFAP" ,"NSG2","ADCY8",
-specific_genes <- c( "OLIG1","OLIG2",
+specific_genes <- c( "OLIG1","OLIG2", "DRD1",
                      "PRSS1", "CTRB2", # "CTRB2",
                      "MYH6", "MYL4")
 spec_genes_w_ids <- gtex_rowinfo[which( is.element(gtex_rowinfo$Description, specific_genes)),]
@@ -1325,9 +1335,9 @@ for(measure in unique(str_split_fixed(names(spec_mats), "_", 2)[,2] )){
 draw(heatmaps)
 
 filename <- paste(figures_dir,"/",date,"marker_genes_grad_v01.png",sep = "")
-#png(filename, width = 8, height = 7, units = "in", res=300 )
-#draw(heatmaps)
-#dev.off()
+png(filename, width = 8, height = 7.5, units = "in", res=300 )
+draw(heatmaps)
+dev.off()
 
 
 ## get particular values reported in paper
@@ -1532,16 +1542,16 @@ for(onto in c("BP")){ #},"MF","CC")){
   n=10
   filename <- paste(figures_dir,"/",date,"_go_dot_",onto,"_",n,".png",sep = "")
   print(filename)
-  #png(filename, width = 6, height = 10, units = "in", res=300 ) 
+  png(filename, width = 6, height = 10, units = "in", res=300 ) 
   print(dotplot(ego, showCategory = n))
-  #dev.off()
+  dev.off()
   
   filename <- paste(figures_dir,"/",date,"_go_clus_wo_labels",onto,"_",n,".png",sep = "")
   print(filename)
-  #png(filename, width = 8, height = 6, units = "in", res=300 )
+  png(filename, width = 8, height = 6, units = "in", res=300 )
   ego <- enrichplot::pairwise_termsim(ego)
   print(emapplot(ego, showCategory = n))
-  #dev.off()
+  dev.off()
   
   filename <- paste(figures_dir,"/",date,"_go_graph_",onto,"_",n,".png",sep = "")
   print(filename)
