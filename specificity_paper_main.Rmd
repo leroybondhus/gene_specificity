@@ -553,7 +553,7 @@ hist(gini_weighted - gini_flat ,breaks=100)
 if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if running sequential. If you want to look at robustness test results it is recommended you have enabled parallel computing (e.g. check getDoParWorkers > 3 or 4 (preferably more))
   
   ## Use this variable to control whether performing random or true brain-non-brain partition
-  random_partition = FALSE
+  random_partition = TRUE
   
   
   robustness_test_results <- list( )
@@ -593,6 +593,8 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   }
   if(random_partition){
     load("final_random_permutation_matrix") ## reproduce same used in paper figures
+    P1 <- as.matrix(exp_mat[,unique(as.vector(permutation_matrix))])
+    notP1 <- as.matrix(exp_mat[,colnames(exp_mat)[!is.element(colnames(exp_mat),P1)]])
   }
 
   
@@ -639,7 +641,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
                         P2_flat_spec_score = specificity_flat
                         )
       }
-      
+      result
       }
       
       results_P1 <- list()
@@ -667,7 +669,7 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
 
 ```{r Figure_2C}
 #system("mkdir figures")
-figures_dir <- paste(getwd(),"figures", sep = "/")
+figures_dir <- paste(getwd(),"figures_2", sep = "/")
 date <- format(Sys.time(), format="%Y%m%d") 
 
 df_robustness_test_results <- data.frame(measure=character(),
@@ -786,11 +788,11 @@ filename <- paste(figures_dir,"/",date,"_variance_random_v01.png",sep = "")
 ggsave(filename, g, device = "png", width = 10, height = 3, dpi = 300)
 
 ## for random supplemental
-if(FALSE){
+if(random_partition){
   grid.arrange(grobs=grobl, nrow=2, heights=c(5,5))
   g <-arrangeGrob(grobs=grobl, nrow=2, heights=c(5,5))
-  filename <- paste(figures_dir,"/",date,"_variance_random_v01.png",sep = "")
- # ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
+  filename <- paste(figures_dir,"/",date,"_variance_random_v02.png",sep = "")
+  ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
 }
 
 
