@@ -593,8 +593,8 @@ if(TRUE){  ## NOTE! This chunk can require a lot of memory and time depending if
   }
   if(random_partition){
     load("final_random_permutation_matrix") ## reproduce same used in paper figures
-    P1 <- as.matrix(exp_mat[,unique(as.vector(permutation_matrix))])
-    notP1 <- as.matrix(exp_mat[,colnames(exp_mat)[!is.element(colnames(exp_mat),P1)]])
+    notP1 <- as.matrix(exp_mat[,unique(as.vector(permutation_matrix)) ])
+    P1 <- as.matrix(exp_mat[,colnames(exp_mat)[ !is.element(colnames(exp_mat),colnames(notP1))]])
   }
 
   
@@ -751,7 +751,7 @@ for(measure in c("Zscore", "notZscore")){
   gg <- ggplot(df_2c_summary_by_partition[which,], aes(x=n, y=mean_var)) +
     scale_color_manual(values=c("grey20","steelblue3"))+
     scale_fill_manual(values=c("grey20","steelblue3"))+
-    geom_ribbon(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, fill=weight_or_flat),alpha=0.5)+
+    geom_ribbon(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, fill=weight_or_flat),alpha=0.3)+
     geom_line(aes( group=weight_or_flat, ymin=y_min, ymax=y_max, color=weight_or_flat, fill=weight_or_flat))+
     geom_point(data = df_robustness_test_results[which2,], size=0.2,
                aes(x=n, y=variance,group=weight_or_flat,color=weight_or_flat, fill=weight_or_flat))+
@@ -997,14 +997,14 @@ for(n in names(ggl_jacc)){
 #grid.arrange(grobs =  list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), ncol=2, widths=c(6,1)  ) ), nrow=2, heights=c(5,4) )
 grid.arrange(grobs =list(grobl$Zscore, arrangeGrob(grobs=list(grobl$notZscore, grob()), nrow=2, heights=c(6,1)  ) ), ncol=2, widths=c(5,4) )
 g <- arrangeGrob(grobs =grobl, ncol=2, widths=c(5,4) )
-filename <- paste(figures_dir,"/",date,"_jaccard_v01.png",sep = "")
+filename <- paste(figures_dir,"/",date,"_jaccard_random_v01.png",sep = "")
 ggsave(filename, g, device = "png", width = 8, height = 3, dpi=300)
 
 ## for random supplemental
-if(FALSE){
+if(random_partition){
   grid.arrange(grobs = grobl, nrow=2, heights=c(5,4) )
   g <- arrangeGrob(grobs = grobl, nrow=2, heights=c(5,4) )
-  filename <- paste(figures_dir,"/",date,"_jaccard_random_v01.png",sep = "")
+  filename <- paste(figures_dir,"/",date,"_jaccard_random_v02.png",sep = "")
   ggsave(filename, g, device = "png", width = 7, height = 7, dpi = 300)
 }
 
