@@ -1754,4 +1754,34 @@ heatmap(canberra_mat, Rowv = sim_tree, Colv = rev(sim_tree), scale = "none", mar
 ```
 
 
+```{r get correlation stats}
 
+balanced_v_unbalanced_cor_table
+
+weighted_bal_v_unbal_cor_table <-
+  balanced_v_unbalanced_cor_table[which(balanced_v_unbalanced_cor_table$weighted),]
+colnames(weighted_bal_v_unbal_cor_table)[which(colnames(weighted_bal_v_unbal_cor_table)=="cor")] <- "w_cor"
+weighted_bal_v_unbal_cor_table$weighted <- NULL
+weighted_bal_v_unbal_cor_table$X <- NULL
+
+flat_bal_v_unbal_cor_table <-
+  balanced_v_unbalanced_cor_table[which(!balanced_v_unbalanced_cor_table$weighted),]
+colnames(flat_bal_v_unbal_cor_table)[which(colnames(flat_bal_v_unbal_cor_table)=="cor")] <- "f_cor"
+flat_bal_v_unbal_cor_table$weighted <- NULL
+flat_bal_v_unbal_cor_table$X <- NULL
+
+bal_v_unbal_cor_table <- merge(flat_bal_v_unbal_cor_table, weighted_bal_v_unbal_cor_table)
+bal_v_unbal_cor_table$delta <- bal_v_unbal_cor_table$w_cor - bal_v_unbal_cor_table$f_cor
+
+for(measure in unique(balanced_v_unbalanced_cor_table$measure)){
+  ## delta here
+  which <- which(bal_v_unbal_cor_table$measure==measure) 
+  print(measure)
+  print("delta")
+  print(t.test(bal_v_unbal_cor_table$w_cor[which],bal_v_unbal_cor_table$f_cor[which], alternative = "greater"))
+  #print("flat")
+  #print(t.test(bal_v_unbal_cor_table$f_cor[which]))
+}
+
+
+```
