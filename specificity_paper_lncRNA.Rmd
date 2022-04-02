@@ -507,31 +507,46 @@ for(el in names(spec_mats)){
 
 }
 
-df_lnc_pc$wf_lincpc <- paste(df_lnc_pc$w_or_f,df_lnc_pc$linc_or_pc ,sep = "_")
+df_lnc_pc$wf_lincpc <- paste(df_lnc_pc$linc_or_pc,df_lnc_pc$w_or_f ,sep = "_")
+df_lnc_pc_means <- aggregate(spec_val ~ measure+brain_or_all+wf_lincpc,df_lnc_pc, mean)
 
 ggplot(df_lnc_pc[which(df_lnc_pc$measure != "Zscore"),], aes(x=spec_val, color=wf_lincpc)) +
-  geom_density()+
+  geom_density(size=0.8)+
+  geom_vline(data=df_lnc_pc_means[which(df_lnc_pc_means$measure != "Zscore"),],
+             aes(xintercept=spec_val, color=wf_lincpc),linetype="dashed",size=0.8)+
+  scale_color_manual(values=c("steelblue4","steelblue2","orange4","orange2"))+
+  theme_bw()+
   facet_grid(measure ~ brain_or_all, scales = "free")
+
+
+ggplot(df_lnc_pc[which(df_lnc_pc$measure != "Zscore"),], aes(x=spec_val, color=wf_lincpc)) +
+  geom_density(size=0.8)+
+  geom_vline(data=df_lnc_pc_means[which(df_lnc_pc_means$measure != "Zscore"),],
+             aes(xintercept=spec_val, color=wf_lincpc),linetype="dashed",size=0.8)+
+  scale_color_manual(values=c("steelblue4","steelblue2","orange4","orange2"))+
+  theme_bw()+
+  facet_grid(measure ~ brain_or_all, scales = "free")
+ggsave(filename="./Figures/lncRNA_v_proteinCoding_nonZscore.png",
+       plot=last_plot(),
+       device = "png",
+       width = 6, height=5, units="in",
+       dpi=250)
+
+
 
 ggplot(df_lnc_pc[which(df_lnc_pc$measure == "Zscore"),], aes(x=spec_val, color=wf_lincpc)) +
-  geom_density()+
+  geom_density(size=0.8)+
+  geom_vline(data=df_lnc_pc_means[which(df_lnc_pc_means$measure == "Zscore"),],
+             aes(xintercept=spec_val, color=wf_lincpc),linetype="dashed",size=0.8)+
+  scale_color_manual(values=c("steelblue4","steelblue2","orange4","orange2"))+
+  theme_bw()+
   facet_grid(measure ~ brain_or_all, scales = "free")
+ggsave(filename="./Figures/lncRNA_v_proteinCoding_Zscore.png",
+       plot=last_plot(),
+       device = "png",
+       width = 6, height=5/3, units="in",
+       dpi=250)
 
-  gg <- ggplot(df_gc[which_count,],
-               aes(x=cut_point, y=gene_count / total,
-                   group=weighted))+
-    theme_bw()+
-    theme(
-      panel.grid.minor.x = element_blank())+
-    geom_line(aes(color=weighted))+
-    scale_color_manual(values=c("grey20","steelblue3"))+
-    scale_y_continuous( limits=c(1e-4,1) , trans = log10_trans(),
-                       breaks = trans_breaks("log10", function(x) 10^x), # ) #,
-                       labels = percent  )
-  if(measure == "Zscore"){
-    gg <- gg+scale_x_continuous(limits = c(0,4), breaks=seq(0,4,by=0.5), expand = c(0,0))
-    gg <- gg + facet_grid(. ~ brain , labeller=labeller(brain=c("TRUE"="brain subset",
-                                                                "FALSE"="all tissues")) )
 ```
 
 

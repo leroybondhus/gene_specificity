@@ -1031,23 +1031,23 @@ figures_dir <- temp_figures_dir
 library("writexl")
 temp_list<-list()
 for(i in 41:44){
-  if(grepl("Zscore", names(results_list$drerio$spec_results)[i] )){
-    temp_list[[paste("zebrafish_",stringr::str_replace(names(results_list$drerio$spec_results)[i],"__weighted_(TRUE|FALSE)__balanced_FALSE__rep_1",""),sep="")]] <-
-    merge(spec_genes_w_ids, rbind(cbind( ensembl_gene_id=rownames(results_list$drerio$spec_results[[i]]$spec_mat_subset),
-                                   data.frame(weighted_or_flat="weighted",specificity=signif(results_list$drerio$spec_results[[i]]$spec_mat_subset,3) )),
-                                  cbind( ensembl_gene_id=rownames(results_list$drerio$spec_results[[i+4]]$spec_mat_subset),
-                                   data.frame(weighted_or_flat="flat",specificity=signif(results_list$drerio$spec_results[[i+4]]$spec_mat_subset,3) ))) )
+  if(grepl("Zscore", names(results_list$mmusculus$spec_results)[i] )){
+    temp_list[[paste("mouse_",stringr::str_replace(names(results_list$mmusculus$spec_results)[i],"__weighted_(TRUE|FALSE)__balanced_FALSE__rep_1",""),sep="")]] <-
+    merge(spec_genes_w_ids, rbind(cbind( ensembl_gene_id=rownames(results_list$mmusculus$spec_results[[i]]$spec_mat_subset),
+                                   data.frame(weighted_or_flat="weighted",specificity=signif(results_list$mmusculus$spec_results[[i]]$spec_mat_subset,3) )),
+                                  cbind( ensembl_gene_id=rownames(results_list$mmusculus$spec_results[[i+4]]$spec_mat_subset),
+                                   data.frame(weighted_or_flat="flat",specificity=signif(results_list$mmusculus$spec_results[[i+4]]$spec_mat_subset,3) ))) )
   } else {
-    temp_list[[paste("zebrafish_",stringr::str_replace(names(results_list$drerio$spec_results)[i],"__weighted_(TRUE|FALSE)__balanced_FALSE__rep_1",""),sep="")]] <-
-    merge(spec_genes_w_ids, rbind(cbind( ensembl_gene_id=names(results_list$drerio$spec_results[[i]]$spec_mat_subset),
-                                   weighted_or_flat="weighted",data.frame(specificity=signif(results_list$drerio$spec_results[[i]]$spec_mat_subset,3) )),
-                                  cbind( ensembl_gene_id=names(results_list$drerio$spec_results[[i+4]]$spec_mat_subset),
-                                   weighted_or_flat="flat",data.frame(specificity=signif(results_list$drerio$spec_results[[i+4]]$spec_mat_subset,3) ))))
+    temp_list[[paste("mouse_",stringr::str_replace(names(results_list$mmusculus$spec_results)[i],"__weighted_(TRUE|FALSE)__balanced_FALSE__rep_1",""),sep="")]] <-
+    merge(spec_genes_w_ids, rbind(cbind( ensembl_gene_id=names(results_list$mmusculus$spec_results[[i]]$spec_mat_subset),
+                                   weighted_or_flat="weighted",data.frame(specificity=signif(results_list$mmusculus$spec_results[[i]]$spec_mat_subset,3) )),
+                                  cbind( ensembl_gene_id=names(results_list$mmusculus$spec_results[[i+4]]$spec_mat_subset),
+                                   weighted_or_flat="flat",data.frame(specificity=signif(results_list$mmusculus$spec_results[[i+4]]$spec_mat_subset,3) ))))
   }
   
 }
 
-filename <- paste(figures_dir, "/specificity_scores_full_zebrafish.xlsx",sep = "")
+filename <- paste(figures_dir, "/specificity_scores_full_mouse.xlsx",sep = "")
 write_xlsx(temp_list, filename)
 
 
