@@ -544,7 +544,7 @@ ggplot(df_lnc_pc[which(df_lnc_pc$measure == "Zscore"),], aes(x=spec_val, color=w
 ggsave(filename="./Figures/lncRNA_v_proteinCoding_Zscore.png",
        plot=last_plot(),
        device = "png",
-       width = 6, height=5/3, units="in",
+       width = 6, height=2.3, units="in",
        dpi=250)
 
 ```
