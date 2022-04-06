@@ -339,6 +339,16 @@ balanced_v_unbalanced_cor <- foreach(i=1:length(which_brain), .combine=rbind) %d
   balanced_v_unbalanced_cor
 }
 write.csv(balanced_v_unbalanced_cor, file = paste(figures_dir,"/balanced_v_unbalanced_cor_table.csv",sep = ""))
+
+for(m in unique(balanced_v_unbalanced_cor$measure)){
+  flat_cor <- balanced_v_unbalanced_cor[which(balanced_v_unbalanced_cor$measure==m & 
+                                           balanced_v_unbalanced_cor$weighted),]
+  weight_cor <- balanced_v_unbalanced_cor[which(balanced_v_unbalanced_cor$measure==m & 
+                                           !balanced_v_unbalanced_cor$weighted),]
+  print(m)
+  print(t.test(flat_cor$cor, weight_cor$cor, paired = T, alternative = "greater"))
+}
+
 ```
 
 

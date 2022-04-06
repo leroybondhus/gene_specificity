@@ -668,6 +668,22 @@ for(results_list_id in 1:length(results_list)){
 }
 
 #write.csv(result_plot_df_list$balanced_v_unbalanced_cor, file=paste(figures_dir,"/balanced_v_unbalanced_model_org_cor_table.csv",sep=""))
+balanced_v_unbalanced_cor <- result_plot_df_list$balanced_v_unbalanced_cor
+for(o in unique(balanced_v_unbalanced_cor$dataset)){
+  for(m in unique(balanced_v_unbalanced_cor$measure)){
+    flat_cor <- balanced_v_unbalanced_cor[which(balanced_v_unbalanced_cor$dataset==o &
+                                                  balanced_v_unbalanced_cor$measure==m &
+                                                  balanced_v_unbalanced_cor$weighted),]
+    weight_cor <- balanced_v_unbalanced_cor[which(balanced_v_unbalanced_cor$dataset==o &
+                                                    balanced_v_unbalanced_cor$measure==m &
+                                                    !balanced_v_unbalanced_cor$weighted),]
+    print(o);print(m)
+    print(t.test(flat_cor$cor, weight_cor$cor, paired = T, alternative = "greater"))
+  }
+}
+
+
+
 
 which <- which(result_plot_df_list$balanced_v_unbalanced$dataset == "mmusculus" &
                  result_plot_df_list$balanced_v_unbalanced$rep == 1)
